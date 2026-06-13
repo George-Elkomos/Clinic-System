@@ -1,0 +1,49 @@
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+.shell__header {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg); border-bottom: 2px solid var(--border);
+  flex-wrap: wrap;
+}
+.shell__brand { font-size: var(--font-h3); font-weight: 700; color: var(--primary); margin: 0; }
+.shell__spacer { flex: 1; }
+.shell__user { color: var(--text-muted); font-size: var(--font-small); }
+
+.shell__body { display: flex; flex: 1; align-items: flex-start; }
+.shell__nav {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-4); min-width: 230px;
+  background: var(--surface); border-inline-end: 1px solid var(--border);
+}
+.shell__main { flex: 1; padding: var(--space-5); width: 100%; }
+
+.navlink {
+  display: block; padding: var(--space-3) var(--space-4);
+  min-height: var(--tap-min); border-radius: var(--radius);
+  color: var(--text); text-decoration: none; font-size: var(--font-action);
+  border: 2px solid transparent;
+}
+.navlink:hover { background: var(--surface-2); }
+.navlink--active { background: var(--primary); color: var(--on-primary); }
+
+/* Notification bell */
+.bell { position: relative; }
+.bell__count {
+  position: absolute; inset-block-start: -4px; inset-inline-end: -4px;
+  background: var(--danger); color: var(--on-danger);
+  border-radius: 999px; min-width: 22px; height: 22px;
+  font-size: 13px; display: flex; align-items: center; justify-content: center; padding: 0 4px;
+}
+.bell__panel {
+  position: absolute; inset-block-start: calc(100% + 6px); inset-inline-end: 0;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); width: 340px; max-height: 420px; overflow-y: auto; z-index: 1200; padding: var(--space-3);
+}
+.bell__item { padding: var(--space-3); border-bottom: 1px solid var(--surface-2); }
+.bell__item strong { display: block; }
+
+@media (max-width: 760px) {
+  .shell__body { flex-direction: column; }
+  .shell__nav { flex-direction: row; flex-wrap: wrap; width: 100%; border-inline-end: none; border-bottom: 1px solid var(--border); }
+}

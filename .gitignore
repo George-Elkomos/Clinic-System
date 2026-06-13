@@ -1,0 +1,26 @@
+# --- Python / Django ---
+Backend/.venv/
+__pycache__/
+*.py[cod]
+Backend/db.sqlite3
+Backend/db.sqlite3-wal
+Backend/db.sqlite3-shm
+Backend/.env
+Backend/media/
+Backend/staticfiles/
+.pytest_cache/
+
+# --- Node / Vite ---
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.vite/
+*.local
+
+# --- Dev runner ---
+.run/
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

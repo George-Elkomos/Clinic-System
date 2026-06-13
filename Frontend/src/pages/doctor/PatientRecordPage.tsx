@@ -1,0 +1,296 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
+import { Button } from '../../components/primitives/Button'
+import { Card } from '../../components/primitives/Card'
+import { FormField } from '../../components/primitives/FormField'
+import { Select } from '../../components/primitives/Select'
+import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { useToast } from '../../components/primitives/Toast'
+import { useLanguage } from '../../hooks/useLanguage'
+import { openBlob, saveBlob } from '../../lib/download'
+import { formatDate } from '../../lib/format'
+import { errorMessage } from '../../services/apiClient'
+import { authApi } from '../../services/auth.api'
+import { medicalApi } from '../../services/medical.api'
+import type { PrescriptionItem } from '../../services/types'
+
+// ---- Records ---------------------------------------------------------------
+function RecordsSection({ patientId }: { patientId: number }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const { showToast } = useToast()
+  const qc = useQueryClient()
+  const [form, setForm] = useState({ chief_complaint: '', diagnosis: '', treatment_plan: '' })
+
+  const { data: records = [] } = useQuery({
+    queryKey: ['records', patientId],
+    queryFn: () => medicalApi.records(patientId),
+  })
+
+  const add = useMutation({
+    mutationFn: () => medicalApi.createRecord({ patient: patientId, ...form }),
+    onSuccess: () => {
+      showToast(t('medical.recordSaved'), 'success')
+      setForm({ chief_complaint: '', diagnosis: '', treatment_plan: '' })
+      qc.invalidateQueries({ queryKey: ['records', patientId] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  return (
+    <Card title={t('medical.records')}>
+      {records.length === 0 ? <p>{t('medical.noRecords')}</p> : records.map((r) => (
+        <div key={r.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
+          <strong>{t('medical.version', { n: r.version })}{r.is_current ? ` · ${t('medical.current')}` : ''}</strong>
+          <span style={{ color: 'var(--text-muted)' }}> · {formatDate(r.created_at, language)}</span>
+          {r.diagnosis && <div>{t('medical.diagnosis')}: {r.diagnosis}</div>}
+          {r.treatment_plan && <div>{t('medical.treatmentPlan')}: {r.treatment_plan}</div>}
+        </div>
+      ))}
+      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.addRecord')}</h3>
+      <FormField label={t('medical.chiefComplaint')}>
+        {(p) => <input {...p} value={form.chief_complaint} onChange={(e) => setForm((f) => ({ ...f, chief_complaint: e.target.value }))} />}
+      </FormField>
+      <FormField label={t('medical.diagnosis')}>
+        {(p) => <textarea {...p} rows={2} value={form.diagnosis} onChange={(e) => setForm((f) => ({ ...f, diagnosis: e.target.value }))} />}
+      </FormField>
+      <FormField label={t('medical.treatmentPlan')}>
+        {(p) => <textarea {...p} rows={2} value={form.treatment_plan} onChange={(e) => setForm((f) => ({ ...f, treatment_plan: e.target.value }))} />}
+      </FormField>
+      <Button loading={add.isPending} onClick={() => add.mutate()}>{t('medical.addRecord')}</Button>
+    </Card>
+  )
+}
+
+// ---- Clinical notes --------------------------------------------------------
+function NotesSection({ patientId, categories }: { patientId: number; categories: { id: number; name: string }[] }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const { showToast } = useToast()
+  const qc = useQueryClient()
+  const [category, setCategory] = useState<number | ''>(categories[0]?.id ?? '')
+  const [body, setBody] = useState('')
+
+  const { data: notes = [] } = useQuery({
+    queryKey: ['notes', patientId],
+    queryFn: () => medicalApi.notes(patientId),
+  })
+
+  const add = useMutation({
+    mutationFn: () => medicalApi.createNote({ patient: patientId, specialty_category: Number(category), body }),
+    onSuccess: () => {
+      showToast(t('medical.noteSaved'), 'success')
+      setBody('')
+      qc.invalidateQueries({ queryKey: ['notes', patientId] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  return (
+    <Card title={t('medical.notes')}>
+      {notes.length === 0 ? <p>{t('medical.noNotes')}</p> : notes.map((n) => (
+        <div key={n.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
+          <div style={{ color: 'var(--text-muted)' }}>{n.specialty_category_name} · {n.doctor_name} · {formatDate(n.created_at, language)}</div>
+          <div>{n.body}</div>
+        </div>
+      ))}
+      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.addNote')}</h3>
+      <FormField label={t('medical.specialtyCategory')} hint={t('medical.noteSpecialtyHint')}>
+        {(p) => (
+          <Select
+            id={p.id}
+            options={categories.map((c) => ({ value: c.id, label: c.name }))}
+            value={category}
+            onChange={(v) => setCategory(Array.isArray(v) || v === '' ? '' : Number(v))}
+          />
+        )}
+      </FormField>
+      <FormField label={t('medical.noteBody')}>
+        {(p) => <textarea {...p} rows={3} value={body} onChange={(e) => setBody(e.target.value)} />}
+      </FormField>
+      <Button loading={add.isPending} disabled={!category || !body} onClick={() => add.mutate()}>{t('medical.addNote')}</Button>
+    </Card>
+  )
+}
+
+// ---- Prescriptions ---------------------------------------------------------
+const EMPTY_ITEM: PrescriptionItem = { drug_name: '', dosage: '', frequency: '', duration: '', instructions: '' }
+
+function PrescriptionsSection({ patientId }: { patientId: number }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const { showToast } = useToast()
+  const qc = useQueryClient()
+  const [notes, setNotes] = useState('')
+  const [items, setItems] = useState<PrescriptionItem[]>([{ ...EMPTY_ITEM }])
+
+  const { data: prescriptions = [] } = useQuery({
+    queryKey: ['prescriptions', patientId],
+    queryFn: () => medicalApi.prescriptions(patientId),
+  })
+
+  const issue = useMutation({
+    mutationFn: () => medicalApi.createPrescription({ patient: patientId, notes, items: items.filter((i) => i.drug_name) }),
+    onSuccess: () => {
+      showToast(t('medical.prescriptionIssued'), 'success')
+      setNotes(''); setItems([{ ...EMPTY_ITEM }])
+      qc.invalidateQueries({ queryKey: ['prescriptions', patientId] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const openPdf = async (id: number) => {
+    try { openBlob(await medicalApi.prescriptionPdf(id)) } catch (err) { showToast(errorMessage(err), 'error') }
+  }
+
+  const setItem = (idx: number, key: keyof PrescriptionItem, value: string) =>
+    setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, [key]: value } : it)))
+
+  return (
+    <Card title={t('medical.prescriptions')}>
+      {prescriptions.length === 0 ? <p>{t('medical.noPrescriptions')}</p> : prescriptions.map((p) => (
+        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <div>
+            <strong>{t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}</strong>
+            <div style={{ color: 'var(--text-muted)' }}>{p.items.map((i) => i.drug_name).join(', ')}</div>
+          </div>
+          <Button variant="secondary" onClick={() => openPdf(p.id)}>{t('medical.openPdf')}</Button>
+        </div>
+      ))}
+
+      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.newPrescription')}</h3>
+      {items.map((it, idx) => (
+        <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}>
+          <div style={{ flex: 2, minWidth: 140 }}><FormField label={t('medical.medication')}>{(p) => <input {...p} value={it.drug_name} onChange={(e) => setItem(idx, 'drug_name', e.target.value)} />}</FormField></div>
+          <div style={{ flex: 1, minWidth: 90 }}><FormField label={t('medical.dosage')}>{(p) => <input {...p} value={it.dosage} onChange={(e) => setItem(idx, 'dosage', e.target.value)} />}</FormField></div>
+          <div style={{ flex: 1, minWidth: 110 }}><FormField label={t('medical.frequency')}>{(p) => <input {...p} value={it.frequency} onChange={(e) => setItem(idx, 'frequency', e.target.value)} />}</FormField></div>
+          <div style={{ flex: 1, minWidth: 90 }}><FormField label={t('medical.duration')}>{(p) => <input {...p} value={it.duration} onChange={(e) => setItem(idx, 'duration', e.target.value)} />}</FormField></div>
+          {items.length > 1 && <Button variant="secondary" onClick={() => setItems((arr) => arr.filter((_, i) => i !== idx))}>{t('medical.removeItem')}</Button>}
+        </div>
+      ))}
+      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, { ...EMPTY_ITEM }])}>{t('medical.addItem')}</Button>
+      <FormField label={t('medical.instructions')}>
+        {(p) => <textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
+      </FormField>
+      <Button loading={issue.isPending} disabled={!items.some((i) => i.drug_name)} onClick={() => issue.mutate()}>{t('medical.issuePrescription')}</Button>
+    </Card>
+  )
+}
+
+// ---- Scans / Labs ----------------------------------------------------------
+function ScansLabsSection({ patientId }: { patientId: number }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const { showToast } = useToast()
+  const qc = useQueryClient()
+  const [file, setFile] = useState<File | null>(null)
+  const [category, setCategory] = useState('XRAY')
+
+  const { data: scans = [] } = useQuery({ queryKey: ['scans', patientId], queryFn: () => medicalApi.scans(patientId) })
+  const { data: labs = [] } = useQuery({ queryKey: ['labs', patientId], queryFn: () => medicalApi.labs(patientId) })
+
+  const upload = useMutation({
+    mutationFn: () => {
+      const form = new FormData()
+      form.append('patient', String(patientId))
+      form.append('category', category)
+      if (file) form.append('file', file)
+      return medicalApi.uploadScan(form)
+    },
+    onSuccess: () => {
+      showToast(t('medical.uploaded'), 'success'); setFile(null)
+      qc.invalidateQueries({ queryKey: ['scans', patientId] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const download = async (id: number, name: string) => {
+    try { saveBlob(await medicalApi.downloadScan(id), name || `scan-${id}`) } catch (err) { showToast(errorMessage(err), 'error') }
+  }
+
+  return (
+    <Card title={`${t('medical.scans')} / ${t('medical.labs')}`}>
+      {scans.map((s) => (
+        <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--surface-2)' }}>
+          <span><strong>{s.category}</strong> · {s.original_filename} · {formatDate(s.created_at, language)}</span>
+          <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
+        </div>
+      ))}
+      {labs.map((l) => (
+        <div key={`l${l.id}`} style={{ padding: 'var(--space-2) 0', borderBottom: '1px solid var(--surface-2)' }}>
+          <strong>{l.test_name}</strong>: {l.result_value} {l.unit}
+        </div>
+      ))}
+      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.uploadScan')}</h3>
+      <FormField label={t('medical.category')}>
+        {(p) => (
+          <Select
+            id={p.id}
+            options={['XRAY', 'MRI', 'CT', 'ULTRASOUND', 'DICOM', 'OTHER'].map((c) => ({ value: c, label: c }))}
+            value={category}
+            onChange={(v) => setCategory(Array.isArray(v) ? 'XRAY' : String(v))}
+          />
+        )}
+      </FormField>
+      <FormField label={t('medical.file')} hint={t('medical.fileHint')}>
+        {(p) => <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
+      </FormField>
+      <Button loading={upload.isPending} disabled={!file} onClick={() => upload.mutate()}>{t('medical.uploadScan')}</Button>
+    </Card>
+  )
+}
+
+// ---- Page ------------------------------------------------------------------
+export function PatientRecordPage() {
+  const { t } = useTranslation()
+  const [patientId, setPatientId] = useState<number | ''>('')
+
+  const { data: patients, isLoading } = useQuery({ queryKey: ['my-patients'], queryFn: medicalApi.myPatients })
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: authApi.me })
+
+  const categories = useMemo(() => {
+    const map = new Map<number, string>()
+    me?.doctor_profile?.specialties_detail.forEach((s) => map.set(s.category, s.category_name))
+    return Array.from(map, ([id, name]) => ({ id, name }))
+  }, [me])
+
+  if (isLoading) return <CenteredSpinner />
+
+  return (
+    <div>
+      <Breadcrumbs trail={[{ label: t('nav.patients') }]} />
+      <h1>{t('nav.patients')}</h1>
+
+      {(patients ?? []).length === 0 ? (
+        <Card><p>{t('medical.noPatients')}</p></Card>
+      ) : (
+        <Card>
+          <FormField label={t('medical.selectPatient')}>
+            {(p) => (
+              <Select
+                id={p.id}
+                options={(patients ?? []).map((pt) => ({ value: pt.id, label: pt.full_name || pt.email || String(pt.id) }))}
+                value={patientId}
+                onChange={(v) => setPatientId(Array.isArray(v) || v === '' ? '' : Number(v))}
+                placeholder="—"
+                searchable
+              />
+            )}
+          </FormField>
+        </Card>
+      )}
+
+      {patientId !== '' && (
+        <>
+          <RecordsSection patientId={patientId} />
+          <NotesSection patientId={patientId} categories={categories} />
+          <PrescriptionsSection patientId={patientId} />
+          <ScansLabsSection patientId={patientId} />
+        </>
+      )}
+    </div>
+  )
+}

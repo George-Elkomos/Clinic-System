@@ -1,0 +1,26 @@
+# Clinic Management System — Backend dependencies
+# Verified for Python 3.14.0 on Windows (June 2026). Always install from PyPI wheels.
+
+# --- Core framework ---
+Django==5.2.8
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+
+# --- API infrastructure ---
+django-cors-headers==4.9.0
+django-filter==25.2
+django-environ==0.13.0
+
+# --- Files / PDF ---
+Pillow==12.2.0          # cp314 wheel — image uploads + logo compositing
+reportlab==4.5.1        # pure-Python — ALL PDFs (prescriptions, reports)
+
+# --- Audit (optional history on MedicalRecord only) ---
+django-simple-history==3.11.0
+
+# --- Optional SMS / WhatsApp (feature-flagged off by default) ---
+twilio==9.10.9          # SMS + WhatsApp via Twilio; feature-gated by SMS_ENABLED / WHATSAPP_ENABLED
+
+# --- Dev / test ---
+pytest==8.4.1
+pytest-django==4.11.1

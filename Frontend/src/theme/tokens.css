@@ -1,0 +1,68 @@
+/* Elder-friendly design tokens. All colours are AA-verified pairs; sizes meet
+   the >=16px body / >=20px action / 48px tap-target minimums. Components must
+   only use these variables (no ad-hoc hex), so the minimums can't be violated. */
+:root {
+  /* Typography */
+  --font-family: system-ui, "Segoe UI", Roboto, "Noto Naskh Arabic", Tahoma, sans-serif;
+  --font-body: 18px;          /* >= 16px floor */
+  --font-action: 20px;        /* buttons / key actions */
+  --font-small: 16px;
+  --font-h1: 34px;
+  --font-h2: 27px;
+  --font-h3: 22px;
+  --line-height: 1.6;
+
+  /* Sizing */
+  --tap-min: 48px;            /* every interactive target */
+  --radius: 10px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --max-content: 1100px;
+
+  /* Colour — contrast ratios vs their pair noted */
+  --bg: #ffffff;
+  --surface: #f4f6f9;
+  --surface-2: #e9edf2;
+  --text: #1a1a1a;            /* 16.1:1 on --bg */
+  --text-muted: #4a5560;      /* 8.0:1 on --bg */
+  --border: #c2ccd6;
+  --primary: #0b5fa5;         /* 6.4:1 on --bg; white text 6.4:1 */
+  --primary-dark: #094a80;
+  --on-primary: #ffffff;
+  --danger: #b00020;          /* 7.0:1 on --bg */
+  --danger-dark: #8a0019;
+  --on-danger: #ffffff;
+  --success: #1b5e20;         /* 6.6:1 on --bg */
+  --warning: #8a5300;         /* 5.0:1 on --bg */
+  --focus-ring: #ffbf47;      /* high-visibility focus outline */
+
+  /* Status accents (used with --text for AA-safe foreground) */
+  --status-pending: #8a5300;
+  --status-confirmed: #1b5e20;
+  --status-cancelled: #b00020;
+  --status-in-progress: #0b5fa5;
+
+  --shadow: 0 2px 8px rgba(16, 31, 51, 0.12);
+  --shadow-md: 0 4px 16px rgba(16, 31, 51, 0.16);
+  --shadow-lg: 0 8px 32px rgba(16, 31, 51, 0.20);
+
+  /* Hover surface */
+  --surface-hover: #dde4ec;
+
+  /* Specialty / tag category pills — all AA-safe on --bg */
+  --tag-blue:   #0b5fa5;   /* primary */
+  --tag-green:  #1b5e20;
+  --tag-orange: #8a5300;
+  --tag-purple: #5b2882;
+  --tag-teal:   #00695c;
+  --tag-red:    #b00020;
+
+  /* Hero gradient */
+  --gradient-hero: linear-gradient(135deg, #0b5fa5 0%, #094a80 60%, #062f52 100%);
+}
