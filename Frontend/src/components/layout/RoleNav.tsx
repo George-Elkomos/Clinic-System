@@ -40,10 +40,35 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
 }
 
+const NAV_ICONS: Record<string, string> = {
+  'nav.dashboard':       '🏠',
+  'nav.bookAppointment': '📅',
+  'nav.myAppointments':  '📋',
+  'nav.medicalHistory':  '🩺',
+  'nav.scansLabs':       '🔬',
+  'nav.prescriptions':   '💊',
+  'nav.liveQueue':       '⚡',
+  'nav.schedule':        '🗓',
+  'nav.appointments':    '📋',
+  'nav.patients':        '👤',
+  'nav.reviews':         '⭐',
+  'nav.appointmentDesk': '📥',
+  'nav.queueBoard':      '📊',
+  'nav.allPatients':     '👥',
+  'nav.absences':        '🚫',
+  'nav.doctors':         '🩺',
+  'nav.users':           '👥',
+  'nav.reports':         '📈',
+  'nav.auditLog':        '📜',
+}
+
 export function RoleNav({ role }: { role: Role }) {
   const { t } = useTranslation()
   return (
     <nav className="shell__nav" aria-label={t('nav.dashboard')}>
+      {/* Close button visible only on mobile */}
+      <label htmlFor="nav-open" className="nav-close-btn" aria-label={t('nav.close')}>✕</label>
+
       {NAV_BY_ROLE[role].map((item) => (
         <NavLink
           key={item.to}
@@ -51,7 +76,8 @@ export function RoleNav({ role }: { role: Role }) {
           end={item.to.split('/').length <= 2}
           className={({ isActive }) => `navlink ${isActive ? 'navlink--active' : ''}`}
         >
-          {t(item.key)}
+          <span className="navlink__icon" aria-hidden="true">{NAV_ICONS[item.key] ?? '•'}</span>
+          <span>{t(item.key)}</span>
         </NavLink>
       ))}
     </nav>

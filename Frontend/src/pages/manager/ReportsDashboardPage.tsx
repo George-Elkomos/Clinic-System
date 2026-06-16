@@ -23,9 +23,9 @@ function Bar({ pct }: { pct: number }) {
 
 function Kpi({ label, value }: { label: string; value: number | string }) {
   return (
-    <div style={{ flex: 1, minWidth: 120 }}>
-      <div style={{ fontSize: 'var(--font-h2)', fontWeight: 700 }}>{value}</div>
-      <div style={{ color: 'var(--text-muted)' }}>{label}</div>
+    <div className="kpi-card">
+      <div className="kpi-card__value">{value}</div>
+      <div className="kpi-card__label">{label}</div>
     </div>
   )
 }
@@ -56,8 +56,8 @@ export function ReportsDashboardPage() {
       <h1>{t('reports.title')}</h1>
 
       <Card>
-        <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 180 }}>
+        <div className="filter-bar">
+          <div className="filter-bar__field">
             <FormField label={t('reports.period')}>
               {(p) => (
                 <Select
@@ -73,8 +73,10 @@ export function ReportsDashboardPage() {
               )}
             </FormField>
           </div>
-          <Button variant="secondary" onClick={() => exportReport('pdf')}>{t('reports.exportPdf')}</Button>
-          <Button variant="secondary" onClick={() => exportReport('csv')}>{t('reports.exportCsv')}</Button>
+          <div className="filter-bar__actions">
+            <Button variant="secondary" onClick={() => exportReport('pdf')}>{t('reports.exportPdf')}</Button>
+            <Button variant="secondary" onClick={() => exportReport('csv')}>{t('reports.exportCsv')}</Button>
+          </div>
         </div>
       </Card>
 
@@ -83,7 +85,7 @@ export function ReportsDashboardPage() {
       ) : (
         <>
           <Card title={t('reports.overall')}>
-            <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+            <div className="kpi-row">
               <Kpi label={t('reports.total')} value={data.overall.total} />
               <Kpi label={t('reports.completed')} value={data.overall.completed} />
               <Kpi label={t('reports.noShow')} value={data.overall.no_show} />

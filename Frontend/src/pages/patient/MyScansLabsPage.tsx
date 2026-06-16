@@ -52,7 +52,7 @@ export function MyScansLabsPage() {
   }
 
   return (
-    <div>
+    <div className="scans-page">
       <Breadcrumbs trail={[{ label: t('nav.scansLabs') }]} />
       <h1>{t('nav.scansLabs')}</h1>
 
@@ -68,18 +68,22 @@ export function MyScansLabsPage() {
           )}
         </FormField>
         <FormField label={t('medical.file')} hint={t('medical.fileHint')}>
-          {(p) => <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
+          {(p) => (
+            <div className="file-input-wrap">
+              <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </div>
+          )}
         </FormField>
-        <Button loading={upload.isPending} disabled={!file} onClick={() => upload.mutate()}>{t('medical.uploadScan')}</Button>
+        <Button loading={upload.isPending} disabled={!file} onClick={() => upload.mutate()} className="medical-upload-submit">{t('medical.uploadScan')}</Button>
       </Card>
 
       <Card title={t('medical.scans')}>
         {scansLoading ? <CenteredSpinner /> : scans.length === 0 ? <p>{t('medical.noScans')}</p> : (
           scans.map((s) => (
-            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-              <div>
+            <div key={s.id} className="appt-list-row">
+              <div className="appt-list-info">
                 <strong>{s.category}</strong> · {s.original_filename}
-                <div style={{ color: 'var(--text-muted)' }}>{formatDate(s.created_at, language)} · {t('medical.uploadedBy', { name: s.uploaded_by_name })}</div>
+                <div className="medical-list-meta">{formatDate(s.created_at, language)} · {t('medical.uploadedBy', { name: s.uploaded_by_name })}</div>
               </div>
               <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
             </div>
@@ -90,9 +94,9 @@ export function MyScansLabsPage() {
       <Card title={t('medical.labs')}>
         {labsLoading ? <CenteredSpinner /> : labs.length === 0 ? <p>{t('medical.noLabs')}</p> : (
           labs.map((l) => (
-            <div key={l.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
+            <div key={l.id} className="medical-lab-row">
               <strong>{l.test_name}</strong> {l.is_abnormal && <span className="badge badge--alert">!</span>}
-              <div style={{ color: 'var(--text-muted)' }}>
+              <div className="medical-list-meta">
                 {l.result_value} {l.unit} · {l.result_date ? formatDate(l.result_date, language) : ''}
               </div>
             </div>

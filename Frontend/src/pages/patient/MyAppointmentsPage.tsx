@@ -91,7 +91,7 @@ function LeaveReviewBox({ appointmentId, onDone }: { appointmentId: number; onDo
   })
 
   return (
-    <div style={{ marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--surface-2)' }}>
+    <div className="appt-review-box">
       <FormField label={t('reviews.yourRating')}>
         {() => <div><StarRating value={rating} onChange={setRating} /></div>}
       </FormField>
@@ -169,14 +169,14 @@ export function MyAppointmentsPage() {
       {suggestedFollowups.length > 0 && (
         <Card title={t('followups.title')}>
           {suggestedFollowups.map((f) => (
-            <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-              <div>
+            <div key={f.id} className="appt-list-row">
+              <div className="appt-list-info">
                 <strong>{f.doctor_name}</strong>
-                <div style={{ color: 'var(--text-muted)' }}>
+                <div className="appt-list-meta">
                   {f.suggested_start ? `${t('followups.suggestedTime')}: ${formatDateTime(f.suggested_start, language)}` : t('followups.noSlot')}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <div className="appt-list-actions">
                 {f.suggested_slot && <Button onClick={() => confirmFollowup.mutate(f.id)}>{t('followups.confirm')}</Button>}
                 <Button variant="secondary" onClick={() => dismissFollowup.mutate(f.id)}>{t('followups.dismiss')}</Button>
               </div>
@@ -192,13 +192,13 @@ export function MyAppointmentsPage() {
       ) : (
         appointments.map((a) => (
           <Card key={a.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-              <div>
-                <h3 style={{ margin: 0 }}>{a.doctor_name}</h3>
-                <div style={{ color: 'var(--text-muted)' }}>{formatDateTime(a.scheduled_start, language)}</div>
-                {a.reason && <div>{t('appointments.reason')}: {a.reason}</div>}
+            <div className="appt-list-row appt-list-row--card">
+              <div className="appt-list-info">
+                <h3 className="appt-list-name">{a.doctor_name}</h3>
+                <div className="appt-list-meta">{formatDateTime(a.scheduled_start, language)}</div>
+                {a.reason && <div className="appt-list-reason">{t('appointments.reason')}: {a.reason}</div>}
               </div>
-              <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+              <div className="appt-list-actions">
                 <StatusBadge status={a.status} />
                 {['PENDING', 'CONFIRMED'].includes(a.status) && (
                   <Button variant="danger" onClick={() => onCancel(a)} loading={cancel.isPending && cancel.variables === a.id}>
@@ -218,10 +218,10 @@ export function MyAppointmentsPage() {
       {waitlist.length > 0 && (
         <Card title={t('waitlist.title')}>
           {waitlist.map((w) => (
-            <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-              <div>
+            <div key={w.id} className="appt-list-row">
+              <div className="appt-list-info">
                 <strong>{w.doctor_name}</strong>
-                <div style={{ color: 'var(--text-muted)' }}>
+                <div className="appt-list-meta">
                   {w.status === 'NOTIFIED' ? t('waitlist.statusNotified') : t('waitlist.statusWaiting')}
                 </div>
               </div>

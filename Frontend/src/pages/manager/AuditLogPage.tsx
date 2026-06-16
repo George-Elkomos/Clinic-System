@@ -51,11 +51,11 @@ export function AuditLogPage() {
       <h1>{t('audit.title')}</h1>
 
       <Card>
-        <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <div style={{ flex: 2, minWidth: 220 }}>
+        <div className="filter-bar">
+          <div className="filter-bar__field audit-filter__search">
             <SearchInput onSearch={setSearch} placeholder={t('audit.searchPlaceholder')} />
           </div>
-          <div style={{ flex: 1, minWidth: 180 }}>
+          <div className="filter-bar__field">
             <FormField label={t('audit.filterAction')}>
               {(p) => (
                 <Select
@@ -80,16 +80,23 @@ export function AuditLogPage() {
       ) : (
         rows.map((e) => (
           <Card key={e.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-              <strong>{e.action_display} · {e.model_name}</strong>
-              <span style={{ color: 'var(--text-muted)' }}>{formatDateTime(e.timestamp, language)}</span>
+            <div className="audit-card__header">
+              <strong className="audit-card__title">{e.action_display} · {e.model_name}</strong>
+              <span className="audit-card__time">{formatDateTime(e.timestamp, language)}</span>
             </div>
-            <div>{t('audit.actor')}: {e.actor_email ?? t('common.none')} · {t('audit.object')}: {e.object_repr}</div>
+            <div className="audit-card__meta">
+              {t('audit.actor')}: <span className="audit-card__meta-value">{e.actor_email ?? t('common.none')}</span>
+              {' · '}
+              {t('audit.object')}: <span className="audit-card__meta-value">{e.object_repr}</span>
+            </div>
             {Object.keys(e.changes || {}).length > 0 && (
-              <div style={{ marginTop: 'var(--space-2)', color: 'var(--text-muted)', fontSize: 'var(--font-small)' }}>
+              <div className="audit-changes">
                 {Object.entries(e.changes).map(([field, diff]) => (
-                  <div key={field}>
-                    {field}: <em>{String(diff.old)}</em> → <strong>{String(diff.new)}</strong>
+                  <div key={field} className="audit-diff-item">
+                    <span className="audit-diff-item__field">{field}</span>
+                    <span className="audit-diff-item__old">{String(diff.old)}</span>
+                    <span className="audit-diff-item__arrow">→</span>
+                    <span className="audit-diff-item__new">{String(diff.new)}</span>
                   </div>
                 ))}
               </div>

@@ -151,7 +151,7 @@ export function UserManagementPage() {
                 <th>{t('auth.email')}</th>
                 <th>{t('auth.phone')}</th>
                 <th>{t('staff.status')}</th>
-                <th>{t('staff.joined')}</th>
+                <th className="col-hide-mobile">{t('staff.joined')}</th>
                 <th>{t('common.actions')}</th>
               </tr>
             </thead>
@@ -166,7 +166,7 @@ export function UserManagementPage() {
                       {user.is_active ? t('staff.active') : t('staff.inactive')}
                     </span>
                   </td>
-                  <td>{formatDate(user.date_joined, language)}</td>
+                  <td className="col-hide-mobile">{formatDate(user.date_joined, language)}</td>
                   <td>
                     <div className="user-table__actions">
                       <Button variant="secondary" onClick={() => setEditing(user)}>{t('common.edit')}</Button>

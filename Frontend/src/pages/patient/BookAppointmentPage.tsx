@@ -67,31 +67,33 @@ export function BookAppointmentPage() {
       <h1>{t('booking.title')}</h1>
 
       <Card>
-        <FormField label={t('booking.chooseDoctor')}>
-          {(p) => (
-            <Select
-              id={p.id}
-              options={(doctors?.results ?? []).map((d) => ({
-                value: d.id,
-                label: d.full_name + (d.specialties_detail[0] ? ` · ${d.specialties_detail[0].name}` : ''),
-              }))}
-              value={doctorId}
-              onChange={(v) => setDoctorId(Array.isArray(v) || v === '' ? '' : Number(v))}
-              placeholder="—"
-              searchable
-            />
-          )}
-        </FormField>
+        <div className="book-appt-form">
+          <FormField label={t('booking.chooseDoctor')}>
+            {(p) => (
+              <Select
+                id={p.id}
+                options={(doctors?.results ?? []).map((d) => ({
+                  value: d.id,
+                  label: d.full_name + (d.specialties_detail[0] ? ` · ${d.specialties_detail[0].name}` : ''),
+                }))}
+                value={doctorId}
+                onChange={(v) => setDoctorId(Array.isArray(v) || v === '' ? '' : Number(v))}
+                placeholder="—"
+                searchable
+              />
+            )}
+          </FormField>
 
-        <FormField label={t('booking.chooseDate')}>
-          {(p) => (
-            <input {...p} type="date" min={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} />
-          )}
-        </FormField>
+          <FormField label={t('booking.chooseDate')}>
+            {(p) => (
+              <input {...p} type="date" min={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} />
+            )}
+          </FormField>
 
-        <FormField label={t('booking.reason')}>
-          {(p) => <textarea {...p} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />}
-        </FormField>
+          <FormField label={t('booking.reason')}>
+            {(p) => <textarea {...p} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />}
+          </FormField>
+        </div>
       </Card>
 
       <Card title={t('booking.availableTimes')}>
@@ -102,13 +104,13 @@ export function BookAppointmentPage() {
         ) : (slots ?? []).length === 0 ? (
           <div>
             <p>{t('booking.noSlots')}</p>
-            <p style={{ color: 'var(--text-muted)' }}>{t('waitlist.joinHint')}</p>
+            <p className="book-hint">{t('waitlist.joinHint')}</p>
             <Button variant="secondary" loading={joinWaitlist.isPending} onClick={() => joinWaitlist.mutate()}>
               {t('waitlist.join')}
             </Button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+          <div className="book-slots-grid">
             {(slots ?? []).map((s) => (
               <Button
                 key={s.id}

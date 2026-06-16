@@ -29,12 +29,14 @@ export function PatientDashboard() {
       <h1>{t('dashboard.welcome', { name: user?.first_name || user?.email })}</h1>
       <p>{t('dashboard.patientIntro')}</p>
 
-      <Card title={t('dashboard.quickActions')}>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-          <Link to="/patient/book" className="btn btn--primary">{t('nav.bookAppointment')}</Link>
-          <Link to="/patient/appointments" className="btn btn--secondary">{t('nav.myAppointments')}</Link>
-        </div>
-      </Card>
+      <div className="patient-quick-actions">
+        <Card title={t('dashboard.quickActions')}>
+          <div className="patient-actions-row">
+            <Link to="/patient/book" className="btn btn--primary">{t('nav.bookAppointment')}</Link>
+            <Link to="/patient/appointments" className="btn btn--secondary">{t('nav.myAppointments')}</Link>
+          </div>
+        </Card>
+      </div>
 
       <Card title={t('dashboard.upcoming')}>
         {isLoading ? (
@@ -43,10 +45,10 @@ export function PatientDashboard() {
           <p>{t('appointments.none')}</p>
         ) : (
           upcoming.map((a) => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
-              <div>
+            <div key={a.id} className="patient-appt-row">
+              <div className="patient-appt-info">
                 <strong>{a.doctor_name}</strong>
-                <div style={{ color: 'var(--text-muted)' }}>{formatDateTime(a.scheduled_start, language)}</div>
+                <div className="patient-appt-date">{formatDateTime(a.scheduled_start, language)}</div>
               </div>
               <StatusBadge status={a.status} />
             </div>

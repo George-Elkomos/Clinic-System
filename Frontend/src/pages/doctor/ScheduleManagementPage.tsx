@@ -78,24 +78,24 @@ export function ScheduleManagementPage() {
             />
           )}
         </FormField>
-        <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 160 }}>
+        <div className="schedule-time-row">
+          <div className="schedule-time-field">
             <FormField label={t('schedule.startTime')}>
               {(p) => <input {...p} type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />}
             </FormField>
           </div>
-          <div style={{ flex: 1, minWidth: 160 }}>
+          <div className="schedule-time-field">
             <FormField label={t('schedule.endTime')}>
               {(p) => <input {...p} type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />}
             </FormField>
           </div>
-          <div style={{ flex: 1, minWidth: 160 }}>
+          <div className="schedule-time-field">
             <FormField label={t('schedule.slotDuration')}>
               {(p) => <input {...p} type="number" min={5} step={5} value={slotDuration} onChange={(e) => setSlotDuration(Number(e.target.value))} />}
             </FormField>
           </div>
         </div>
-        <Button loading={create.isPending} onClick={() => create.mutate()}>
+        <Button loading={create.isPending} onClick={() => create.mutate()} className="schedule-submit-btn">
           {create.isPending ? t('schedule.adding') : t('schedule.add')}
         </Button>
       </Card>
@@ -107,7 +107,7 @@ export function ScheduleManagementPage() {
           <p>{t('schedule.none')}</p>
         ) : (
           (schedules ?? []).map((s) => (
-            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
+            <div key={s.id} className="schedule-row">
               <span>
                 <strong>{t(`schedule.days.${s.weekday}`)}</strong> · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
               </span>

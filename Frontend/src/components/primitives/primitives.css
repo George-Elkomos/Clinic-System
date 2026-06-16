@@ -253,7 +253,15 @@
 .user-table th, .user-table td { padding: var(--space-3) var(--space-4); text-align: start; border-bottom: 1px solid var(--border); }
 .user-table th { background: var(--surface); font-weight: 700; font-size: var(--font-small); text-transform: uppercase; letter-spacing: 0.05em; }
 .user-table tr:hover td { background: var(--surface); }
-.user-table__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.user-table__actions {
+  display: flex; gap: var(--space-2); flex-wrap: nowrap; align-items: center;
+}
+.user-table__actions .btn {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-small);
+  min-height: 40px;
+  white-space: nowrap;
+}
 .inactive-row td { opacity: 0.55; }
 
 /* ---- Tab bar ---- */
@@ -288,3 +296,642 @@
 /* ---- Active / inactive user badge ---- */
 .badge--active   { border-color: var(--success); color: var(--success); }
 .badge--inactive { border-color: var(--text-muted); color: var(--text-muted); }
+
+/* ---- Quick actions row (card inner button group) ---- */
+.quick-actions {
+  display: flex; gap: var(--space-3); flex-wrap: wrap;
+  padding-block: var(--space-2);
+}
+
+/* Last column stays narrow */
+.user-table td:last-child,
+.user-table th:last-child { width: 1%; white-space: nowrap; }
+
+/* ---- Hide column on mobile ---- */
+.col-hide-mobile { /* always visible by default */ }
+
+/* ---- Language dropdown (custom — native <select> can't be styled) ---- */
+.lang-dropdown { position: relative; }
+
+.lang-dropdown__trigger {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px; border: 2px solid var(--border);
+  border-radius: var(--radius); background: var(--bg);
+  color: var(--text); font-size: var(--font-small);
+  font-family: inherit; cursor: pointer;
+  list-style: none; user-select: none; white-space: nowrap;
+}
+.lang-dropdown__trigger::-webkit-details-marker { display: none; }
+.lang-dropdown__trigger:hover { border-color: var(--primary); background: var(--surface); }
+.lang-dropdown[open] .lang-dropdown__trigger {
+  border-color: var(--primary);
+  border-end-start-radius: 0; border-end-end-radius: 0;
+}
+
+.lang-dropdown__arrow {
+  font-size: 11px; color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.lang-dropdown[open] .lang-dropdown__arrow { transform: rotate(180deg); }
+
+/* Panel — hidden by default; !important overrides the <details> UA stylesheet */
+.lang-dropdown__menu {
+  position: absolute; inset-block-start: calc(100% - 2px);
+  inset-inline-start: 0; inset-inline-end: 0;
+  display: none !important;
+  flex-direction: column;
+  background: var(--bg);
+  border: 2px solid var(--primary);
+  border-top: none;
+  border-end-start-radius: var(--radius); border-end-end-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 350;
+  padding: var(--space-1) 0;
+  overflow: hidden;
+}
+.lang-dropdown[open] .lang-dropdown__menu { display: flex !important; }
+
+.lang-dropdown__item {
+  display: block; width: 100%;
+  text-align: start;
+  padding: var(--space-2) var(--space-4);
+  background: none; border: none; cursor: pointer;
+  color: var(--text); font-size: var(--font-small);
+  font-family: inherit; min-height: var(--tap-min);
+  line-height: 1.4; border-radius: 0;
+}
+.lang-dropdown__item:hover  { background: var(--surface-2); color: var(--primary); }
+.lang-dropdown__item--active { color: var(--primary); font-weight: 700; background: var(--surface); }
+
+/* ---- Filter bar (period selector + export buttons) ---- */
+.filter-bar { display: flex; gap: var(--space-4); align-items: flex-end; flex-wrap: wrap; }
+.filter-bar__field { flex: 1; min-width: 180px; }
+.filter-bar__actions {
+  display: flex; gap: var(--space-3); align-items: center; flex-shrink: 0;
+  padding-bottom: var(--space-4); /* offset .field margin-bottom so buttons align with input */
+}
+
+/* ---- KPI stat cards ---- */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--space-4);
+}
+.kpi-card__value { font-size: var(--font-h2); font-weight: 700; line-height: 1.2; }
+.kpi-card__label { color: var(--text-muted); min-height: 2.6em; }
+
+/* ---- Page heading row (title + action button side by side) ---- */
+.page-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.page-heading-row h1 { margin-bottom: var(--space-1); }
+
+/* ---- Form grid (2-col on desktop, 1-col on mobile) ---- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 var(--space-5);
+}
+
+/* ---- Live Queue page ---- */
+
+/* Equal-height columns: stretch fills the row, card uses flex-column */
+.queue-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+/* Every direct child of the grid (panel wrapper divs) must be flex columns */
+.queue-grid > * { display: flex; flex-direction: column; }
+/* Cards inside panels fill their column and become flex columns too */
+.queue-grid .card {
+  flex: 1; display: flex; flex-direction: column;
+  margin-bottom: 0;
+}
+
+/* Current patient: single primary border on the card itself (no double-border) */
+.queue-card--current { display: flex; flex-direction: column; }
+.queue-card--current .card { border-color: var(--primary); border-width: 2px; }
+
+/* Waiting count badge */
+.queue-waiting-badge {
+  display: inline-flex; align-items: center;
+  background: var(--surface-2); color: var(--text);
+  border: 2px solid var(--border); border-radius: 999px;
+  padding: var(--space-1) var(--space-4);
+  font-weight: 700; font-size: var(--font-small); white-space: nowrap;
+}
+.queue-waiting-badge--active {
+  background: var(--primary); color: var(--on-primary); border-color: var(--primary);
+}
+
+/* Shared patient name style (h2/h3 across all three panels) */
+.queue-patient-name {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-h3); font-weight: 700; color: var(--text);
+}
+.queue-patient-name--muted { color: var(--text-muted); font-weight: 600; }
+
+/* Current patient: name + chips + badge on one flex row */
+.queue-patient-header {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-2); margin-bottom: var(--space-4);
+}
+.queue-patient-header .queue-patient-name { margin-bottom: 0; }
+
+/* Info chips (gender, age, blood type) */
+.queue-chip {
+  background: var(--surface-2); border-radius: var(--radius);
+  padding: 2px var(--space-3); font-size: var(--font-small);
+  font-weight: 600; white-space: nowrap; color: var(--text);
+}
+
+/* Muted metadata rows (phone, scheduled time, completed time) */
+.queue-panel-meta {
+  color: var(--text-muted); font-size: var(--font-small); margin-bottom: var(--space-3);
+}
+
+/* Reason text row */
+.queue-panel-reason { font-size: var(--font-small); margin-bottom: var(--space-3); }
+
+/* Action buttons — pushed to the bottom of the flex-column card */
+.queue-actions {
+  display: flex; gap: var(--space-2);
+  margin-top: auto; padding-top: var(--space-4); align-items: stretch;
+}
+.queue-actions .btn   { flex: 1; min-width: 100px; }
+.queue-actions a      { flex: 1; display: flex; min-width: 100px; }
+.queue-actions a .btn { width: 100%; }
+
+/* "Call Next" button — pushed to the bottom of the flex-column card */
+.queue-next-action         { margin-top: auto; padding-top: var(--space-4); }
+.queue-next-action .btn    { width: 100%; }
+
+/* Auto-refresh footer note */
+.queue-footer {
+  text-align: center; color: var(--text-muted); font-size: var(--font-small);
+  margin-top: var(--space-5); padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* ---- Schedule management page ---- */
+.schedule-time-row   { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.schedule-time-field { flex: 1; min-width: 160px; }
+.schedule-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--surface-2);
+}
+
+/* ---- Medical / Patient Records page ---- */
+
+/* Version history item */
+.medical-version-row {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+/* Version label + current badge + date on one flex row */
+.medical-version-header {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-2); margin-bottom: var(--space-2);
+}
+.medical-version-label { font-weight: 700; }
+.medical-version-date  { color: var(--text-muted); font-size: var(--font-small); }
+
+/* Diagnosis / treatment text under version header */
+.medical-version-detail {
+  font-size: var(--font-small); color: var(--text-muted); margin-top: var(--space-1);
+}
+
+/* "Add a new …" heading — clear visual break from history list */
+.medical-section-divider {
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 2px solid var(--border);
+  font-size: var(--font-h3);
+  margin-bottom: var(--space-4);
+}
+
+/* textarea padding + focus ring (supplements existing input styles) */
+.card textarea {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 2px solid var(--border);
+  width: 100%; resize: vertical;
+  font-family: inherit; font-size: var(--font-body);
+  background: var(--bg); color: var(--text); line-height: 1.5;
+}
+.card textarea:focus {
+  border-color: var(--primary);
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Submit button: margin below + full-width on mobile */
+.medical-form-submit { margin-top: var(--space-2); margin-bottom: var(--space-5); }
+
+/* Clinical note row */
+.medical-note-row {
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--surface-2);
+}
+.medical-note-meta {
+  color: var(--text-muted); font-size: var(--font-small); margin-bottom: var(--space-1);
+}
+
+/* Prescription history row */
+.medical-prescription-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--surface-2);
+  gap: var(--space-3); flex-wrap: wrap;
+}
+.medical-list-meta { color: var(--text-muted); font-size: var(--font-small); margin-top: var(--space-1); }
+
+/* Prescription drug item row */
+.medical-rx-item {
+  display: flex; gap: var(--space-4);
+  flex-wrap: wrap; align-items: flex-end;
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface); border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.medical-rx-field       { flex: 1; min-width: 90px; }
+.medical-rx-field--wide { flex: 2; min-width: 140px; }
+.medical-rx-field--mid  { flex: 1; min-width: 110px; }
+
+/* "Add medication" button — sits between the item rows and Instructions textarea */
+.medical-add-item-btn { margin-bottom: var(--space-5); }
+
+/* Scan / lab list rows */
+.medical-scan-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--surface-2);
+  gap: var(--space-3); flex-wrap: wrap;
+}
+.medical-lab-row {
+  padding: var(--space-3) var(--space-1);
+  border-bottom: 1px solid var(--surface-2);
+}
+
+/* ---- Reviews page ---- */
+
+/* Summary bar: stars + "X.X out of 5 (N reviews)" */
+.review-summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4);
+}
+.review-summary__label {
+  font-size: var(--font-body); font-weight: 700; color: var(--text);
+}
+
+/* Individual review card: stars on left, date on right */
+.review-card__header {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3);
+}
+.review-card__date {
+  color: var(--text-muted); font-size: var(--font-small);
+  white-space: nowrap; flex-shrink: 0;
+}
+
+/* Comment text: softer tone, generous line-height */
+.review-card__comment {
+  margin: 0; line-height: 1.65;
+  color: var(--text-muted); font-size: var(--font-body);
+}
+
+/* ---- Audit log page ---- */
+
+/* Offset .field's margin-bottom so the bare search input aligns with the labelled select */
+.audit-filter__search { padding-bottom: var(--space-4); }
+
+/* Card header: title + timestamp */
+.audit-card__header {
+  display: flex; justify-content: space-between;
+  align-items: baseline; flex-wrap: wrap; gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.audit-card__title { font-size: var(--font-body); }
+.audit-card__time  { color: var(--text-muted); font-size: var(--font-small); white-space: nowrap; flex-shrink: 0; }
+
+/* Actor / object meta row */
+.audit-card__meta { color: var(--text-muted); font-size: var(--font-small); margin-bottom: var(--space-2); }
+.audit-card__meta-value { color: var(--text); font-weight: 600; }
+
+/* Changes block */
+.audit-changes {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-2); border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+/* Individual field diff row */
+.audit-diff-item {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-2); font-size: var(--font-small); line-height: 1.5;
+}
+.audit-diff-item__field {
+  font-family: monospace; font-size: 13px;
+  background: var(--surface-2); color: var(--text);
+  padding: 1px var(--space-2); border-radius: var(--radius);
+  border: 1px solid var(--border); white-space: nowrap; font-weight: 600;
+}
+.audit-diff-item__old   { color: var(--danger); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.audit-diff-item__arrow { color: var(--text-muted); flex-shrink: 0; margin-inline: var(--space-2); }
+.audit-diff-item__new   { color: var(--success); font-weight: 700; }
+
+/* ---- Scans & Labs page (patient) ---- */
+/* Wider gaps between the three section cards */
+.scans-page .card { margin-bottom: var(--space-6); }
+
+/* ---- My Appointments page (patient) ---- */
+
+/* Shared row used in follow-up, appointment, and waitlist lists */
+.appt-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--surface-2);
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+/* Variant inside a Card: no top padding (card already has padding) */
+.appt-list-row--card { padding: 0; border-bottom: none; }
+
+.appt-list-info { flex: 1; min-width: 0; }
+.appt-list-name { margin: 0 0 var(--space-1); font-size: var(--font-h3); }
+.appt-list-meta { color: var(--text-muted); font-size: var(--font-small); margin-top: var(--space-1); }
+.appt-list-reason { font-size: var(--font-small); margin-top: var(--space-1); color: var(--text-muted); }
+
+/* Right-hand controls: badge + action buttons in a row */
+.appt-list-actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+/* Badge inside actions: prevent shrink */
+.appt-list-actions .badge { flex-shrink: 0; }
+
+/* Inline review/follow-up form appended below a card row */
+.appt-review-box {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--surface-2);
+}
+
+@media (max-width: 760px) {
+  .appt-list-row { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .appt-list-actions { width: 100%; flex-wrap: wrap; }
+  .appt-list-actions .btn { flex: 1; min-width: 120px; }
+}
+
+/* ---- Book Appointment page ---- */
+
+/* Vertical rhythm between form groups — overrides the per-field margin-bottom */
+.book-appt-form { display: flex; flex-direction: column; gap: var(--space-5); }
+.book-appt-form .field { margin-bottom: 0; }
+
+/* Available time-slot buttons */
+.book-slots-grid { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Waitlist hint text */
+.book-hint { color: var(--text-muted); margin-bottom: var(--space-3); }
+
+/* ---- Patient Dashboard ---- */
+
+/* Extra gap after the quick-actions card */
+.patient-quick-actions .card { margin-bottom: var(--space-6); }
+
+/* Action buttons row — uniform height, no text wrap */
+.patient-actions-row { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+.patient-actions-row .btn { white-space: nowrap; }
+
+/* Upcoming appointment rows */
+.patient-appt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--surface-2);
+}
+.patient-appt-info { flex: 1; min-width: 0; }
+.patient-appt-date { color: var(--text-muted); font-size: var(--font-small); margin-top: var(--space-1); }
+/* Keep badge from shrinking and give it a touch of right breathing room */
+.patient-appt-row .badge { flex-shrink: 0; margin-inline-end: var(--space-1); }
+
+/* ---- Custom file input ---- */
+.file-input-wrap {
+  display: block;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.file-input-wrap:focus-within {
+  border-color: var(--primary);
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.file-input-wrap input[type="file"] {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+  font-size: var(--font-small);
+  font-family: inherit;
+  color: var(--text-muted);
+}
+/* Standard pseudo-element (all modern browsers) */
+.file-input-wrap input[type="file"]::file-selector-button {
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-small);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-inline-end: var(--space-4);
+  min-height: 36px;
+  transition: background 0.15s ease;
+}
+.file-input-wrap input[type="file"]::file-selector-button:hover {
+  background: var(--primary-dark);
+}
+/* Webkit fallback (Safari, older Chrome) */
+.file-input-wrap input[type="file"]::-webkit-file-upload-button {
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-small);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  margin-inline-end: var(--space-4);
+  min-height: 36px;
+  transition: background 0.15s ease;
+}
+.file-input-wrap input[type="file"]::-webkit-file-upload-button:hover {
+  background: var(--primary-dark);
+}
+/* Extra breathing room above the upload submit button */
+.medical-upload-submit { margin-top: var(--space-5); }
+
+/* ---- Doctor Appointments page ---- */
+
+/* Filter card: constrained width, compact vertical rhythm */
+.appt-filter-wrap { max-width: 400px; margin-bottom: var(--space-6); }
+/* Tighten vertical padding — horizontal stays at --space-5 for alignment */
+.appt-filter-wrap .card { padding-top: var(--space-3); padding-bottom: var(--space-3); margin-bottom: 0; }
+/* Remove FormField's own bottom margin — it's the sole child, so the margin just bloats the card */
+.appt-filter-wrap .field { margin-bottom: 0; }
+
+/* Appointment card row: name+date left, badge+buttons right */
+.appt-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.appt-card__info { flex: 1; min-width: 0; }
+.appt-card__name { margin: 0 0 var(--space-1); font-size: var(--font-h3); }
+.appt-card__date { color: var(--text-muted); font-size: var(--font-small); }
+.appt-card__actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Follow-up inline form */
+.appt-followup-box {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--surface-2);
+}
+
+/* ---- Responsive overrides ---- */
+@media (max-width: 760px) {
+  /* Tables: horizontal scroll instead of overflow */
+  .user-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  /* Tables without explicit class (e.g. reports page) */
+  .card > table,
+  section > table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    width: 100%;
+  }
+  /* Keep cell content readable — override the table-level nowrap for name/text columns */
+  .user-table td:first-child,
+  .user-table th:first-child { white-space: normal; min-width: 120px; }
+
+  /* Tab bar: scroll horizontally, no line breaks */
+  .tabs { overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; padding-bottom: 2px; }
+  .tab  { white-space: nowrap; flex-shrink: 0; padding: var(--space-2) var(--space-4); }
+
+  /* Form grid collapses to single column */
+  .form-grid { grid-template-columns: 1fr; }
+
+  /* Modal: less padding on small screens */
+  .modal { padding: var(--space-4); }
+
+  /* Doctor grid: allow narrower cards */
+  .doctor-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+  /* Toasts: stretch across the bottom on small screens */
+  .toasts {
+    inset-inline-end: var(--space-3);
+    inset-inline-start: var(--space-3);
+  }
+  .toast { max-width: 100%; }
+
+  /* Hide non-essential table columns */
+  .col-hide-mobile { display: none; }
+
+  /* Filter bar stacks vertically */
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-bar__actions { padding-bottom: 0; }
+  .filter-bar__actions .btn { flex: 1; }
+  /* KPI grid: smaller columns */
+  .kpi-row { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+
+  /* Medical page: stack prescription drug fields */
+  .medical-rx-item { flex-direction: column; }
+  .medical-rx-field,
+  .medical-rx-field--wide,
+  .medical-rx-field--mid { flex: none; min-width: 0; width: 100%; }
+  /* Submit + add-item buttons go full-width on mobile */
+  .medical-form-submit,
+  .medical-add-item-btn { width: 100%; }
+
+  /* Queue: single-column on mobile/tablet */
+  .queue-grid { grid-template-columns: 1fr; }
+  /* Queue actions: stack buttons full-width */
+  .queue-actions { flex-direction: column; }
+  .queue-actions .btn,
+  .queue-actions a   { flex: none; width: 100%; min-width: 0; }
+
+  /* Schedule: stack time fields, full-width submit */
+  .schedule-time-row { flex-direction: column; }
+  .schedule-time-field { min-width: 0; }
+  .schedule-submit-btn { width: 100%; }
+
+  /* Audit log: stack header on small screens */
+  .audit-card__header { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+  .audit-card__time   { white-space: normal; }
+  /* Diff items: stack field name above the diff values */
+  .audit-diff-item    { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+
+  /* Public header: tighten up on mobile */
+  .pub-header { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
+  .pub-main   { padding: var(--space-3); }
+
+  /* Hero: reduce vertical padding */
+  .hero { padding: var(--space-5) var(--space-4); }
+
+  /* Appointments: filter full-width, card rows stack vertically */
+  .appt-filter-wrap { max-width: 100%; }
+  .appt-card__row { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .appt-card__actions { width: 100%; flex-wrap: wrap; }
+  .appt-card__actions .btn { flex: 1; min-width: 120px; }
+}
+
+/* ---- Small phones (< 480 px) ---- */
+@media (max-width: 480px) {
+  /* Doctor cards: full width */
+  .doctor-grid { grid-template-columns: 1fr; }
+
+  /* Steps section: single column */
+  .step { min-width: unset; max-width: 100%; flex-basis: 100%; }
+
+  /* Action buttons wrap and stretch on tiny phones */
+  .user-table__actions { flex-wrap: wrap; }
+  .user-table__actions .btn { flex: 1; min-width: 80px; }
+
+  /* Review cards: stack stars and date vertically on tiny screens */
+  .review-card__header { flex-direction: column; align-items: flex-start; }
+  .review-card__date   { white-space: normal; flex-shrink: 1; }
+}

@@ -45,7 +45,9 @@
     "liveQueue": "قائمة الانتظار الحية",
     "settings": "الإعدادات",
     "signOut": "تسجيل الخروج",
-    "users": "المستخدمون"
+    "users": "المستخدمون",
+    "menu": "فتح القائمة",
+    "close": "إغلاق القائمة"
   },
   "roles": {
     "PATIENT": "مريض",
@@ -465,7 +467,10 @@
     "doctorCreated": "تم إنشاء حساب الطبيب.",
     "secretaryCreated": "تم إنشاء حساب السكرتير/ة.",
     "backToUsers": "العودة إلى المستخدمين",
-    "createAnotherDoctor": "تسجيل طبيب آخر"
+    "createAnotherDoctor": "تسجيل طبيب آخر",
+    "doctors": "الأطباء",
+    "secretaries": "السكرتارية",
+    "patients": "المرضى"
   },
   "errors": {
     "generic": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",

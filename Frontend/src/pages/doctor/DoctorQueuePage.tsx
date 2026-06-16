@@ -76,58 +76,49 @@ function CurrentPanel({
   ].filter(Boolean)
 
   return (
-    <div style={{ border: '2px solid var(--color-primary)', borderRadius: 'var(--radius-lg)' }}>
-    <Card title={t('queue.current')}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
-        <h2 style={{ margin: 0, fontSize: '1.4rem' }}>{appt.patient_name}</h2>
-        {chips.map((c) => (
-          <span key={c} style={{
-            background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)',
-            padding: '2px 8px', fontSize: '0.82rem', fontWeight: 600,
-          }}>{c}</span>
-        ))}
-        <span className={`badge badge--${appt.appointment_type}`}>{appt.type_display}</span>
-      </div>
-
-      {appt.patient_phone && (
-        <div style={{ marginBottom: 'var(--space-3)', fontSize: '0.95rem', color: 'var(--text-muted)' }}>
-          {appt.patient_phone}
+    <div className="queue-card--current">
+      <Card title={t('queue.current')}>
+        <div className="queue-patient-header">
+          <h2 className="queue-patient-name">{appt.patient_name}</h2>
+          {chips.map((c) => (
+            <span key={c} className="queue-chip">{c}</span>
+          ))}
+          <span className={`badge badge--${appt.appointment_type}`}>{appt.type_display}</span>
         </div>
-      )}
 
-      {appt.started_at && (
-        <div style={{ marginBottom: 'var(--space-3)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          {t('queue.startedAt', { time: formatTime(appt.started_at, language) })}
+        {appt.patient_phone && (
+          <div className="queue-panel-meta">{appt.patient_phone}</div>
+        )}
+
+        {appt.started_at && (
+          <div className="queue-panel-meta">
+            {t('queue.startedAt', { time: formatTime(appt.started_at, language) })}
+          </div>
+        )}
+
+        {appt.reason && <InfoRow label={t('appointments.reason')} value={appt.reason} />}
+
+        <AllergyBanner allergies={appt.patient_allergies} />
+
+        {appt.patient_chronic_conditions && (
+          <InfoRow label={t('queue.chronicConditions')} value={appt.patient_chronic_conditions} />
+        )}
+        {appt.patient_current_medications && (
+          <InfoRow label={t('queue.currentMedications')} value={appt.patient_current_medications} />
+        )}
+
+        <div className="queue-actions">
+          <Button loading={isPending} onClick={() => onComplete(appt.id)}>
+            {t('queue.complete')}
+          </Button>
+          <Link to={`/doctor/patients?patient=${appt.patient_profile_id}`}>
+            <Button variant="secondary">{t('queue.openRecord')}</Button>
+          </Link>
+          <Button variant="danger" loading={isPending} onClick={() => onNoShow(appt.id)}>
+            {t('queue.noShow')}
+          </Button>
         </div>
-      )}
-
-      {appt.reason && <InfoRow label={t('appointments.reason')} value={appt.reason} />}
-
-      <AllergyBanner allergies={appt.patient_allergies} />
-
-      {appt.patient_chronic_conditions && (
-        <InfoRow label={t('queue.chronicConditions')} value={appt.patient_chronic_conditions} />
-      )}
-      {appt.patient_current_medications && (
-        <InfoRow label={t('queue.currentMedications')} value={appt.patient_current_medications} />
-      )}
-
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
-        <Button
-          loading={isPending}
-          onClick={() => onComplete(appt.id)}
-          style={{ flex: 1 }}
-        >
-          {t('queue.complete')}
-        </Button>
-        <Link to={`/doctor/patients?patient=${appt.patient_profile_id}`}>
-          <Button variant="secondary">{t('queue.openRecord')}</Button>
-        </Link>
-        <Button variant="danger" loading={isPending} onClick={() => onNoShow(appt.id)}>
-          {t('queue.noShow')}
-        </Button>
-      </div>
-    </Card>
+      </Card>
     </div>
   )
 }
@@ -154,16 +145,14 @@ function NextPanel({
 
   return (
     <Card title={t('queue.next')}>
-      <h3 style={{ margin: '0 0 var(--space-1)' }}>{appt.patient_name}</h3>
-      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 'var(--space-2)' }}>
-        {formatTime(appt.scheduled_start, language)}
-      </div>
+      <h3 className="queue-patient-name">{appt.patient_name}</h3>
+      <div className="queue-panel-meta">{formatTime(appt.scheduled_start, language)}</div>
       {appt.reason && (
-        <div style={{ marginBottom: 'var(--space-3)', fontSize: '0.9rem' }}>{appt.reason}</div>
+        <div className="queue-panel-reason">{appt.reason}</div>
       )}
       <span className={`badge badge--${appt.appointment_type}`}>{appt.type_display}</span>
-      <div style={{ marginTop: 'var(--space-4)' }}>
-        <Button loading={isPending} onClick={() => onCallNext(appt.id)} style={{ width: '100%' }}>
+      <div className="queue-next-action">
+        <Button loading={isPending} onClick={() => onCallNext(appt.id)}>
           {t('queue.callNext')}
         </Button>
       </div>
@@ -185,16 +174,14 @@ function PreviousPanel({ appt }: { appt: QueueAppointment | null }) {
 
   return (
     <Card title={t('queue.previous')}>
-      <h3 style={{ margin: '0 0 var(--space-1)', color: 'var(--text-muted)' }}>{appt.patient_name}</h3>
+      <h3 className="queue-patient-name queue-patient-name--muted">{appt.patient_name}</h3>
       {appt.completed_at && (
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+        <div className="queue-panel-meta">
           {t('queue.completedAt', { time: formatTime(appt.completed_at, language) })}
         </div>
       )}
       {appt.reason && (
-        <div style={{ marginTop: 'var(--space-2)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          {appt.reason}
-        </div>
+        <div className="queue-panel-meta">{appt.reason}</div>
       )}
     </Card>
   )
@@ -255,19 +242,14 @@ export function DoctorQueuePage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-        <h1 style={{ margin: 0 }}>{t('queue.liveTitle')}</h1>
-        <span style={{
-          background: waiting_count > 0 ? 'var(--color-primary)' : 'var(--surface-2)',
-          color: waiting_count > 0 ? '#fff' : 'var(--text-muted)',
-          borderRadius: 'var(--radius-pill)',
-          padding: '4px 14px', fontWeight: 600, fontSize: '0.9rem',
-        }}>
+      <div className="page-heading-row">
+        <h1>{t('queue.liveTitle')}</h1>
+        <span className={`queue-waiting-badge${waiting_count > 0 ? ' queue-waiting-badge--active' : ''}`}>
           {t('queue.waiting', { count: waiting_count })}
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: 'var(--space-4)', alignItems: 'start' }}>
+      <div className="queue-grid">
         <PreviousPanel appt={previous ?? null} />
         <CurrentPanel
           appt={current ?? null}
@@ -282,7 +264,7 @@ export function DoctorQueuePage() {
         />
       </div>
 
-      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: 'var(--space-4)' }}>
+      <p className="queue-footer">
         {t('queue.autoRefresh')}
       </p>
     </div>

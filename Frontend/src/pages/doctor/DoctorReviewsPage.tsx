@@ -30,9 +30,11 @@ export function DoctorReviewsPage() {
         <>
           {avg && (
             <Card>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <div className="review-summary">
                 <StarRating value={Math.round(Number(avg))} readOnly />
-                <strong>{t('reviews.averageLabel', { avg, count: visible.length })}</strong>
+                <strong className="review-summary__label">
+                  {t('reviews.averageLabel', { avg, count: visible.length })}
+                </strong>
               </div>
             </Card>
           )}
@@ -41,13 +43,13 @@ export function DoctorReviewsPage() {
           ) : (
             reviews.map((r) => (
               <Card key={r.id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                <div className="review-card__header">
                   <StarRating value={r.rating} readOnly />
-                  <span style={{ color: 'var(--text-muted)' }}>
+                  <span className="review-card__date">
                     {formatDate(r.created_at, language)}{r.is_hidden ? ` · ${t('reviews.hidden')}` : ''}
                   </span>
                 </div>
-                {r.comment && <p style={{ marginTop: 'var(--space-2)' }}>{r.comment}</p>}
+                {r.comment && <p className="review-card__comment">{r.comment}</p>}
               </Card>
             ))
           )}

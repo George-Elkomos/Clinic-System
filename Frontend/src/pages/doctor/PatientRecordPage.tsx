@@ -43,14 +43,17 @@ function RecordsSection({ patientId }: { patientId: number }) {
   return (
     <Card title={t('medical.records')}>
       {records.length === 0 ? <p>{t('medical.noRecords')}</p> : records.map((r) => (
-        <div key={r.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
-          <strong>{t('medical.version', { n: r.version })}{r.is_current ? ` · ${t('medical.current')}` : ''}</strong>
-          <span style={{ color: 'var(--text-muted)' }}> · {formatDate(r.created_at, language)}</span>
-          {r.diagnosis && <div>{t('medical.diagnosis')}: {r.diagnosis}</div>}
-          {r.treatment_plan && <div>{t('medical.treatmentPlan')}: {r.treatment_plan}</div>}
+        <div key={r.id} className="medical-version-row">
+          <div className="medical-version-header">
+            <strong className="medical-version-label">{t('medical.version', { n: r.version })}</strong>
+            {r.is_current && <span className="badge badge--active">{t('medical.current')}</span>}
+            <span className="medical-version-date">{formatDate(r.created_at, language)}</span>
+          </div>
+          {r.diagnosis && <div className="medical-version-detail">{t('medical.diagnosis')}: {r.diagnosis}</div>}
+          {r.treatment_plan && <div className="medical-version-detail">{t('medical.treatmentPlan')}: {r.treatment_plan}</div>}
         </div>
       ))}
-      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.addRecord')}</h3>
+      <h3 className="medical-section-divider">{t('medical.addRecord')}</h3>
       <FormField label={t('medical.chiefComplaint')}>
         {(p) => <input {...p} value={form.chief_complaint} onChange={(e) => setForm((f) => ({ ...f, chief_complaint: e.target.value }))} />}
       </FormField>
@@ -60,7 +63,7 @@ function RecordsSection({ patientId }: { patientId: number }) {
       <FormField label={t('medical.treatmentPlan')}>
         {(p) => <textarea {...p} rows={2} value={form.treatment_plan} onChange={(e) => setForm((f) => ({ ...f, treatment_plan: e.target.value }))} />}
       </FormField>
-      <Button loading={add.isPending} onClick={() => add.mutate()}>{t('medical.addRecord')}</Button>
+      <Button loading={add.isPending} onClick={() => add.mutate()} className="medical-form-submit">{t('medical.addRecord')}</Button>
     </Card>
   )
 }
@@ -92,12 +95,12 @@ function NotesSection({ patientId, categories }: { patientId: number; categories
   return (
     <Card title={t('medical.notes')}>
       {notes.length === 0 ? <p>{t('medical.noNotes')}</p> : notes.map((n) => (
-        <div key={n.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
-          <div style={{ color: 'var(--text-muted)' }}>{n.specialty_category_name} · {n.doctor_name} · {formatDate(n.created_at, language)}</div>
+        <div key={n.id} className="medical-note-row">
+          <div className="medical-note-meta">{n.specialty_category_name} · {n.doctor_name} · {formatDate(n.created_at, language)}</div>
           <div>{n.body}</div>
         </div>
       ))}
-      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.addNote')}</h3>
+      <h3 className="medical-section-divider">{t('medical.addNote')}</h3>
       <FormField label={t('medical.specialtyCategory')} hint={t('medical.noteSpecialtyHint')}>
         {(p) => (
           <Select
@@ -111,7 +114,7 @@ function NotesSection({ patientId, categories }: { patientId: number; categories
       <FormField label={t('medical.noteBody')}>
         {(p) => <textarea {...p} rows={3} value={body} onChange={(e) => setBody(e.target.value)} />}
       </FormField>
-      <Button loading={add.isPending} disabled={!category || !body} onClick={() => add.mutate()}>{t('medical.addNote')}</Button>
+      <Button loading={add.isPending} disabled={!category || !body} onClick={() => add.mutate()} className="medical-form-submit">{t('medical.addNote')}</Button>
     </Card>
   )
 }
@@ -152,30 +155,30 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
   return (
     <Card title={t('medical.prescriptions')}>
       {prescriptions.length === 0 ? <p>{t('medical.noPrescriptions')}</p> : prescriptions.map((p) => (
-        <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <div key={p.id} className="medical-prescription-row">
           <div>
             <strong>{t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}</strong>
-            <div style={{ color: 'var(--text-muted)' }}>{p.items.map((i) => i.drug_name).join(', ')}</div>
+            <div className="medical-list-meta">{p.items.map((i) => i.drug_name).join(', ')}</div>
           </div>
           <Button variant="secondary" onClick={() => openPdf(p.id)}>{t('medical.openPdf')}</Button>
         </div>
       ))}
 
-      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.newPrescription')}</h3>
+      <h3 className="medical-section-divider">{t('medical.newPrescription')}</h3>
       {items.map((it, idx) => (
-        <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 'var(--space-2)' }}>
-          <div style={{ flex: 2, minWidth: 140 }}><FormField label={t('medical.medication')}>{(p) => <input {...p} value={it.drug_name} onChange={(e) => setItem(idx, 'drug_name', e.target.value)} />}</FormField></div>
-          <div style={{ flex: 1, minWidth: 90 }}><FormField label={t('medical.dosage')}>{(p) => <input {...p} value={it.dosage} onChange={(e) => setItem(idx, 'dosage', e.target.value)} />}</FormField></div>
-          <div style={{ flex: 1, minWidth: 110 }}><FormField label={t('medical.frequency')}>{(p) => <input {...p} value={it.frequency} onChange={(e) => setItem(idx, 'frequency', e.target.value)} />}</FormField></div>
-          <div style={{ flex: 1, minWidth: 90 }}><FormField label={t('medical.duration')}>{(p) => <input {...p} value={it.duration} onChange={(e) => setItem(idx, 'duration', e.target.value)} />}</FormField></div>
+        <div key={idx} className="medical-rx-item">
+          <div className="medical-rx-field--wide"><FormField label={t('medical.medication')}>{(p) => <input {...p} value={it.drug_name} onChange={(e) => setItem(idx, 'drug_name', e.target.value)} />}</FormField></div>
+          <div className="medical-rx-field"><FormField label={t('medical.dosage')}>{(p) => <input {...p} value={it.dosage} onChange={(e) => setItem(idx, 'dosage', e.target.value)} />}</FormField></div>
+          <div className="medical-rx-field--mid"><FormField label={t('medical.frequency')}>{(p) => <input {...p} value={it.frequency} onChange={(e) => setItem(idx, 'frequency', e.target.value)} />}</FormField></div>
+          <div className="medical-rx-field"><FormField label={t('medical.duration')}>{(p) => <input {...p} value={it.duration} onChange={(e) => setItem(idx, 'duration', e.target.value)} />}</FormField></div>
           {items.length > 1 && <Button variant="secondary" onClick={() => setItems((arr) => arr.filter((_, i) => i !== idx))}>{t('medical.removeItem')}</Button>}
         </div>
       ))}
-      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, { ...EMPTY_ITEM }])}>{t('medical.addItem')}</Button>
+      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, { ...EMPTY_ITEM }])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
       <FormField label={t('medical.instructions')}>
         {(p) => <textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </FormField>
-      <Button loading={issue.isPending} disabled={!items.some((i) => i.drug_name)} onClick={() => issue.mutate()}>{t('medical.issuePrescription')}</Button>
+      <Button loading={issue.isPending} disabled={!items.some((i) => i.drug_name)} onClick={() => issue.mutate()} className="medical-form-submit">{t('medical.issuePrescription')}</Button>
     </Card>
   )
 }
@@ -214,17 +217,17 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
   return (
     <Card title={`${t('medical.scans')} / ${t('medical.labs')}`}>
       {scans.map((s) => (
-        <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--surface-2)' }}>
+        <div key={s.id} className="medical-scan-row">
           <span><strong>{s.category}</strong> · {s.original_filename} · {formatDate(s.created_at, language)}</span>
           <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
         </div>
       ))}
       {labs.map((l) => (
-        <div key={`l${l.id}`} style={{ padding: 'var(--space-2) 0', borderBottom: '1px solid var(--surface-2)' }}>
+        <div key={`l${l.id}`} className="medical-lab-row">
           <strong>{l.test_name}</strong>: {l.result_value} {l.unit}
         </div>
       ))}
-      <h3 style={{ marginTop: 'var(--space-4)' }}>{t('medical.uploadScan')}</h3>
+      <h3 className="medical-section-divider">{t('medical.uploadScan')}</h3>
       <FormField label={t('medical.category')}>
         {(p) => (
           <Select
@@ -236,9 +239,13 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
         )}
       </FormField>
       <FormField label={t('medical.file')} hint={t('medical.fileHint')}>
-        {(p) => <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
+        {(p) => (
+          <div className="file-input-wrap">
+            <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </div>
+        )}
       </FormField>
-      <Button loading={upload.isPending} disabled={!file} onClick={() => upload.mutate()}>{t('medical.uploadScan')}</Button>
+      <Button loading={upload.isPending} disabled={!file} onClick={() => upload.mutate()} className="medical-form-submit medical-upload-submit">{t('medical.uploadScan')}</Button>
     </Card>
   )
 }

@@ -45,7 +45,9 @@
     "liveQueue": "Live Queue",
     "settings": "Settings",
     "signOut": "Sign Out",
-    "users": "Users"
+    "users": "Users",
+    "menu": "Open menu",
+    "close": "Close menu"
   },
   "roles": {
     "PATIENT": "Patient",
@@ -465,7 +467,10 @@
     "doctorCreated": "Doctor account created.",
     "secretaryCreated": "Secretary account created.",
     "backToUsers": "Back to Users",
-    "createAnotherDoctor": "Register another doctor"
+    "createAnotherDoctor": "Register another doctor",
+    "doctors": "Doctors",
+    "secretaries": "Secretaries",
+    "patients": "Patients"
   },
   "errors": {
     "generic": "Something went wrong. Please try again.",

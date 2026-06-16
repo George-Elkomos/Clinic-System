@@ -15,21 +15,33 @@ export function AppShell() {
 
   return (
     <div className="shell">
+      {/* Hidden checkbox — drives the CSS-only mobile drawer */}
+      <input type="checkbox" id="nav-open" className="nav-toggle__input" aria-hidden="true" />
+
       <header className="shell__header">
+        <label htmlFor="nav-open" className="nav-toggle__btn" aria-label={t('nav.menu')}>
+          <span aria-hidden="true">☰</span>
+        </label>
         <h1 className="shell__brand">{t('app.name')}</h1>
         <div className="shell__spacer" />
-        <span className="shell__user">
-          {user.full_name || user.email} · {t(`roles.${user.role}`)}
-        </span>
-        <NotificationBell />
-        <Link to="/account/notifications" className="btn btn--secondary" style={{ minHeight: 44 }}>
-          {t('nav.settings')}
-        </Link>
-        <LanguageSwitcher />
-        <Button variant="secondary" onClick={() => void logout()} style={{ minHeight: 44 }}>
-          {t('nav.signOut')}
-        </Button>
+        <div className="shell__actions">
+          <span className="shell__user">
+            {user.full_name || user.email} · {t(`roles.${user.role}`)}
+          </span>
+          <NotificationBell />
+          <Link to="/account/notifications" className="btn btn--secondary shell__action-settings">
+            {t('nav.settings')}
+          </Link>
+          <LanguageSwitcher />
+          <Button variant="secondary" onClick={() => void logout()}>
+            {t('nav.signOut')}
+          </Button>
+        </div>
       </header>
+
+      {/* Clicking overlay closes the drawer */}
+      <label htmlFor="nav-open" className="nav-overlay" aria-hidden="true" />
+
       <div className="shell__body">
         <RoleNav role={user.role} />
         <main className="shell__main">

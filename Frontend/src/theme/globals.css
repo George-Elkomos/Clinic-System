@@ -61,3 +61,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ---- Responsive typography ---- */
+@media (max-width: 760px) {
+  h1 { font-size: var(--font-h2); }
+  h2 { font-size: var(--font-h3); }
+  h3 { font-size: 20px; }
+  .container { padding-inline: var(--space-4); }
+}

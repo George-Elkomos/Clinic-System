@@ -36,7 +36,7 @@ function FollowUpBox({ appointmentId, onDone }: { appointmentId: number; onDone:
   })
 
   return (
-    <div style={{ marginTop: 'var(--space-3)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--surface-2)' }}>
+    <div className="appt-followup-box">
       <FormField label={t('followups.recommendedDate')}>
         {(p) => <input {...p} type="date" min={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} />}
       </FormField>
@@ -82,21 +82,23 @@ export function DoctorAppointmentsPage() {
       <Breadcrumbs trail={[{ label: t('nav.appointments') }]} />
       <h1>{t('appointments.title')}</h1>
 
-      <Card>
-        <FormField label={t('appointments.status')}>
-          {(p) => (
-            <Select
-              id={p.id}
-              options={[
-                { value: '', label: t('appointments.filterAll') },
-                ...STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) })),
-              ]}
-              value={status}
-              onChange={(v) => setStatus(Array.isArray(v) ? '' : String(v))}
-            />
-          )}
-        </FormField>
-      </Card>
+      <div className="appt-filter-wrap">
+        <Card>
+          <FormField label={t('appointments.status')}>
+            {(p) => (
+              <Select
+                id={p.id}
+                options={[
+                  { value: '', label: t('appointments.filterAll') },
+                  ...STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) })),
+                ]}
+                value={status}
+                onChange={(v) => setStatus(Array.isArray(v) ? '' : String(v))}
+              />
+            )}
+          </FormField>
+        </Card>
+      </div>
 
       {isLoading ? (
         <CenteredSpinner />
@@ -107,12 +109,12 @@ export function DoctorAppointmentsPage() {
           const action = nextAction(a)
           return (
             <Card key={a.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-                <div>
-                  <h3 style={{ margin: 0 }}>{a.patient_name}</h3>
-                  <div style={{ color: 'var(--text-muted)' }}>{formatDateTime(a.scheduled_start, language)}</div>
+              <div className="appt-card__row">
+                <div className="appt-card__info">
+                  <h3 className="appt-card__name">{a.patient_name}</h3>
+                  <div className="appt-card__date">{formatDateTime(a.scheduled_start, language)}</div>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                <div className="appt-card__actions">
                   <StatusBadge status={a.status} />
                   {action && (
                     <Button onClick={() => transition.mutate({ id: a.id, action: action.action })}>

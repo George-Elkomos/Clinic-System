@@ -18,7 +18,7 @@ export function ManagerDashboard() {
 
       {data && (
         <Card title={t('reports.month')}>
-          <div style={{ display: 'flex', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
+          <div className="kpi-row">
             {[
               [t('reports.total'), data.overall.total],
               [t('reports.completed'), data.overall.completed],
@@ -26,9 +26,9 @@ export function ManagerDashboard() {
               [t('reports.avgWait'), data.avg_wait_minutes],
               [t('reports.newPatients'), data.new_patients_total],
             ].map(([label, value]) => (
-              <div key={label as string} style={{ minWidth: 110 }}>
-                <div style={{ fontSize: 'var(--font-h2)', fontWeight: 700 }}>{value as number}</div>
-                <div style={{ color: 'var(--text-muted)' }}>{label as string}</div>
+              <div key={label as string} className="kpi-card">
+                <div className="kpi-card__value">{value as number}</div>
+                <div className="kpi-card__label">{label as string}</div>
               </div>
             ))}
           </div>
@@ -36,7 +36,7 @@ export function ManagerDashboard() {
       )}
 
       <Card title={t('dashboard.quickActions')}>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+        <div className="quick-actions">
           <Link to="/manager/reports" className="btn btn--primary">{t('nav.reports')}</Link>
           <Link to="/manager/reviews" className="btn btn--secondary">{t('nav.reviews')}</Link>
           <Link to="/manager/audit" className="btn btn--secondary">{t('nav.auditLog')}</Link>
