@@ -454,3 +454,135 @@ export interface UserEditPayload {
   phone?: string
   email?: string
 }
+
+// --- Vital Signs (Phase 5) ---
+
+export type VitalAlertLevel = 'normal' | 'warning' | 'danger'
+
+export interface VitalSigns {
+  id: number
+  patient: number
+  appointment: number | null
+  recorded_by: number | null
+  recorded_by_name: string
+  bp_systolic: number
+  bp_diastolic: number
+  heart_rate: number
+  temperature: string        // DecimalField serializes as string — use parseFloat()
+  respiratory_rate: number
+  oxygen_saturation: number
+  weight: string             // DecimalField serializes as string — use parseFloat()
+  height: number
+  bmi: number | null
+  blood_glucose: number | null
+  notes: string
+  created_at: string
+}
+
+export interface CreateVitalSignsPayload {
+  patient: number
+  appointment?: number | null
+  bp_systolic: number
+  bp_diastolic: number
+  heart_rate: number
+  temperature: number
+  respiratory_rate: number
+  oxygen_saturation: number
+  weight: number
+  height: number
+  blood_glucose?: number | null
+  notes?: string
+}
+
+export interface UpdateVitalSignsPayload extends Partial<CreateVitalSignsPayload> {}
+
+// --- Lab Orders (Phase 6) ---
+
+export type LabOrderStatus =
+  | 'DRAFT' | 'ORDERED' | 'SAMPLE_COLLECTED' | 'PROCESSING' | 'COMPLETED' | 'REVIEWED'
+
+export type LabOrderPriority = 'ROUTINE' | 'URGENT' | 'STAT'
+
+export interface LabOrderItem {
+  id?: number
+  test_name: string
+  test_code: string
+  notes: string
+}
+
+export interface LabOrderResult {
+  id: number
+  order: number
+  order_item: number | null
+  test_name: string
+  result_value: string
+  unit: string
+  reference_range: string
+  is_abnormal: boolean
+  is_critical: boolean
+  result_date: string
+  entered_by: number | null
+  entered_by_name: string
+  file: string | null
+  interpretation: string
+}
+
+export interface LabOrder {
+  id: number
+  order_number: string
+  patient: number
+  patient_name: string
+  doctor: number
+  doctor_name: string
+  appointment: number | null
+  status: LabOrderStatus
+  priority: LabOrderPriority
+  clinical_notes: string
+  ordered_at: string | null
+  sample_collected_at: string | null
+  completed_at: string | null
+  reviewed_at: string | null
+  items: LabOrderItem[]
+  results: LabOrderResult[]
+  has_critical: boolean
+  created_at: string
+}
+
+export interface LabOrderSummary {
+  id: number
+  order_number: string
+  patient: number
+  patient_name: string
+  doctor: number
+  doctor_name: string
+  appointment: number | null
+  status: LabOrderStatus
+  priority: LabOrderPriority
+  clinical_notes: string
+  ordered_at: string | null
+  completed_at: string | null
+  reviewed_at: string | null
+  item_count: number
+  created_at: string
+}
+
+export interface CreateLabOrderPayload {
+  patient: number
+  appointment?: number | null
+  priority: LabOrderPriority
+  clinical_notes?: string
+  items: Omit<LabOrderItem, 'id'>[]
+}
+
+export interface CreateLabOrderResultPayload {
+  order_item?: number | null
+  test_name: string
+  result_value: string
+  unit?: string
+  reference_range?: string
+  is_abnormal: boolean
+  is_critical: boolean
+  result_date: string
+  interpretation?: string
+  file?: File | null
+}

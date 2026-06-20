@@ -13,12 +13,18 @@ import { MyAppointmentsPage } from '../pages/patient/MyAppointmentsPage'
 import { MyMedicalHistoryPage } from '../pages/patient/MyMedicalHistoryPage'
 import { MyScansLabsPage } from '../pages/patient/MyScansLabsPage'
 import { MyPrescriptionsPage } from '../pages/patient/MyPrescriptionsPage'
+import { PatientVitalSignsTab } from '../pages/patient/PatientVitalSignsTab'
 import { DoctorDashboard } from '../pages/doctor/DoctorDashboard'
 import { DoctorQueuePage } from '../pages/doctor/DoctorQueuePage'
 import { ScheduleManagementPage } from '../pages/doctor/ScheduleManagementPage'
 import { DoctorAppointmentsPage } from '../pages/doctor/DoctorAppointmentsPage'
 import { PatientRecordPage } from '../pages/doctor/PatientRecordPage'
 import { DoctorReviewsPage } from '../pages/doctor/DoctorReviewsPage'
+import { LabOrdersListPage } from '../pages/doctor/LabOrdersListPage'
+import { CreateLabOrderPage } from '../pages/doctor/CreateLabOrderPage'
+import { LabOrderDetailsPage } from '../pages/doctor/LabOrderDetailsPage'
+import { PatientLabResultsPage } from '../pages/patient/PatientLabResultsPage'
+import { SampleCollectionPage } from '../pages/secretary/SampleCollectionPage'
 import { SecretaryDashboard } from '../pages/secretary/SecretaryDashboard'
 import { AppointmentDeskPage } from '../pages/secretary/AppointmentDeskPage'
 import { DoctorsPage } from '../pages/secretary/DoctorsPage'
@@ -57,6 +63,8 @@ export const router = createBrowserRouter([
       { path: 'history', element: <MyMedicalHistoryPage /> },
       { path: 'scans', element: <MyScansLabsPage /> },
       { path: 'prescriptions', element: <MyPrescriptionsPage /> },
+      { path: 'vitals', element: <PatientVitalSignsTab /> },
+      { path: 'lab-results', element: <PatientLabResultsPage /> },
     ],
   },
 
@@ -71,6 +79,9 @@ export const router = createBrowserRouter([
       { path: 'appointments', element: <DoctorAppointmentsPage /> },
       { path: 'patients', element: <PatientRecordPage /> },
       { path: 'reviews', element: <DoctorReviewsPage /> },
+      { path: 'lab-orders', element: <LabOrdersListPage /> },
+      { path: 'lab-orders/new', element: <CreateLabOrderPage /> },
+      { path: 'lab-orders/:id', element: <LabOrderDetailsPage /> },
     ],
   },
 
@@ -85,6 +96,8 @@ export const router = createBrowserRouter([
       { path: 'absences', element: <DoctorAbsencePage /> },
       { path: 'doctors', element: <DoctorsPage /> },
       { path: 'patients', element: <PatientDirectoryPage /> },
+      { path: 'lab', element: <SampleCollectionPage /> },
+      { path: 'lab/:id', element: <LabOrderDetailsPage /> },
     ],
   },
 

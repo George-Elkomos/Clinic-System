@@ -92,6 +92,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         appointment = self.get_object()
+        # Appointments that have already progressed past CONFIRMED (e.g.
+        # CHECKED_IN, IN_PROGRESS) can only be cancelled by a manager.
+        safe_to_cancel = (AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED)
+        if (appointment.status not in safe_to_cancel
+                and request.user.role != RoleChoices.MANAGER):
+            raise PermissionDenied(
+                "Only a manager can cancel an appointment that has already started."
+            )
         serializer = CancelAppointmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         enforce_window = request.user.role == RoleChoices.PATIENT
@@ -311,14 +319,26 @@ class FollowUpViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def dismiss(self, request, pk=None):
         followup = self.get_object()
+        user = request.user
+        if user.role == RoleChoices.PATIENT and followup.patient.user_id != user.id:
+            raise PermissionDenied("You can only dismiss your own follow-ups.")
+        if user.role == RoleChoices.DOCTOR and followup.doctor.user_id != user.id:
+            raise PermissionDenied("You can only dismiss follow-ups you created.")
         services.dismiss_followup(followup)
         return Response(FollowUpSerializer(followup).data)
 
 
-def _kiosk_display_name(user):
-    first = user.first_name or "Patient"
-    last_initial = (user.last_name[:1] + ".") if user.last_name else ""
-    return f"{first} {last_initial}".strip()
+def _kiosk_display_name(appointment_id: int) -> str:
+    """Return an opaque queue number instead of the patient's real name.
+
+    The waiting-room kiosk is public and unauthenticated — broadcasting a
+    patient's name violates privacy (HIPAA/GDPR waiting-room rule). A
+    deterministic but non-sequential token (last 4 hex digits of the ID)
+    lets the patient recognise their own ticket without revealing identity
+    to bystanders.
+    """
+    token = f"{appointment_id:04X}"[-4:]
+    return f"#{token}"
 
 
 class KioskQueueView(APIView):
@@ -353,7 +373,7 @@ class KioskQueueView(APIView):
             is_walk_in = appt.appointment_type == AppointmentType.WALK_IN
             row = {
                 "position": position,
-                "display_name": _kiosk_display_name(appt.patient.user),
+                "display_name": _kiosk_display_name(appt.id),
                 "status": appt.status,
                 "scheduled_start": appt.scheduled_start,
                 "is_emergency": is_emergency,

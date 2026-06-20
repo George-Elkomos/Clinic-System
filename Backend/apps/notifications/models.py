@@ -13,7 +13,7 @@ class Notification(TimeStampedModel):
         User, on_delete=models.CASCADE, related_name="notifications"
     )
     verb = models.CharField(
-        max_length=24, choices=NotificationVerb.choices, default=NotificationVerb.GENERIC
+        max_length=32, choices=NotificationVerb.choices, default=NotificationVerb.GENERIC
     )
     title = models.CharField(max_length=200)
     title_ar = models.CharField(max_length=200, blank=True)

@@ -3,11 +3,14 @@ from pathlib import Path
 from django.conf import settings
 from rest_framework import serializers
 
-from apps.core.enums import RoleChoices
+from apps.core.enums import LabOrderStatus, RoleChoices
 from apps.users.models import PatientProfile
 
 from .models import (
     ClinicalNote,
+    LabOrder,
+    LabOrderItem,
+    LabOrderResult,
     LabResult,
     MedicalRecord,
     Prescription,
@@ -42,8 +45,12 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
             "vitals", "appointment", "created_at",
         ]
         # Versioning + authorship are controlled by the service/view, not the client.
+        # CW-7: `vitals` is a legacy JSONField — the typed VitalSigns model is the
+        # authoritative source.  It is exposed read-only here for backward
+        # compatibility; writes are rejected at the API layer.  A post_save signal
+        # on VitalSigns keeps this field in sync automatically.
         read_only_fields = ["id", "doctor", "doctor_name", "version", "is_current",
-                            "supersedes", "created_at"]
+                            "supersedes", "vitals", "created_at"]
 
 
 class ClinicalNoteSerializer(serializers.ModelSerializer):
@@ -164,3 +171,129 @@ class PatientSummarySerializer(serializers.Serializer):
         if email.endswith("@noemail.clinic"):
             return None
         return email
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 — Lab Orders
+# ---------------------------------------------------------------------------
+
+class LabOrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LabOrderItem
+        fields = ["id", "test_name", "test_code", "notes"]
+        read_only_fields = ["id"]
+
+
+class LabOrderResultSerializer(serializers.ModelSerializer):
+    entered_by_name = serializers.CharField(source="entered_by.get_full_name", read_only=True, default="")
+
+    class Meta:
+        model = LabOrderResult
+        fields = [
+            "id", "order", "order_item", "test_name", "result_value", "unit",
+            "reference_range", "is_abnormal", "is_critical", "result_date",
+            "entered_by", "entered_by_name", "file", "interpretation",
+        ]
+        read_only_fields = ["id", "order", "entered_by", "entered_by_name"]
+
+    def validate_file(self, value):
+        _validate_upload(value)
+        return value
+
+
+class LabOrderCancelSerializer(serializers.Serializer):
+    cancellation_reason = serializers.CharField(min_length=5, max_length=500)
+
+
+class LabOrderSerializer(serializers.ModelSerializer):
+    items = LabOrderItemSerializer(many=True)
+    # CW-2: results are a SerializerMethodField so we can gate them by role+status.
+    results = serializers.SerializerMethodField()
+    patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True, default="")
+    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True, default="")
+    has_critical = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabOrder
+        fields = [
+            "id", "order_number", "patient", "patient_name", "doctor", "doctor_name",
+            "appointment", "status", "priority", "clinical_notes",
+            "ordered_at", "sample_collected_at", "completed_at", "reviewed_at",
+            "cancellation_reason", "cancelled_at",
+            "items", "results", "has_critical", "created_at",
+        ]
+        read_only_fields = [
+            "id", "order_number", "doctor", "doctor_name", "patient_name",
+            "status", "ordered_at", "sample_collected_at", "completed_at",
+            "reviewed_at", "cancellation_reason", "cancelled_at",
+            "results", "has_critical", "created_at",
+        ]
+
+    def get_results(self, obj):
+        request = self.context.get("request")
+        # CW-2: Patients only receive result details once the ordering doctor
+        # has explicitly reviewed the order (REVIEWED status).  Before that
+        # they can see the order metadata and status timeline but not the
+        # numerical values.
+        if request and hasattr(request, "user"):
+            user = request.user
+            if (
+                user.is_authenticated
+                and user.role == RoleChoices.PATIENT
+                and obj.status != LabOrderStatus.REVIEWED
+            ):
+                return []
+        return LabOrderResultSerializer(
+            obj.results.all(), many=True, context=self.context
+        ).data
+
+    def get_has_critical(self, obj):
+        return obj.results.filter(is_critical=True).exists()
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items", [])
+        order = LabOrder.objects.create(**validated_data)
+        for item in items_data:
+            LabOrderItem.objects.create(order=order, **item)
+        return order
+
+    def update(self, instance, validated_data):
+        if instance.status == LabOrderStatus.CANCELLED:
+            raise serializers.ValidationError(
+                {"status": "A cancelled order cannot be modified."}
+            )
+        if instance.status != LabOrderStatus.DRAFT and "items" in validated_data:
+            raise serializers.ValidationError(
+                {"items": "Test items cannot be changed after the order has been submitted."}
+            )
+        items_data = validated_data.pop("items", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if items_data is not None:
+            instance.items.all().delete()
+            for item in items_data:
+                LabOrderItem.objects.create(order=instance, **item)
+        return instance
+
+
+class LabOrderListSerializer(serializers.ModelSerializer):
+    """Lightweight list view — no nested results."""
+
+    patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True, default="")
+    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True, default="")
+    item_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabOrder
+        fields = [
+            "id", "order_number", "patient", "patient_name", "doctor", "doctor_name",
+            "appointment", "status", "priority", "clinical_notes",
+            "ordered_at", "completed_at", "reviewed_at", "item_count", "created_at",
+        ]
+
+    def get_item_count(self, obj):
+        # ARCH-6: prefer the Count annotation added by LabOrderViewSet.get_queryset()
+        # (zero extra SQL per row); fall back gracefully for any context without it.
+        count = getattr(obj, "item_count", None)
+        return count if count is not None else obj.items.count()

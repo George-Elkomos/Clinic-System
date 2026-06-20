@@ -13,6 +13,8 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { to: '/patient/history', key: 'nav.medicalHistory' },
     { to: '/patient/scans', key: 'nav.scansLabs' },
     { to: '/patient/prescriptions', key: 'nav.prescriptions' },
+    { to: '/patient/vitals', key: 'nav.vitals' },
+    { to: '/patient/lab-results', key: 'nav.labResults' },
   ],
   DOCTOR: [
     { to: '/doctor', key: 'nav.dashboard' },
@@ -21,6 +23,7 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { to: '/doctor/appointments', key: 'nav.appointments' },
     { to: '/doctor/patients', key: 'nav.patients' },
     { to: '/doctor/reviews', key: 'nav.reviews' },
+    { to: '/doctor/lab-orders', key: 'nav.labOrders' },
   ],
   SECRETARY: [
     { to: '/secretary', key: 'nav.dashboard' },
@@ -29,6 +32,7 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { to: '/secretary/patients', key: 'nav.allPatients' },
     { to: '/secretary/absences', key: 'nav.absences' },
     { to: '/secretary/doctors', key: 'nav.doctors' },
+    { to: '/secretary/lab', key: 'nav.labOrders' },
   ],
   MANAGER: [
     { to: '/manager', key: 'nav.dashboard' },
@@ -60,6 +64,9 @@ const NAV_ICONS: Record<string, string> = {
   'nav.users':           '👥',
   'nav.reports':         '📈',
   'nav.auditLog':        '📜',
+  'nav.vitals':          '❤️',
+  'nav.labOrders':       '🧪',
+  'nav.labResults':      '🧪',
 }
 
 export function RoleNav({ role }: { role: Role }) {

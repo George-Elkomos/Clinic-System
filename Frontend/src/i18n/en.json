@@ -1,5 +1,8 @@
 {
-  "app": { "name": "Sunrise Family Clinic", "tagline": "Professional healthcare management" },
+  "app": {
+    "name": "Sunrise Family Clinic",
+    "tagline": "Professional healthcare management"
+  },
   "common": {
     "loading": "Loading…",
     "save": "Save",
@@ -23,7 +26,11 @@
     "minutes": "min",
     "years": "yrs"
   },
-  "language": { "label": "Language", "en": "English", "ar": "العربية" },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "ar": "العربية"
+  },
   "nav": {
     "dashboard": "Home",
     "bookAppointment": "Book Appointment",
@@ -47,7 +54,10 @@
     "signOut": "Sign Out",
     "users": "Users",
     "menu": "Open menu",
-    "close": "Close menu"
+    "close": "Close menu",
+    "vitals": "Vital Signs",
+    "labOrders": "Lab Orders",
+    "labResults": "Lab Results"
   },
   "roles": {
     "PATIENT": "Patient",
@@ -136,8 +146,13 @@
     "removeConfirm": "Remove this working day from your schedule?",
     "none": "You have not set any working days yet.",
     "days": {
-      "0": "Monday", "1": "Tuesday", "2": "Wednesday", "3": "Thursday",
-      "4": "Friday", "5": "Saturday", "6": "Sunday"
+      "0": "Monday",
+      "1": "Tuesday",
+      "2": "Wednesday",
+      "3": "Thursday",
+      "4": "Friday",
+      "5": "Saturday",
+      "6": "Sunday"
     }
   },
   "kiosk": {
@@ -154,11 +169,19 @@
   "status": {
     "PENDING": "Pending",
     "CONFIRMED": "Confirmed",
-    "CHECKED_IN": "Checked in",
-    "IN_PROGRESS": "In progress",
+    "CHECKED_IN": "Checked In",
+    "IN_PROGRESS": "In Progress",
     "COMPLETED": "Completed",
     "CANCELLED": "Cancelled",
-    "NO_SHOW": "No show"
+    "NO_SHOW": "No Show",
+    "DRAFT": "Draft",
+    "ORDERED": "Ordered",
+    "SAMPLE_COLLECTED": "Sample Collected",
+    "PROCESSING": "Processing",
+    "REVIEWED": "Reviewed",
+    "ROUTINE": "Routine",
+    "URGENT": "Urgent",
+    "STAT": "STAT"
   },
   "notifications": {
     "title": "Notifications",
@@ -472,6 +495,113 @@
     "secretaries": "Secretaries",
     "patients": "Patients"
   },
+  "lab": {
+    "title": "Lab Orders",
+    "newOrder": "New Lab Order",
+    "orderNumber": "Order #",
+    "patient": "Patient",
+    "doctor": "Ordering Doctor",
+    "priority": "Priority",
+    "status": "Status",
+    "clinicalNotes": "Clinical Notes",
+    "clinicalNotesPlaceholder": "Relevant clinical context…",
+    "linkedAppointment": "Linked Appointment",
+    "tests": "Test Items",
+    "addTest": "Add Test",
+    "testName": "Test Name",
+    "testCode": "Test Code (optional)",
+    "testNotes": "Notes (optional)",
+    "removeTest": "Remove",
+    "saveAsDraft": "Save as Draft",
+    "submitOrder": "Submit Order",
+    "saveDraft": "Draft saved.",
+    "submitted": "Order submitted.",
+    "results": "Results",
+    "resultValue": "Result Value",
+    "unit": "Unit",
+    "referenceRange": "Reference Range",
+    "resultDate": "Result Date",
+    "interpretation": "Interpretation (optional)",
+    "isAbnormal": "Abnormal",
+    "isCritical": "Critical",
+    "resultFile": "Attach File (optional)",
+    "enterResults": "Enter Results",
+    "resultsSaved": "Results entered.",
+    "collectSample": "Collect Sample",
+    "sampleCollected": "Sample collected.",
+    "startProcessing": "Send to Lab",
+    "processingStarted": "Sent to lab.",
+    "review": "Mark as Reviewed",
+    "reviewed": "Marked as reviewed.",
+    "deleteOrder": "Delete Order",
+    "deleteConfirmTitle": "Delete lab order?",
+    "deleteConfirmMessage": "This DRAFT order will be deleted. This cannot be undone.",
+    "deleted": "Order deleted.",
+    "noOrders": "No lab orders yet.",
+    "noResults": "No results entered yet.",
+    "download": "Download",
+    "hasCritical": "Contains critical values",
+    "pendingCount": "Pending Orders",
+    "criticalCount": "Critical Results",
+    "recentLabs": "Recent Lab Orders",
+    "page": "Page",
+    "of": "of",
+    "filterStatus": "Filter by status",
+    "filterPriority": "Filter by priority",
+    "searchPlaceholder": "Search by order #, patient…",
+    "loadError": "Failed to load lab orders."
+  },
+  "vitals": {
+    "title": "Vital Signs",
+    "record": "Record Vitals",
+    "editRecord": "Edit Vital Signs",
+    "history": "Vitals History",
+    "trend": "Trend Chart",
+    "noHistory": "No vital signs recorded yet.",
+    "noTrendData": "At least 2 readings are needed to show a trend.",
+    "recordedBy": "Recorded by",
+    "recordedOn": "on",
+    "bmi": "BMI",
+    "bmiAuto": "Auto-calculated",
+    "bp": "Blood Pressure",
+    "bpSystolic": "Systolic (mmHg)",
+    "bpDiastolic": "Diastolic (mmHg)",
+    "heartRate": "Heart Rate (bpm)",
+    "temperature": "Temperature (°C)",
+    "respiratoryRate": "Respiratory Rate (/min)",
+    "oxygenSaturation": "SpO2 (%)",
+    "weight": "Weight (kg)",
+    "height": "Height (cm)",
+    "bloodGlucose": "Blood Glucose (mg/dL)",
+    "bloodGlucoseOptional": "Blood Glucose (mg/dL) — optional",
+    "notes": "Notes",
+    "notesPlaceholder": "Any clinical observations…",
+    "appointment": "Linked Appointment",
+    "appointmentOptional": "Linked Appointment (optional)",
+    "metricBpSystolic": "Systolic BP",
+    "metricBpDiastolic": "Diastolic BP",
+    "metricHeartRate": "Heart Rate",
+    "metricTemperature": "Temperature",
+    "metricOxygenSaturation": "SpO2",
+    "metricBmi": "BMI",
+    "unitMmhg": "mmHg",
+    "unitBpm": "bpm",
+    "unitCelsius": "°C",
+    "unitPercent": "%",
+    "unitKg": "kg",
+    "unitCm": "cm",
+    "unitMgdl": "mg/dL",
+    "abnormal": "Abnormal",
+    "selectMetric": "Select metric",
+    "deleteConfirmTitle": "Delete vital signs?",
+    "deleteConfirmMessage": "This record will be permanently removed. This cannot be undone.",
+    "deleted": "Vital signs deleted.",
+    "saved": "Vital signs saved.",
+    "editWindowExpired": "This record is older than 24 hours and can no longer be edited.",
+    "loadError": "Failed to load vital signs.",
+    "page": "Page",
+    "of": "of"
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "network": "We couldn't reach the server. Please check your connection.",
@@ -481,5 +611,7 @@
     "notFoundBody": "The page you are looking for doesn't exist.",
     "goHome": "Go to home"
   },
-  "breadcrumbs": { "home": "Home" }
+  "breadcrumbs": {
+    "home": "Home"
+  }
 }

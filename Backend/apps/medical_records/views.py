@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from django.http import FileResponse
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -10,16 +11,21 @@ from apps.core.enums import RoleChoices
 from apps.users.models import PatientProfile
 from apps.users.permissions import IsDoctorOrManager
 
-from .models import ClinicalNote, LabResult, MedicalRecord, Prescription, Scan
-from .permissions import ClinicalNotePermission, MedicalDataPermission, doctor_treats
+from .models import ClinicalNote, LabOrder, LabResult, MedicalRecord, Prescription, Scan
+from .permissions import ClinicalNotePermission, LabOrderPermission, MedicalDataPermission, doctor_treats
 from .serializers import (
     ClinicalNoteSerializer,
+    LabOrderCancelSerializer,
+    LabOrderListSerializer,
+    LabOrderResultSerializer,
+    LabOrderSerializer,
     LabResultSerializer,
     MedicalRecordSerializer,
     PatientSummarySerializer,
     PrescriptionSerializer,
     ScanSerializer,
 )
+from .services import lab_orders as lab_order_service
 from .services.pdf import render_prescription_pdf
 from .services.records import create_record_version
 
@@ -192,3 +198,133 @@ class MyPatientsView(ListAPIView):
                 .select_related("user").distinct()
             )
         return PatientProfile.objects.select_related("user").all()
+
+
+class LabOrderViewSet(viewsets.ModelViewSet):
+    permission_classes = [LabOrderPermission]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+    filterset_fields = ["patient", "doctor", "status", "priority"]
+
+    def get_queryset(self):
+        user = self.request.user
+        # ARCH-6: annotate item_count once here so LabOrderListSerializer can
+        # read obj.item_count without firing a COUNT query per row.
+        # distinct=True prevents double-counting when the doctor join multiplies rows.
+        qs = LabOrder.objects.select_related(
+            "patient__user", "doctor__user", "appointment"
+        ).prefetch_related("items", "results").annotate(
+            item_count=Count("items", distinct=True)
+        )
+
+        if user.role in (RoleChoices.MANAGER, RoleChoices.SECRETARY):
+            return qs.order_by("-created_at")
+        if user.role == RoleChoices.PATIENT:
+            return qs.filter(patient__user=user).order_by("-created_at")
+        if user.role == RoleChoices.DOCTOR:
+            return (
+                qs.filter(
+                    Q(doctor__user=user) |
+                    Q(patient__treating_doctors__doctor__user=user)
+                )
+                .distinct()
+                .order_by("-created_at")
+            )
+        return qs.none()
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return LabOrderListSerializer
+        return LabOrderSerializer
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role != RoleChoices.DOCTOR:
+            raise PermissionDenied("Only doctors can create lab orders.")
+        patient = serializer.validated_data.get("patient")
+        if patient and not doctor_treats(user, patient):
+            raise PermissionDenied("You can only order labs for your own patients.")
+        serializer.save(doctor=user.doctor_profile)
+
+    def destroy(self, request, *args, **kwargs):
+        order = self.get_object()
+        order.soft_delete()
+        return Response(status=204)
+
+    @action(detail=True, methods=["post"])
+    def submit(self, request, pk=None):
+        order = self.get_object()
+        if order.doctor.user_id != request.user.id and request.user.role != RoleChoices.MANAGER:
+            raise PermissionDenied("Only the ordering doctor can submit this order.")
+        result = lab_order_service.submit_order(order)
+        return Response(LabOrderSerializer(result).data)
+
+    @action(detail=True, methods=["post"], url_path="collect-sample")
+    def collect_sample(self, request, pk=None):
+        if request.user.role not in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
+            raise PermissionDenied("Only lab staff can collect samples.")
+        order = self.get_object()
+        result = lab_order_service.collect_sample(order)
+        return Response(LabOrderSerializer(result).data)
+
+    @action(detail=True, methods=["post"], url_path="start-processing")
+    def start_processing(self, request, pk=None):
+        if request.user.role not in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
+            raise PermissionDenied("Only lab staff can start processing.")
+        order = self.get_object()
+        result = lab_order_service.start_processing(order)
+        return Response(LabOrderSerializer(result).data)
+
+    @action(detail=True, methods=["post"], url_path="enter-results",
+            parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def enter_results(self, request, pk=None):
+        if request.user.role not in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
+            raise PermissionDenied("Only lab staff can enter results.")
+        order = self.get_object()
+        results_data = request.data.get("results", [])
+        if not isinstance(results_data, list):
+            raise ValidationError({"results": "Expected a list of result objects."})
+        serializer = LabOrderResultSerializer(data=results_data, many=True)
+        serializer.is_valid(raise_exception=True)
+        result_order = lab_order_service.complete_order(
+            order, serializer.validated_data, entered_by=request.user
+        )
+        return Response(LabOrderSerializer(result_order).data)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        order = self.get_object()
+        if order.doctor.user_id != request.user.id and request.user.role != RoleChoices.MANAGER:
+            raise PermissionDenied("Only the ordering doctor or a manager can cancel this order.")
+        serializer = LabOrderCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        result = lab_order_service.cancel_order(
+            order,
+            reason=serializer.validated_data["cancellation_reason"],
+            cancelled_by=request.user,
+        )
+        return Response(LabOrderSerializer(result, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"])
+    def review(self, request, pk=None):
+        order = self.get_object()
+        if order.doctor.user_id != request.user.id and request.user.role != RoleChoices.MANAGER:
+            raise PermissionDenied("Only the ordering doctor can mark results as reviewed.")
+        result = lab_order_service.review_order(order)
+        return Response(LabOrderSerializer(result).data)
+
+    @action(detail=True, methods=["get"], url_path=r"results/(?P<result_pk>\d+)/download")
+    def download_result_file(self, request, pk=None, result_pk=None):
+        from .models import LabOrderResult
+        order = self.get_object()
+        try:
+            lab_result = order.results.get(pk=result_pk)
+        except LabOrderResult.DoesNotExist:
+            raise ValidationError({"detail": "Result not found."})
+        if not lab_result.file:
+            raise ValidationError({"file": "No file attached to this result."})
+        return FileResponse(
+            lab_result.file.open("rb"), as_attachment=True,
+            filename=lab_result.file.name.split("/")[-1],
+        )
+
+

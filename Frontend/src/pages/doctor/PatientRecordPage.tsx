@@ -9,13 +9,50 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
+import { VitalSignsHistory } from '../../components/vitals/VitalSignsHistory'
+import { VitalSignsTrendChart } from '../../components/vitals/VitalSignsTrendChart'
 import { useLanguage } from '../../hooks/useLanguage'
 import { openBlob, saveBlob } from '../../lib/download'
 import { formatDate } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { authApi } from '../../services/auth.api'
 import { medicalApi } from '../../services/medical.api'
+import { vitalsApi } from '../../services/vitals.api'
 import type { PrescriptionItem } from '../../services/types'
+
+// ---- Vital Signs -----------------------------------------------------------
+function VitalsSection({ patientId }: { patientId: number }) {
+  const { t } = useTranslation()
+  const [showForm, setShowForm] = useState(true)
+
+  const { data: trend = [] } = useQuery({
+    queryKey: ['vitals', patientId, 'trend'],
+    queryFn: () => vitalsApi.trend(patientId),
+    staleTime: 30_000,
+    retry: 1,
+  })
+
+  return (
+    <Card title={t('vitals.title')}>
+      {trend.length >= 2 && <VitalSignsTrendChart data={trend} />}
+
+      {showForm ? (
+        <>
+          <h3 className="medical-section-divider">{t('vitals.record')}</h3>
+          <VitalSignsForm patientId={patientId} onSuccess={() => setShowForm(false)} />
+        </>
+      ) : (
+        <div style={{ marginBottom: 'var(--space-3)', textAlign: 'right' }}>
+          <Button variant="secondary" onClick={() => setShowForm(true)}>{t('vitals.record')}</Button>
+        </div>
+      )}
+
+      <h3 className="medical-section-divider">{t('vitals.history')}</h3>
+      <VitalSignsHistory patientId={patientId} />
+    </Card>
+  )
+}
 
 // ---- Records ---------------------------------------------------------------
 function RecordsSection({ patientId }: { patientId: number }) {
@@ -120,7 +157,13 @@ function NotesSection({ patientId, categories }: { patientId: number; categories
 }
 
 // ---- Prescriptions ---------------------------------------------------------
-const EMPTY_ITEM: PrescriptionItem = { drug_name: '', dosage: '', frequency: '', duration: '', instructions: '' }
+// ARCH-4: carry a stable client-only key so React correctly reconciles rows
+// when items are added/removed from the middle of the list.
+type RxItem = PrescriptionItem & { _key: string }
+const newRxItem = (): RxItem => ({
+  drug_name: '', dosage: '', frequency: '', duration: '', instructions: '',
+  _key: crypto.randomUUID(),
+})
 
 function PrescriptionsSection({ patientId }: { patientId: number }) {
   const { t } = useTranslation()
@@ -128,7 +171,7 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
   const { showToast } = useToast()
   const qc = useQueryClient()
   const [notes, setNotes] = useState('')
-  const [items, setItems] = useState<PrescriptionItem[]>([{ ...EMPTY_ITEM }])
+  const [items, setItems] = useState<RxItem[]>([newRxItem()])
 
   const { data: prescriptions = [] } = useQuery({
     queryKey: ['prescriptions', patientId],
@@ -136,10 +179,15 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
   })
 
   const issue = useMutation({
-    mutationFn: () => medicalApi.createPrescription({ patient: patientId, notes, items: items.filter((i) => i.drug_name) }),
+    mutationFn: () => medicalApi.createPrescription({
+      patient: patientId,
+      notes,
+      // Strip the client-only _key before sending to the API.
+      items: items.filter((i) => i.drug_name).map(({ _key: _, ...rest }) => rest),
+    }),
     onSuccess: () => {
       showToast(t('medical.prescriptionIssued'), 'success')
-      setNotes(''); setItems([{ ...EMPTY_ITEM }])
+      setNotes(''); setItems([newRxItem()])
       qc.invalidateQueries({ queryKey: ['prescriptions', patientId] })
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
@@ -166,15 +214,15 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
 
       <h3 className="medical-section-divider">{t('medical.newPrescription')}</h3>
       {items.map((it, idx) => (
-        <div key={idx} className="medical-rx-item">
+        <div key={it._key} className="medical-rx-item">
           <div className="medical-rx-field--wide"><FormField label={t('medical.medication')}>{(p) => <input {...p} value={it.drug_name} onChange={(e) => setItem(idx, 'drug_name', e.target.value)} />}</FormField></div>
           <div className="medical-rx-field"><FormField label={t('medical.dosage')}>{(p) => <input {...p} value={it.dosage} onChange={(e) => setItem(idx, 'dosage', e.target.value)} />}</FormField></div>
           <div className="medical-rx-field--mid"><FormField label={t('medical.frequency')}>{(p) => <input {...p} value={it.frequency} onChange={(e) => setItem(idx, 'frequency', e.target.value)} />}</FormField></div>
           <div className="medical-rx-field"><FormField label={t('medical.duration')}>{(p) => <input {...p} value={it.duration} onChange={(e) => setItem(idx, 'duration', e.target.value)} />}</FormField></div>
-          {items.length > 1 && <Button variant="secondary" onClick={() => setItems((arr) => arr.filter((_, i) => i !== idx))}>{t('medical.removeItem')}</Button>}
+          {items.length > 1 && <Button variant="secondary" onClick={() => setItems((arr) => arr.filter((i) => i._key !== it._key))}>{t('medical.removeItem')}</Button>}
         </div>
       ))}
-      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, { ...EMPTY_ITEM }])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
+      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, newRxItem()])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
       <FormField label={t('medical.instructions')}>
         {(p) => <textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </FormField>
@@ -292,6 +340,7 @@ export function PatientRecordPage() {
 
       {patientId !== '' && (
         <>
+          <VitalsSection patientId={patientId} />
           <RecordsSection patientId={patientId} />
           <NotesSection patientId={patientId} categories={categories} />
           <PrescriptionsSection patientId={patientId} />

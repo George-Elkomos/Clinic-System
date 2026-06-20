@@ -15,7 +15,7 @@ env = environ.Env(
     DEBUG=(bool, False),
     ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
     CORS_ALLOWED_ORIGINS=(list, ["http://localhost:5173"]),
-    JWT_COOKIE_SECURE=(bool, False),
+    JWT_COOKIE_SECURE=(bool, None),  # default resolved below after DEBUG is known
     JWT_COOKIE_SAMESITE=(str, "Lax"),
     ACCESS_TOKEN_LIFETIME_MINUTES=(int, 30),
     REFRESH_TOKEN_LIFETIME_DAYS=(int, 7),
@@ -32,7 +32,7 @@ env = environ.Env(
 # Read .env if present (sibling of manage.py).
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("SECRET_KEY", default="dev-insecure-change-me-please-set-a-real-32+char-secret-key")
+SECRET_KEY = env("SECRET_KEY")  # No default — raises ImproperlyConfigured if missing from .env
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
@@ -65,6 +65,7 @@ LOCAL_APPS = [
     "apps.notifications",
     "apps.reports",
     "apps.audit",
+    "apps.vital_signs",   # Phase 5
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -139,7 +140,7 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.core.exceptions.plain_language_exception_handler",
     "DEFAULT_RENDERER_CLASSES": (
         "rest_framework.renderers.JSONRenderer",
-        "rest_framework.renderers.BrowsableAPIRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",  # stripped in prod.py
     ),
 }
 
@@ -154,8 +155,11 @@ SIMPLE_JWT = {
 }
 
 # Name + flags for the httpOnly refresh cookie (set/cleared by auth views).
+# JWT_COOKIE_SECURE defaults to False when DEBUG=True (plain-HTTP localhost) and
+# True when DEBUG=False (production HTTPS).  Override via JWT_COOKIE_SECURE in .env.
 JWT_REFRESH_COOKIE = "clinic_refresh"
-JWT_COOKIE_SECURE = env("JWT_COOKIE_SECURE")
+_jwt_secure_raw = env("JWT_COOKIE_SECURE", default=None)
+JWT_COOKIE_SECURE = _jwt_secure_raw if _jwt_secure_raw is not None else (not DEBUG)
 JWT_COOKIE_SAMESITE = env("JWT_COOKIE_SAMESITE")
 JWT_COOKIE_PATH = "/api/auth/"
 

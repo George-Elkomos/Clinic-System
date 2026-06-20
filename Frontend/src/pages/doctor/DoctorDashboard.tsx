@@ -6,6 +6,9 @@ import { Button } from '../../components/primitives/Button'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { StatusBadge } from '../../components/primitives/StatusBadge'
 import { useToast } from '../../components/primitives/Toast'
+import { PendingOrdersWidget } from '../../components/lab/PendingOrdersWidget'
+import { CriticalResultsWidget } from '../../components/lab/CriticalResultsWidget'
+import { RecentLabsWidget } from '../../components/lab/RecentLabsWidget'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatTime } from '../../lib/format'
@@ -49,6 +52,12 @@ export function DoctorDashboard() {
     <div>
       <h1>{t('dashboard.welcome', { name: user?.first_name || user?.email })}</h1>
       <p>{t('dashboard.doctorIntro')}</p>
+
+      <div className="lab-kpi-row">
+        <PendingOrdersWidget />
+        <CriticalResultsWidget />
+      </div>
+      <RecentLabsWidget />
 
       <Card title={t('dashboard.todayQueue')}>
         {isLoading ? (

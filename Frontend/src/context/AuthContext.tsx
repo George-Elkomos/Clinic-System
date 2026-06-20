@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 
+import { useQueryClient } from '@tanstack/react-query'
+
 import { tokenStore } from '../lib/tokenStore'
 import { authApi } from '../services/auth.api'
 import { setOnAuthExpired } from '../services/apiClient'
@@ -31,12 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [status, setStatus] = useState<Status>('loading')
   const bootstrapped = useRef(false)
+  const qc = useQueryClient()
 
   const clearSession = useCallback(() => {
     tokenStore.clear()
+    qc.clear()   // drop all cached query data so stale requests can't fire after logout
     setUser(null)
     setStatus('anon')
-  }, [])
+  }, [qc])
 
   // Let the Axios interceptor force a logout when refresh ultimately fails.
   useEffect(() => {

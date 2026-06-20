@@ -41,7 +41,13 @@ def _set_refresh_cookie(response, refresh_token):
 
 
 def _delete_refresh_cookie(response):
-    response.delete_cookie(COOKIE_NAME, path=settings.JWT_COOKIE_PATH)
+    # Pass the same samesite/secure attributes as the original Set-Cookie so that
+    # strict browsers (Safari, Firefox) actually remove the httpOnly cookie.
+    response.delete_cookie(
+        COOKIE_NAME,
+        path=settings.JWT_COOKIE_PATH,
+        samesite=settings.JWT_COOKIE_SAMESITE,
+    )
 
 
 def _audit_auth(user, action, request):

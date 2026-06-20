@@ -133,6 +133,28 @@ class NotificationVerb(models.TextChoices):
     FOLLOWUP = "FOLLOWUP", _("Follow-up")
     REVIEW = "REVIEW", _("Review request")
     GENERIC = "GENERIC", _("Notification")
+    # Phase 6 — Lab Orders
+    LAB_ORDER_CREATED = "LAB_ORDER_CREATED", _("Lab order created")
+    LAB_ORDER_CANCELLED = "LAB_ORDER_CANCELLED", _("Lab order cancelled")
+    LAB_RESULT_AVAILABLE = "LAB_RESULT_AVAILABLE", _("Lab result available")
+    LAB_RESULT_CRITICAL = "LAB_RESULT_CRITICAL", _("Critical lab result")
+    LAB_RESULT_REVIEWED = "LAB_RESULT_REVIEWED", _("Lab result reviewed")
+
+
+class LabOrderStatus(models.TextChoices):
+    DRAFT = "DRAFT", _("Draft")
+    ORDERED = "ORDERED", _("Ordered")
+    SAMPLE_COLLECTED = "SAMPLE_COLLECTED", _("Sample collected")
+    PROCESSING = "PROCESSING", _("Processing")
+    COMPLETED = "COMPLETED", _("Completed")
+    REVIEWED = "REVIEWED", _("Reviewed")
+    CANCELLED = "CANCELLED", _("Cancelled")
+
+
+class LabOrderPriority(models.TextChoices):
+    ROUTINE = "ROUTINE", _("Routine")
+    URGENT = "URGENT", _("Urgent")
+    STAT = "STAT", _("STAT")
 
 
 class AuditAction(models.TextChoices):

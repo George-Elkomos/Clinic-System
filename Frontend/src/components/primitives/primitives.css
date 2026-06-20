@@ -935,3 +935,258 @@
   .review-card__header { flex-direction: column; align-items: flex-start; }
   .review-card__date   { white-space: normal; flex-shrink: 1; }
 }
+
+/* ============================================================
+   Vital Signs (Phase 5)
+   ============================================================ */
+
+/* Form layout — 2-column grid for paired fields */
+.vitals-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--space-5);
+}
+
+/* BMI read-only display box */
+.vitals-form__bmi {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  min-height: var(--tap-min);
+  font-size: var(--font-body);
+}
+.vitals-form__bmi-label { font-weight: 600; color: var(--text-muted); }
+.vitals-form__bmi-value { font-weight: 700; color: var(--text); font-size: var(--font-h3); }
+
+/* Card metric grid */
+.vitals-card__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.vitals-card__item {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+}
+.vitals-card__item-label {
+  font-size: var(--font-small);
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+.vitals-card__item-value {
+  font-size: var(--font-h3);
+  font-weight: 700;
+  color: var(--text);
+}
+.vitals-card__item-unit {
+  font-size: var(--font-small);
+  color: var(--text-muted);
+  margin-left: var(--space-1);
+}
+
+.vitals-card__item--warning .vitals-card__item-value { color: var(--warning); }
+.vitals-card__item--danger  .vitals-card__item-value { color: var(--danger); }
+
+/* Card meta row (recorded by / date) */
+.vitals-card__meta {
+  font-size: var(--font-small);
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
+}
+
+/* Card action row */
+.vitals-card__actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* Abnormal badge */
+.badge--warning { border-color: var(--warning); color: var(--warning); }
+
+/* History list */
+.vitals-history__item {
+  margin-bottom: var(--space-4);
+}
+.vitals-history__empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--space-6) 0;
+}
+
+/* Trend chart */
+.vitals-trend {
+  margin-top: var(--space-4);
+}
+.vitals-trend__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+.vitals-trend__title {
+  font-size: var(--font-h3);
+  font-weight: 600;
+  margin: 0;
+}
+.vitals-trend__svg-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--space-3);
+}
+.vitals-trend__no-data {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--space-5) 0;
+}
+
+/* Responsive overrides */
+@media (max-width: 760px) {
+  .vitals-form__row { grid-template-columns: 1fr; }
+  .vitals-card__grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .vitals-trend__header { flex-direction: column; align-items: flex-start; }
+  .vitals-card__actions { flex-wrap: wrap; }
+}
+
+/* ============================================================
+   Lab Orders (Phase 6)
+   ============================================================ */
+
+/* Status badges */
+.badge--DRAFT            { border-color: var(--text-muted); color: var(--text-muted); }
+.badge--ORDERED          { border-color: var(--primary); color: var(--primary); }
+.badge--SAMPLE_COLLECTED { border-color: var(--warning); color: var(--warning); }
+.badge--PROCESSING       { border-color: var(--warning); color: var(--warning); }
+.badge--COMPLETED        { border-color: var(--success); color: var(--success); }
+.badge--REVIEWED         { border-color: var(--success); color: var(--success); background: color-mix(in srgb, var(--success) 10%, transparent); }
+
+/* Priority badges */
+.badge--ROUTINE { border-color: var(--border); color: var(--text-muted); }
+.badge--URGENT  { border-color: var(--warning); color: var(--warning); }
+.badge--STAT    { border-color: var(--danger); color: var(--danger); font-weight: 700; }
+
+/* KPI row */
+.lab-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+/* Status timeline */
+.lab-timeline {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.lab-timeline__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.lab-timeline__dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.lab-timeline__step--done  .lab-timeline__dot { background: var(--success); border-color: var(--success); color: var(--on-primary); }
+.lab-timeline__step--active .lab-timeline__dot { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.lab-timeline__label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+  text-align: center;
+  max-width: 64px;
+  word-break: break-word;
+}
+.lab-timeline__step--active .lab-timeline__label { color: var(--primary); font-weight: 600; }
+.lab-timeline__connector {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  min-width: var(--space-4);
+  margin-bottom: 20px;
+}
+.lab-timeline__connector--done { background: var(--success); }
+
+/* Result table rows */
+.lab-result-row--critical { background: color-mix(in srgb, var(--danger) 8%, var(--bg)); border-left: 3px solid var(--danger); }
+.lab-result-row--abnormal { background: color-mix(in srgb, var(--warning) 8%, var(--bg)); border-left: 3px solid var(--warning); }
+
+/* Dynamic test item row in create form */
+.lab-item-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  align-items: flex-end;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-3);
+}
+.lab-item-row__name  { flex: 2; min-width: 180px; }
+.lab-item-row__code  { flex: 1; min-width: 100px; }
+.lab-item-row__notes { flex: 2; min-width: 180px; }
+
+/* Flag checkboxes row in result entry */
+.lab-flags-row {
+  display: flex;
+  gap: var(--space-5);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+.lab-flag-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-body);
+  cursor: pointer;
+}
+
+/* Order action buttons row */
+.lab-order-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+.lab-form-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 760px) {
+  .lab-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .lab-item-row { flex-direction: column; }
+  .lab-item-row__name, .lab-item-row__code, .lab-item-row__notes { min-width: 0; flex: none; width: 100%; }
+  .lab-flags-row { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .lab-order-actions { flex-direction: column; }
+  .lab-order-actions .btn { width: 100%; }
+  .lab-form-actions { flex-direction: column; }
+  .lab-form-actions .btn { width: 100%; }
+}
