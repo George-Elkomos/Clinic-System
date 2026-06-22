@@ -298,6 +298,11 @@
     "voidedOn": "أُلغيت {{date}}",
     "voidedBy": "بواسطة {{name}}",
     "voidReason": "السبب: {{reason}}",
+    "reissuePrescription": "تعديل / إعادة إصدار",
+    "reissueConfirmTitle": "تعديل / إعادة إصدار الوصفة الطبية",
+    "reissueConfirmMessage": "سيؤدي هذا إلى إلغاء الوصفة الحالية ونسخ محتواها في النموذج أدناه للتعديل. ستُوسَم الوصفة الأصلية بحالة (ملغاة). هل تريد المتابعة؟",
+    "reissueConfirmBtn": "متابعة",
+    "reissued": "تم إلغاء الوصفة — تم تعبئة النموذج بالمحتوى السابق. راجعه وأعد الإصدار.",
     "selectPatient": "اختر مريضًا",
     "noPatients": "لا يوجد لديك مرضى بعد. يظهر المرضى هنا بعد اكتمال زيارة.",
     "uploadedBy": "رفعها {{name}}"
@@ -708,6 +713,23 @@
       "reason": "السبب",
       "scheduled_start": "الموعد",
       "completed_at": "اكتمل في"
+    },
+    "event": {
+      "VITAL_SIGNS":           { "title": "سُجِّلت العلامات الحيوية", "summary": "ض.د: {{bp}}/{{dbp}} · ن.ق: {{hr}} ن/د · حرارة: {{temp}}°C" },
+      "LAB_ORDER":             { "title": "طلب مختبر",               "summary": "طلب #{{order_number}} · {{status}}" },
+      "PRESCRIPTION":          { "title": "وصفة طبية",               "summary": "{{count}} دواء موصوف" },
+      "CLINICAL_NOTE":         { "title": "ملاحظة سريرية" },
+      "MEDICAL_RECORD":        { "title": "سجل طبي (v{{version}})" },
+      "APPOINTMENT_COMPLETED": { "title": "موعد مكتمل",              "summary": "استشارة مع د. {{doctor_name}}" }
+    },
+    "status": {
+      "ACTIVE":      "نشط",
+      "CANCELLED":   "ملغى",
+      "COMPLETED":   "مكتمل",
+      "PENDING":     "معلّق",
+      "COLLECTED":   "تم جمع العينة",
+      "PROCESSING":  "قيد المعالجة",
+      "REVIEWED":    "تمت المراجعة"
     }
   },
   "encounters": {

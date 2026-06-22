@@ -4,11 +4,72 @@ import { useTranslation } from 'react-i18next'
 
 import { CenteredSpinner, Spinner } from '../primitives/Spinner'
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatDate } from '../../lib/format'
+import { formatDate, formatDateTime } from '../../lib/format'
 import { timelineApi } from '../../services/timeline.api'
 import type { TimelineEvent, TimelineEventType } from '../../services/types'
 
 const PAGE_SIZE = 20
+
+// ---- Prescription item helpers ---------------------------------------------
+
+interface RxItem {
+  drug_name: string
+  dosage?: string
+  frequency?: string
+  duration?: string
+}
+
+// Matches ISO 8601 datetime strings: "2026-06-13T10:30:00Z", "2026-06-13T10:30:00+03:00", etc.
+function isISODatetime(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)
+}
+
+function parsePrescriptionItems(value: unknown): RxItem[] | null {
+  // Already an array of objects with drug_name — the normal case.
+  if (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    typeof value[0] === 'object' &&
+    value[0] !== null &&
+    'drug_name' in value[0]
+  ) {
+    return value as RxItem[]
+  }
+  // Legacy / edge-case: the field arrived as a JSON string instead of a parsed array.
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value)
+      if (
+        Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        typeof parsed[0] === 'object' &&
+        parsed[0] !== null &&
+        'drug_name' in parsed[0]
+      ) {
+        return parsed as RxItem[]
+      }
+    } catch {
+      // Not valid JSON — fall through and render as plain text.
+    }
+  }
+  return null
+}
+
+function PrescriptionItemList({ items }: { items: RxItem[] }) {
+  const { t } = useTranslation()
+  return (
+    <ul className="timeline__rx-items" dir="ltr">
+      {items.map((item, idx) => (
+        <li key={idx}>
+          <strong>{item.drug_name}</strong>
+          {item.dosage    && <> · {t('medical.dosage')}: {item.dosage}</>}
+          {item.frequency && <> · {t('medical.frequency')}: {item.frequency}</>}
+          {item.duration  && <> · {t('medical.duration')}: {item.duration}</>}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 // Chip → which event types it selects. `null` means "all".
 const CHIPS: { key: string; types: TimelineEventType[] | null }[] = [
@@ -20,6 +81,12 @@ const CHIPS: { key: string; types: TimelineEventType[] | null }[] = [
   { key: 'records', types: ['MEDICAL_RECORD'] },
   { key: 'appointments', types: ['APPOINTMENT_COMPLETED'] },
 ]
+
+// Fields whose values are always English medical data — force LTR even in Arabic UI.
+const LTR_FIELDS = new Set([
+  'diagnosis', 'chief_complaint', 'treatment_plan',
+  'body', 'clinical_notes', 'notes', 'doctor_name', 'reason',
+])
 
 // Maps an event type to its CSS border modifier.
 const BORDER_CLASS: Record<TimelineEventType, string> = {
@@ -41,6 +108,47 @@ function EventCard({ event }: { event: TimelineEvent }) {
   const { language } = useLanguage()
   const [open, setOpen] = useState(false)
 
+  // Derive a translated title from event_type so the backend's hardcoded English string is never shown.
+  function getTitle(): string {
+    const d = event.detail
+    if (event.event_type === 'MEDICAL_RECORD') {
+      return t('timeline.event.MEDICAL_RECORD.title', { version: d.version ?? 1 })
+    }
+    return t(`timeline.event.${event.event_type}.title`, { defaultValue: event.title })
+  }
+
+  // Derive a translated summary from event_type + detail fields.
+  function getSummary(): string {
+    const d = event.detail
+    switch (event.event_type) {
+      case 'VITAL_SIGNS':
+        return t('timeline.event.VITAL_SIGNS.summary', {
+          bp: d.bp_systolic ?? '—', dbp: d.bp_diastolic ?? '—',
+          hr: d.heart_rate ?? '—', temp: d.temperature ?? '—',
+        })
+      case 'LAB_ORDER':
+        return t('timeline.event.LAB_ORDER.summary', {
+          order_number: d.order_number ?? '—',
+          status: d.status ? t(`timeline.status.${String(d.status)}`, { defaultValue: String(d.status) }) : '—',
+        })
+      case 'PRESCRIPTION':
+        return t('timeline.event.PRESCRIPTION.summary', {
+          count: Array.isArray(d.items) ? d.items.length : 0,
+        })
+      case 'CLINICAL_NOTE':
+        return typeof d.body === 'string' ? d.body.slice(0, 120) : ''
+      case 'MEDICAL_RECORD':
+        return (typeof d.diagnosis === 'string' && d.diagnosis
+          ? d.diagnosis
+          : typeof d.chief_complaint === 'string' ? d.chief_complaint : ''
+        ).slice(0, 120)
+      case 'APPOINTMENT_COMPLETED':
+        return t('timeline.event.APPOINTMENT_COMPLETED.summary', { doctor_name: d.doctor_name ?? '—' })
+      default:
+        return event.summary
+    }
+  }
+
   const detailRows = Object.entries(event.detail).filter(
     ([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0),
   )
@@ -49,8 +157,8 @@ function EventCard({ event }: { event: TimelineEvent }) {
     <div className={`timeline__event ${BORDER_CLASS[event.event_type]}`}>
       <button type="button" className="timeline__event-head" onClick={() => setOpen((o) => !o)}>
         <div className="timeline__event-main">
-          <span className="timeline__event-title">{event.title}</span>
-          <span className="timeline__event-summary">{event.summary}</span>
+          <span className="timeline__event-title">{getTitle()}</span>
+          <span className="timeline__event-summary">{getSummary()}</span>
         </div>
         <div className="timeline__event-meta">
           <span>{event.event_date ? formatDate(event.event_date, language) : ''}</span>
@@ -67,11 +175,18 @@ function EventCard({ event }: { event: TimelineEvent }) {
               <tbody>
                 {detailRows.map(([key, value]) => (
                   <tr key={key}>
-                    <th>{t(`timeline.field.${key}`, key)}</th>
-                    <td dir="auto">
-                      {Array.isArray(value)
-                        ? value.map((v) => (typeof v === 'object' ? JSON.stringify(v) : String(v))).join(', ')
-                        : String(value)}
+                    <th>{t(`timeline.field.${key}`, { defaultValue: key })}</th>
+                    <td dir={LTR_FIELDS.has(key) ? 'ltr' : 'auto'}>
+                      {(() => {
+                        const rxItems = parsePrescriptionItems(value)
+                        if (rxItems) return <PrescriptionItemList items={rxItems} />
+                        if (key === 'status' && typeof value === 'string') {
+                          return t(`timeline.status.${value}`, { defaultValue: value })
+                        }
+                        if (Array.isArray(value)) return value.map(String).join(', ')
+                        if (typeof value === 'string' && isISODatetime(value)) return formatDateTime(value, language)
+                        return String(value)
+                      })()}
                     </td>
                   </tr>
                 ))}

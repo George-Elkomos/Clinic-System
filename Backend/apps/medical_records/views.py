@@ -186,25 +186,41 @@ class PrescriptionViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
         patient = self._resolve_patient(serializer)
         serializer.save(doctor=self.request.user.doctor_profile, patient=patient)
 
-    @action(detail=True, methods=["post"])
-    def cancel(self, request, pk=None):
-        from django.utils import timezone as tz
+    def _assert_cancellable(self, prescription, user):
+        """Shared guard for cancel and reissue: ACTIVE + (issuing doctor or manager)."""
         from apps.core.enums import PrescriptionStatus
-        prescription = self.get_object()
         if prescription.status != PrescriptionStatus.ACTIVE:
             raise ValidationError({"status": "Only an active prescription can be cancelled."})
-        user = request.user
         if user.role != RoleChoices.MANAGER and (
             prescription.doctor is None or prescription.doctor.user_id != user.id
         ):
             raise PermissionDenied("Only the issuing doctor or a manager can cancel this prescription.")
-        serializer = PrescriptionCancelSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+
+    def _do_cancel(self, prescription, user, reason):
+        from django.utils import timezone as tz
+        from apps.core.enums import PrescriptionStatus
         prescription.status = PrescriptionStatus.CANCELLED
-        prescription.cancellation_reason = serializer.validated_data["cancellation_reason"]
+        prescription.cancellation_reason = reason
         prescription.cancelled_at = tz.now()
         prescription.cancelled_by = user
         prescription.save(update_fields=["status", "cancellation_reason", "cancelled_at", "cancelled_by", "updated_at"])
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        prescription = self.get_object()
+        self._assert_cancellable(prescription, request.user)
+        serializer = PrescriptionCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self._do_cancel(prescription, request.user, serializer.validated_data["cancellation_reason"])
+        return Response(PrescriptionSerializer(prescription).data)
+
+    @action(detail=True, methods=["post"])
+    def reissue(self, request, pk=None):
+        """Void the prescription with a fixed reason and return its full data so the
+        frontend can pre-fill the new-prescription form with the old items."""
+        prescription = self.get_object()
+        self._assert_cancellable(prescription, request.user)
+        self._do_cancel(prescription, request.user, "Voided for modification/re-issue")
         return Response(PrescriptionSerializer(prescription).data)
 
     @action(detail=True, methods=["get"])

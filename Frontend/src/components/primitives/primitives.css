@@ -1240,6 +1240,7 @@
 .timeline__detail-table th { text-align: start; padding: var(--space-2) var(--space-3); color: var(--text-muted); white-space: nowrap; vertical-align: top; width: 40%; }
 .timeline__detail-table td { padding: var(--space-2) var(--space-3); }
 .timeline__detail-empty, .timeline__empty { color: var(--text-muted); padding: var(--space-4) 0; }
+.timeline__rx-items { margin: 0; padding: 0; list-style: disc inside; display: flex; flex-direction: column; gap: var(--space-1); }
 .timeline__sentinel { display: flex; justify-content: center; padding: var(--space-3); min-height: 1px; }
 
 @media (max-width: 760px) {

@@ -61,4 +61,7 @@ export const medicalApi = {
 
   cancelPrescription: (id: number, cancellation_reason: string) =>
     api.post<Prescription>(`/prescriptions/${id}/cancel/`, { cancellation_reason }).then((r) => r.data),
+
+  reissuePrescription: (id: number) =>
+    api.post<Prescription>(`/prescriptions/${id}/reissue/`).then((r) => r.data),
 }

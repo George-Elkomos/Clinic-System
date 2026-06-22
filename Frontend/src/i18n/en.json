@@ -298,6 +298,11 @@
     "voidedOn": "Voided {{date}}",
     "voidedBy": "by {{name}}",
     "voidReason": "Reason: {{reason}}",
+    "reissuePrescription": "Modify / Re-issue",
+    "reissueConfirmTitle": "Modify / Re-issue Prescription",
+    "reissueConfirmMessage": "This will void the current prescription and copy its contents into the form below for modification. The original will be marked CANCELLED. Do you want to proceed?",
+    "reissueConfirmBtn": "Proceed",
+    "reissued": "Prescription voided — form pre-filled with previous contents. Review and re-issue.",
     "selectPatient": "Select a patient",
     "noPatients": "You have no patients yet. Patients appear here after a completed visit.",
     "uploadedBy": "Uploaded by {{name}}"
@@ -708,6 +713,23 @@
       "reason": "Reason",
       "scheduled_start": "Scheduled",
       "completed_at": "Completed"
+    },
+    "event": {
+      "VITAL_SIGNS":           { "title": "Vital Signs Recorded",  "summary": "BP: {{bp}}/{{dbp}} mmHg · HR: {{hr}} bpm · Temp: {{temp}}°C" },
+      "LAB_ORDER":             { "title": "Lab Order",              "summary": "Order #{{order_number}} · {{status}}" },
+      "PRESCRIPTION":          { "title": "Prescription",           "summary": "{{count}} item(s) prescribed" },
+      "CLINICAL_NOTE":         { "title": "Clinical Note" },
+      "MEDICAL_RECORD":        { "title": "Medical Record (v{{version}})" },
+      "APPOINTMENT_COMPLETED": { "title": "Completed Appointment",  "summary": "Consultation with Dr. {{doctor_name}}" }
+    },
+    "status": {
+      "ACTIVE":      "Active",
+      "CANCELLED":   "Cancelled",
+      "COMPLETED":   "Completed",
+      "PENDING":     "Pending",
+      "COLLECTED":   "Sample Collected",
+      "PROCESSING":  "Processing",
+      "REVIEWED":    "Reviewed"
     }
   },
   "encounters": {

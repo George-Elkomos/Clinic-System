@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { useAuth } from '../../hooks/useAuth'
 
 import { AIScribePanel } from '../../components/ai/AIScribePanel'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
@@ -22,7 +24,7 @@ import { errorMessage } from '../../services/apiClient'
 import { authApi } from '../../services/auth.api'
 import { medicalApi } from '../../services/medical.api'
 import { vitalsApi } from '../../services/vitals.api'
-import type { PrescriptionItem } from '../../services/types'
+import type { Prescription, PrescriptionItem } from '../../services/types'
 
 // ---- Vital Signs -----------------------------------------------------------
 function VitalsSection({ patientId }: { patientId: number }) {
@@ -173,8 +175,13 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
   const { language } = useLanguage()
   const { showToast } = useToast()
   const qc = useQueryClient()
+  const { user } = useAuth()
+  const confirm = useConfirm()
+  const newRxRef = useRef<HTMLHeadingElement>(null)
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<RxItem[]>([newRxItem()])
+  const [voidingId, setVoidingId] = useState<number | null>(null)
+  const [voidReason, setVoidReason] = useState('')
 
   const { data: prescriptions = [] } = useQuery({
     queryKey: ['prescriptions', patientId],
@@ -196,6 +203,40 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
+  const cancelRx = useMutation({
+    mutationFn: (id: number) => medicalApi.cancelPrescription(id, voidReason),
+    onSuccess: () => {
+      showToast(t('medical.voidedBadge'), 'success')
+      setVoidingId(null)
+      setVoidReason('')
+      qc.invalidateQueries({ queryKey: ['prescriptions', patientId] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const reissueMut = useMutation({
+    mutationFn: (id: number) => medicalApi.reissuePrescription(id),
+    onSuccess: (old) => {
+      setNotes(old.notes)
+      setItems(old.items.map((item) => ({ ...item, _key: crypto.randomUUID() })))
+      qc.invalidateQueries({ queryKey: ['prescriptions', patientId] })
+      showToast(t('medical.reissued'), 'success')
+      setTimeout(() => newRxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const handleReissue = async (p: Prescription) => {
+    const ok = await confirm({
+      title: t('medical.reissueConfirmTitle'),
+      message: t('medical.reissueConfirmMessage'),
+      confirmLabel: t('medical.reissueConfirmBtn'),
+      danger: true,
+    })
+    if (!ok) return
+    reissueMut.mutate(p.id)
+  }
+
   const openPdf = async (id: number) => {
     try { openBlob(await medicalApi.prescriptionPdf(id)) } catch (err) { showToast(errorMessage(err), 'error') }
   }
@@ -205,17 +246,92 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
 
   return (
     <Card title={t('medical.prescriptions')}>
-      {prescriptions.length === 0 ? <p>{t('medical.noPrescriptions')}</p> : prescriptions.map((p) => (
-        <div key={p.id} className="medical-prescription-row">
-          <div>
-            <strong>{t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}</strong>
-            <div className="medical-list-meta">{p.items.map((i) => i.drug_name).join(', ')}</div>
-          </div>
-          <Button variant="secondary" onClick={() => openPdf(p.id)}>{t('medical.openPdf')}</Button>
-        </div>
-      ))}
+      {prescriptions.length === 0 ? <p>{t('medical.noPrescriptions')}</p> : prescriptions.map((p) => {
+        const isCancelled = p.status === 'CANCELLED'
+        const isVoiding = voidingId === p.id
+        const canVoid = p.status === 'ACTIVE' && (
+          user?.role === 'MANAGER' ||
+          (user?.doctor_profile?.id != null && p.doctor === user.doctor_profile.id)
+        )
 
-      <h3 className="medical-section-divider">{t('medical.newPrescription')}</h3>
+        return (
+          <div key={p.id} className={`medical-prescription-row${isCancelled ? ' encounter-rx-item--voided' : ''}`}>
+            <div style={{ flex: 1 }}>
+              <div className="encounter-rx-item__row">
+                <strong>{t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}</strong>
+                {isCancelled && <span className="badge badge--CANCELLED">{t('medical.voidedBadge')}</span>}
+              </div>
+              <div className={`medical-list-meta${isCancelled ? ' rx-items--voided' : ''}`}>
+                {p.items.map((i) => i.drug_name).join(', ')}
+              </div>
+              {isCancelled && p.cancelled_at && (
+                <div className="rx-voided-banner">
+                  <span className="rx-voided-meta">
+                    {t('medical.voidedOn', { date: formatDate(p.cancelled_at, language) })}
+                    {p.cancelled_by_name && ` · ${t('medical.voidedBy', { name: p.cancelled_by_name })}`}
+                  </span>
+                  {p.cancellation_reason && (
+                    <span className="rx-voided-reason">{t('medical.voidReason', { reason: p.cancellation_reason })}</span>
+                  )}
+                </div>
+              )}
+              {isVoiding && (
+                <div className="encounter-rx-void-form">
+                  <textarea
+                    className="encounter-rx-void-reason"
+                    rows={2}
+                    placeholder={t('medical.voidReasonPlaceholder')}
+                    value={voidReason}
+                    onChange={(e) => setVoidReason(e.target.value)}
+                  />
+                  <div className="encounter-rx-void-actions">
+                    <Button
+                      variant="danger"
+                      loading={cancelRx.isPending}
+                      disabled={voidReason.trim().length < 5}
+                      onClick={() => cancelRx.mutate(p.id)}
+                    >
+                      {t('medical.voidConfirmBtn')}
+                    </Button>
+                    <Button variant="secondary" onClick={() => { setVoidingId(null); setVoidReason('') }}>
+                      {t('common.cancel')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0, alignItems: 'flex-start' }}>
+              {!isCancelled && (
+                <Button variant="secondary" onClick={() => openPdf(p.id)}>{t('medical.openPdf')}</Button>
+              )}
+              {canVoid && !isVoiding && (
+                <>
+                  <button
+                    className="encounter-rx-void-btn"
+                    title={t('medical.reissuePrescription')}
+                    onClick={() => handleReissue(p)}
+                    disabled={reissueMut.isPending}
+                  >✏️</button>
+                  <button
+                    className="encounter-rx-void-btn"
+                    title={t('medical.voidPrescription')}
+                    onClick={() => { setVoidingId(p.id); setVoidReason('') }}
+                  >🚫</button>
+                </>
+              )}
+              {isVoiding && (
+                <button
+                  className="encounter-rx-void-btn"
+                  title={t('common.cancel')}
+                  onClick={() => { setVoidingId(null); setVoidReason('') }}
+                >✕</button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      <h3 ref={newRxRef} className="medical-section-divider">{t('medical.newPrescription')}</h3>
       {items.map((it, idx) => (
         <div key={it._key} className="medical-rx-item">
           <div className="medical-rx-field--wide"><FormField label={t('medical.medication')}>{(p) => <input {...p} value={it.drug_name} onChange={(e) => setItem(idx, 'drug_name', e.target.value)} />}</FormField></div>
