@@ -130,6 +130,16 @@ class _UploadViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
             )
         serializer.save(**extra)
 
+    def destroy(self, request, *args, **kwargs):
+        obj = self.get_object()  # MedicalDataPermission object check runs here
+        # Tighter restriction: only the uploader or a manager may delete.
+        if request.user.role != RoleChoices.MANAGER and obj.uploaded_by_id != request.user.id:
+            raise PermissionDenied("You can only delete files you uploaded.")
+        if obj.file:
+            obj.file.delete(save=False)  # remove bytes from storage
+        obj.soft_delete()
+        return Response(status=204)
+
     @action(detail=True, methods=["get"])
     def download(self, request, pk=None):
         obj = self.get_object()  # enforces object-level permission

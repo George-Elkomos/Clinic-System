@@ -1268,6 +1268,11 @@
 .badge--AMENDED   { border-color: var(--warning); color: var(--warning); }
 .badge--CANCELLED { border-color: var(--error, #e53e3e); color: var(--error, #e53e3e); }
 
+/* Scan row actions */
+.medical-scan-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
+.medical-scan-row:last-of-type { border-bottom: none; }
+.medical-scan-actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
+
 /* Prescription void UI — encounter sidebar */
 .encounter-rx-item { list-style: none; padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
 .encounter-rx-item:last-child { border-bottom: none; }

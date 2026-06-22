@@ -6,6 +6,7 @@ import { AIScribePanel } from '../../components/ai/AIScribePanel'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
+import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
@@ -238,6 +239,7 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [file, setFile] = useState<File | null>(null)
   const [category, setCategory] = useState('XRAY')
@@ -260,8 +262,27 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
+  const deleteScan = useMutation({
+    mutationFn: (id: number) => medicalApi.deleteScan(id),
+    onSuccess: () => {
+      showToast(t('medical.scanDeleted'), 'success')
+      qc.invalidateQueries({ queryKey: ['scans', patientId] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
   const download = async (id: number, name: string) => {
     try { saveBlob(await medicalApi.downloadScan(id), name || `scan-${id}`) } catch (err) { showToast(errorMessage(err), 'error') }
+  }
+
+  const handleDelete = async (id: number, name: string) => {
+    const ok = await confirm({
+      title: t('medical.deleteScanTitle'),
+      message: t('medical.deleteScanMessage', { name }),
+      confirmLabel: t('medical.deleteScanConfirm'),
+      danger: true,
+    })
+    if (ok) deleteScan.mutate(id)
   }
 
   return (
@@ -269,7 +290,10 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
       {scans.map((s) => (
         <div key={s.id} className="medical-scan-row">
           <span><strong>{s.category}</strong> · {s.original_filename} · {formatDate(s.created_at, language)}</span>
-          <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
+          <div className="medical-scan-actions">
+            <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
+            <Button variant="danger" onClick={() => handleDelete(s.id, s.original_filename)}>🗑 {t('medical.delete')}</Button>
+          </div>
         </div>
       ))}
       {labs.map((l) => (
