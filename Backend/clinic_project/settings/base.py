@@ -66,6 +66,7 @@ LOCAL_APPS = [
     "apps.reports",
     "apps.audit",
     "apps.vital_signs",   # Phase 5
+    "apps.ai_scribe",     # AI medical scribe (voice -> transcript -> structured draft)
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -212,3 +213,23 @@ REMINDER_24H_WINDOW_MINUTES = env("REMINDER_24H_WINDOW_MINUTES")
 REMINDER_1H_WINDOW_MINUTES = env("REMINDER_1H_WINDOW_MINUTES")
 WAITLIST_HOLD_HOURS = env("WAITLIST_HOLD_HOURS")
 CLINIC_NAME = env("CLINIC_NAME")
+
+# --- AI Scribe (apps/ai_scribe) ---------------------------------------------
+# Records a doctor-patient session -> Whisper transcript -> Gemini structured
+# draft the doctor reviews and confirms. All heavy deps are imported lazily, so
+# the app boots even if faster-whisper / google-genai are not installed yet.
+AI_SCRIBE_ENABLED = env("AI_SCRIBE_ENABLED", default=True)
+
+# Speech-to-text (faster-whisper, runs locally / offline).
+# large-v3 is the most accurate for Egyptian Arabic but heavy on CPU; drop to
+# "medium" or "small" via .env if transcription is too slow on this machine.
+WHISPER_MODEL_SIZE = env("WHISPER_MODEL_SIZE", default="large-v3")
+WHISPER_DEVICE = env("WHISPER_DEVICE", default="cpu")          # "cpu" or "cuda"
+WHISPER_COMPUTE_TYPE = env("WHISPER_COMPUTE_TYPE", default="int8")  # int8=CPU-friendly; float16 for GPU
+WHISPER_DEFAULT_LANGUAGE = env("WHISPER_DEFAULT_LANGUAGE", default="ar")
+WHISPER_MODEL_DIR = env("WHISPER_MODEL_DIR", default=str(BASE_DIR / "media" / "whisper_models"))
+AI_SCRIBE_MAX_AUDIO_MB = env.int("AI_SCRIBE_MAX_AUDIO_MB", default=80)
+
+# Structured extraction (Google Gemini — free tier key from aistudio.google.com).
+GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-2.0-flash")

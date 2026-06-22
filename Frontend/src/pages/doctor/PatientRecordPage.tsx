@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { AIScribePanel } from '../../components/ai/AIScribePanel'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
@@ -340,6 +341,7 @@ export function PatientRecordPage() {
 
       {patientId !== '' && (
         <>
+          <AIScribePanel patientId={patientId} />
           <VitalsSection patientId={patientId} />
           <RecordsSection patientId={patientId} />
           <NotesSection patientId={patientId} categories={categories} />

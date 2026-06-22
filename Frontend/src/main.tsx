@@ -12,6 +12,7 @@ import { queryClient } from './lib/queryClient'
 import { router } from './routes/router'
 import './theme/globals.css'
 import './components/primitives/primitives.css'
+import './components/ai/ai-scribe.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
