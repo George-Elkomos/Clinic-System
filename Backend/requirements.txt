@@ -21,6 +21,17 @@ django-simple-history==3.11.0
 # --- Optional SMS / WhatsApp (feature-flagged off by default) ---
 twilio==9.10.9          # SMS + WhatsApp via Twilio; feature-gated by SMS_ENABLED / WHATSAPP_ENABLED
 
+# --- AI Scribe (apps/ai_scribe): voice session -> transcript -> structured draft ---
+# Speech-to-text. faster-whisper runs Whisper large-v3 locally via CTranslate2
+# (4x faster, ~1/4 the memory of openai-whisper, same accuracy). Best open option
+# for Egyptian Arabic. Bundles its own audio decoding (PyAV) — no separate ffmpeg.
+# Verified to install on Python 3.14 (cp314 wheels resolved June 2026).
+faster-whisper==1.2.1   # pulls ctranslate2, av (audio decode), onnxruntime, tokenizers
+# Structured extraction. Google Gemini has a genuinely free API tier (free key at
+# aistudio.google.com, no card) and strong Arabic. Provider is pluggable in
+# apps/ai_scribe/services/extraction.py — swap for Groq/OpenAI by editing one module.
+google-genai==2.9.0
+
 # --- Dev / test ---
 pytest==8.4.1
 pytest-django==4.11.1

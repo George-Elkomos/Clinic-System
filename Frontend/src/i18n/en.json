@@ -613,5 +613,38 @@
   },
   "breadcrumbs": {
     "home": "Home"
+  },
+  "ai": {
+    "title": "AI Scribe — record this visit",
+    "intro": "Record (or upload) the consultation. It is transcribed and turned into a draft you review and confirm before anything is saved.",
+    "record": "Record session",
+    "stop": "Stop",
+    "or": "or",
+    "upload": "Upload audio file",
+    "uploading": "Uploading audio…",
+    "queued": "Queued for processing…",
+    "transcribing": "Transcribing the recording…",
+    "extracting": "Extracting clinical details…",
+    "failed": "Processing failed.",
+    "retry": "Try again",
+    "discard": "Discard",
+    "committed": "Saved to the patient's record.",
+    "committedDetail": "The medical record (and any prescription) was saved.",
+    "newRecording": "Record another session",
+    "reviewWarning": "AI-generated draft — review and edit carefully before saving. Nothing is stored until you confirm.",
+    "transcript": "Show transcript",
+    "draftHeading": "Draft record",
+    "commit": "Confirm & save to record",
+    "micDenied": "Microphone access was denied or is unavailable.",
+    "noMeds": "No medications detected. Add one if needed.",
+    "followUp": "Follow-up",
+    "vitals": {
+      "blood_pressure": "Blood pressure",
+      "heart_rate": "Heart rate",
+      "temperature": "Temperature",
+      "respiratory_rate": "Respiratory rate",
+      "oxygen_saturation": "O₂ saturation",
+      "weight": "Weight"
+    }
   }
 }
