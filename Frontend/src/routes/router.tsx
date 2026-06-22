@@ -14,6 +14,7 @@ import { MyMedicalHistoryPage } from '../pages/patient/MyMedicalHistoryPage'
 import { MyScansLabsPage } from '../pages/patient/MyScansLabsPage'
 import { MyPrescriptionsPage } from '../pages/patient/MyPrescriptionsPage'
 import { PatientVitalSignsTab } from '../pages/patient/PatientVitalSignsTab'
+import { PatientTimelinePage } from '../pages/patient/PatientTimelinePage'
 import { DoctorDashboard } from '../pages/doctor/DoctorDashboard'
 import { DoctorQueuePage } from '../pages/doctor/DoctorQueuePage'
 import { ScheduleManagementPage } from '../pages/doctor/ScheduleManagementPage'
@@ -23,6 +24,7 @@ import { DoctorReviewsPage } from '../pages/doctor/DoctorReviewsPage'
 import { LabOrdersListPage } from '../pages/doctor/LabOrdersListPage'
 import { CreateLabOrderPage } from '../pages/doctor/CreateLabOrderPage'
 import { LabOrderDetailsPage } from '../pages/doctor/LabOrderDetailsPage'
+import { EncounterPage } from '../pages/doctor/EncounterPage'
 import { PatientLabResultsPage } from '../pages/patient/PatientLabResultsPage'
 import { SampleCollectionPage } from '../pages/secretary/SampleCollectionPage'
 import { SecretaryDashboard } from '../pages/secretary/SecretaryDashboard'
@@ -65,6 +67,7 @@ export const router = createBrowserRouter([
       { path: 'prescriptions', element: <MyPrescriptionsPage /> },
       { path: 'vitals', element: <PatientVitalSignsTab /> },
       { path: 'lab-results', element: <PatientLabResultsPage /> },
+      { path: 'timeline', element: <PatientTimelinePage /> },
     ],
   },
 
@@ -82,6 +85,7 @@ export const router = createBrowserRouter([
       { path: 'lab-orders', element: <LabOrdersListPage /> },
       { path: 'lab-orders/new', element: <CreateLabOrderPage /> },
       { path: 'lab-orders/:id', element: <LabOrderDetailsPage /> },
+      { path: 'encounters/:appointmentId', element: <EncounterPage /> },
     ],
   },
 

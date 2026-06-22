@@ -1190,3 +1190,92 @@
   .lab-form-actions { flex-direction: column; }
   .lab-form-actions .btn { width: 100%; }
 }
+
+/* --- Patient History Timeline (Phase 7) --- */
+.timeline { display: flex; flex-direction: column; gap: var(--space-4); }
+.timeline__filters {
+  display: flex; flex-wrap: wrap; gap: var(--space-4);
+  align-items: flex-end; justify-content: space-between;
+}
+.timeline__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.timeline-chip {
+  padding: var(--space-2) var(--space-4); border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  font-size: var(--font-small); cursor: pointer; min-height: var(--tap-min);
+}
+.timeline-chip:hover { background: var(--surface-hover); }
+.timeline-chip--active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.timeline__dates { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.timeline__dates label { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--font-small); color: var(--text-muted); }
+.timeline__dates input { min-height: var(--tap-min); padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--radius); }
+
+.timeline__group { display: flex; flex-direction: column; gap: var(--space-3); }
+.timeline__month {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg); padding: var(--space-2) 0;
+  margin: 0; font-size: var(--font-h3); border-bottom: 1px solid var(--border);
+}
+.timeline__event {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--border); border-radius: var(--radius);
+  overflow: hidden;
+}
+.timeline__event--vitals { border-left-color: #8B5CF6; }
+.timeline__event--labs   { border-left-color: #3B82F6; }
+.timeline__event--rx     { border-left-color: #10B981; }
+.timeline__event--notes  { border-left-color: #6B7280; }
+.timeline__event-head {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4); padding: var(--space-3) var(--space-4);
+  background: none; border: none; cursor: pointer; text-align: start;
+  font: inherit; color: inherit; min-height: var(--tap-min);
+}
+.timeline__event-head:hover { background: var(--surface-hover); }
+.timeline__event-main { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.timeline__event-title { font-weight: 700; }
+.timeline__event-summary { color: var(--text-muted); font-size: var(--font-small); }
+.timeline__event-meta { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; color: var(--text-muted); font-size: var(--font-small); }
+.timeline__detail { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); background: var(--bg); }
+.timeline__detail-table { width: 100%; border-collapse: collapse; font-size: var(--font-small); }
+.timeline__detail-table th { text-align: start; padding: var(--space-2) var(--space-3); color: var(--text-muted); white-space: nowrap; vertical-align: top; width: 40%; }
+.timeline__detail-table td { padding: var(--space-2) var(--space-3); }
+.timeline__detail-empty, .timeline__empty { color: var(--text-muted); padding: var(--space-4) 0; }
+.timeline__sentinel { display: flex; justify-content: center; padding: var(--space-3); min-height: 1px; }
+
+@media (max-width: 760px) {
+  .timeline__filters { flex-direction: column; align-items: stretch; }
+  .timeline__event-head { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+  .timeline__detail-table th { width: auto; }
+}
+
+/* --- Clinical Encounter (Phase 8) --- */
+.encounter-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.encounter-locked { color: var(--text-muted); margin-bottom: var(--space-3); }
+.encounter-layout { display: grid; grid-template-columns: 1fr 320px; gap: var(--space-4); align-items: start; }
+.encounter-main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.encounter-sidebar { position: sticky; top: var(--space-4); }
+.encounter-sidebar-actions { display: flex; flex-direction: column; gap: var(--space-3); }
+.encounter-linked-list { margin: 0; padding-inline-start: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
+.encounter-none { color: var(--text-muted); font-size: var(--font-small); }
+.encounter-vitals-linked { color: var(--success); font-weight: 600; }
+.encounter-submit-row { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
+.encounter-autosave-hint { color: var(--text-muted); font-size: var(--font-small); }
+.queue-encounter-cta { display: block; margin-bottom: var(--space-3); }
+
+/* Encounter status badges */
+.badge--DRAFT     { border-color: var(--border); color: var(--text-muted); }
+.badge--SUBMITTED { border-color: var(--success); color: var(--success); }
+.badge--AMENDED   { border-color: var(--warning); color: var(--warning); }
+
+/* Modal header/close + wide variant (extends the shared .modal styles) */
+.modal--wide { max-width: 760px; width: 100%; }
+.modal__header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.modal__close {
+  background: none; border: none; font-size: var(--font-h2); line-height: 1;
+  cursor: pointer; color: var(--text-muted); padding: var(--space-1); min-height: var(--tap-min); min-width: var(--tap-min);
+}
+
+@media (max-width: 760px) {
+  .encounter-layout { grid-template-columns: 1fr; }
+  .encounter-sidebar { position: static; }
+}

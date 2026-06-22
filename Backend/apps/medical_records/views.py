@@ -3,11 +3,14 @@ from django.http import FileResponse
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, get_object_or_404
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.core.enums import RoleChoices
+from apps.core.pagination import DefaultPagination
 from apps.users.models import PatientProfile
 from apps.users.permissions import IsDoctorOrManager
 
@@ -28,6 +31,7 @@ from .serializers import (
 from .services import lab_orders as lab_order_service
 from .services.pdf import render_prescription_pdf
 from .services.records import create_record_version
+from .services.timeline import build_patient_timeline
 
 
 def scope_to_user(qs, user):
@@ -326,5 +330,40 @@ class LabOrderViewSet(viewsets.ModelViewSet):
             lab_result.file.open("rb"), as_attachment=True,
             filename=lab_result.file.name.split("/")[-1],
         )
+
+
+class PatientTimelineView(APIView):
+    """GET /api/patients/{id}/timeline/ — unified chronological history feed.
+
+    RBAC: patient (own only), treating doctor, manager. Secretaries are denied.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk=None):
+        patient = get_object_or_404(PatientProfile, pk=pk)
+        user = request.user
+
+        if user.role == RoleChoices.SECRETARY:
+            raise PermissionDenied("Secretaries cannot view patient timelines.")
+        if user.role == RoleChoices.PATIENT and patient.user_id != user.id:
+            raise PermissionDenied("You can only view your own history.")
+        if user.role == RoleChoices.DOCTOR and not doctor_treats(user, patient):
+            raise PermissionDenied("You can only view your own patients' history.")
+        # MANAGER falls through with full access.
+
+        types_param = request.query_params.get("types")
+        types = [t.strip() for t in types_param.split(",") if t.strip()] if types_param else None
+
+        events = build_patient_timeline(
+            patient,
+            types=types,
+            date_from=request.query_params.get("date_from"),
+            date_to=request.query_params.get("date_to"),
+        )
+
+        paginator = DefaultPagination()
+        page = paginator.paginate_queryset(events, request, view=self)
+        return paginator.get_paginated_response(page)
 
 

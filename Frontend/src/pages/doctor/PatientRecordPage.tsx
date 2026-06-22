@@ -13,6 +13,7 @@ import { useToast } from '../../components/primitives/Toast'
 import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
 import { VitalSignsHistory } from '../../components/vitals/VitalSignsHistory'
 import { VitalSignsTrendChart } from '../../components/vitals/VitalSignsTrendChart'
+import { PatientTimeline } from '../../components/timeline/PatientTimeline'
 import { useLanguage } from '../../hooks/useLanguage'
 import { openBlob, saveBlob } from '../../lib/download'
 import { formatDate } from '../../lib/format'
@@ -347,6 +348,9 @@ export function PatientRecordPage() {
           <NotesSection patientId={patientId} categories={categories} />
           <PrescriptionsSection patientId={patientId} />
           <ScansLabsSection patientId={patientId} />
+          <Card title={t('timeline.title')}>
+            <PatientTimeline patientId={patientId} />
+          </Card>
         </>
       )}
     </div>

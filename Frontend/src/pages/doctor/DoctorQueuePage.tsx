@@ -107,6 +107,12 @@ function CurrentPanel({
           <InfoRow label={t('queue.currentMedications')} value={appt.patient_current_medications} />
         )}
 
+        {appt.status === 'IN_PROGRESS' && (
+          <Link to={`/doctor/encounters/${appt.id}`} className="queue-encounter-cta">
+            <Button block>🩻 {t('encounters.open')}</Button>
+          </Link>
+        )}
+
         <div className="queue-actions">
           <Button loading={isPending} onClick={() => onComplete(appt.id)}>
             {t('queue.complete')}

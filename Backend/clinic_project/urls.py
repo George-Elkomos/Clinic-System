@@ -19,6 +19,7 @@ api_patterns = [
     path("", include("apps.reports.urls")),  # Phase 4
     path("", include("apps.vital_signs.urls")),  # Phase 5
     path("", include("apps.ai_scribe.urls")),  # AI medical scribe
+    path("", include("apps.encounters.urls")),  # Phase 8 — encounters + complaints + diagnoses
 ]
 
 urlpatterns = [

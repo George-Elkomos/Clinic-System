@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
@@ -116,6 +117,11 @@ export function DoctorAppointmentsPage() {
                 </div>
                 <div className="appt-card__actions">
                   <StatusBadge status={a.status} />
+                  {a.status === 'IN_PROGRESS' && (
+                    <Link to={`/doctor/encounters/${a.id}`}>
+                      <Button>🩻 {t('encounters.open')}</Button>
+                    </Link>
+                  )}
                   {action && (
                     <Button onClick={() => transition.mutate({ id: a.id, action: action.action })}>
                       {action.label}

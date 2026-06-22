@@ -195,9 +195,10 @@ The trend chart appears **above the form** inside the Vital Signs card, but **on
 - If you changed a value from danger to normal, the red color on that tile should disappear
 
 #### Edge case — 24-hour edit window:
-- If you try to edit a record that was created **more than 24 hours ago**, you will see a **red error toast** saying the edit window has expired.
-- The save button will fail and the form will remain open.
-- You **cannot** edit records older than 24 hours as a Doctor. Only a Manager role can do this.
+- Records older than 24 hours show the **Edit button greyed out (disabled)**.
+- If you hover over the disabled button, a tooltip appears: *"Editing is locked — this record is older than 24 hours."*
+- The form **never opens** for expired records — the lock is visible before you start any editing.
+- Only a **Manager** account ignores this limit and always gets a clickable Edit button.
 
 ---
 
@@ -558,9 +559,382 @@ The "Submit Order" and "Save as Draft" buttons are **disabled** (greyed out) unt
 
 ---
 
+---
+
+## PART 3 — AI SCRIBE
+
+The AI Scribe lets a Doctor **record or upload** a consultation audio, have it transcribed automatically, and get a structured clinical draft (chief complaint, diagnosis, treatment plan, vitals, prescriptions) that the doctor reviews and edits before confirming. **Nothing is written to the patient's record until the doctor clicks "Confirm & save".**
+
+> **Prerequisites:**
+> - The server must be configured with a Gemini API key (`GOOGLE_API_KEY` in `.env`) and `faster-whisper` must be installed (see `requirements.txt`).
+> - You must be logged in as a **Doctor**.
+> - A patient must be assigned to your doctor profile.
+
+---
+
+### 3.1 FINDING THE AI SCRIBE PANEL
+
+1. Go to **Patients** in the sidebar → `/doctor/patients`.
+2. Select any patient from the dropdown.
+3. Scroll down through the patient sections. After Vital Signs and Medical Records, you will see a card titled **"AI Scribe — record this visit"**.
+4. The panel shows a short intro line: *"Record (or upload) the consultation. It is transcribed and turned into a draft you review and confirm before anything is saved."*
+5. Two controls appear:
+   - A blue **"● Record session"** button
+   - An **"or"** separator
+   - A **"Upload audio file"** secondary button
+
+> **Expected:** The panel is visible only to Doctors. Patients and Secretaries do not see it.
+
+---
+
+### 3.2 RECORD A LIVE CONSULTATION
+
+**Starting point:** AI Scribe panel visible with a patient selected.
+
+1. Click **"● Record session"**.
+   - Your browser will ask for **microphone permission** — click **Allow**.
+   - If you deny it, a red toast appears: *"Microphone access was denied or is unavailable."* — this is correct behavior.
+2. Once recording starts:
+   - The "Record session" button is replaced by a red **"■ Stop · 0:00"** button.
+   - A running **timer** counts up every second (e.g., `■ Stop · 0:07`).
+3. Speak for 10–15 seconds. Say something like:
+   > *"Patient is a 45-year-old presenting with chest pain and shortness of breath. Blood pressure 130 over 85. Heart rate 92. Temperature 37.2. Diagnosis: hypertensive urgency. Treatment plan: start Amlodipine 5mg once daily for 30 days. Follow up in two weeks."*
+4. Click **"■ Stop"** to finish recording.
+
+#### What happens after stopping:
+- The recording is uploaded automatically (you see *"Uploading audio…"* with a spinner).
+- Status changes to *"Queued for processing…"* briefly.
+- Then *"Transcribing the recording…"* (Whisper running — may take 10–60 seconds depending on audio length and server hardware).
+- Then *"Extracting clinical details…"* (Gemini structuring the transcript).
+- When done, the processing spinner disappears and the **draft review form** appears.
+
+#### Success criteria:
+- [ ] Timer increments while recording
+- [ ] Stop button changes back after stopping
+- [ ] Each processing phase label appears in sequence
+- [ ] Draft form appears when extraction is complete
+
+---
+
+### 3.3 UPLOAD A PRE-RECORDED AUDIO FILE
+
+Instead of recording live, you can upload an existing audio file:
+
+1. Click the **"Upload audio file"** button (secondary/outline button).
+2. A file picker opens. Select any `.mp3`, `.wav`, `.webm`, `.m4a`, or `.ogg` file that contains speech.
+3. The file uploads and goes through the same processing pipeline as a live recording.
+
+#### Notes:
+- The upload button is **disabled while recording** (you cannot record and upload at the same time).
+- Very short files (under 2 seconds) may produce an empty transcript — this is expected.
+
+---
+
+### 3.4 REVIEWING AND EDITING THE DRAFT
+
+Once processing completes, the panel shows the **draft review form**. This is the most important step.
+
+#### Yellow warning banner
+At the top of the draft you will see:
+> *"AI-generated draft — review and edit carefully before saving. Nothing is stored until you confirm."*
+
+This is always visible as a reminder that the AI may have made mistakes.
+
+#### Transcript toggle (optional)
+- Below the warning, there is a collapsible **"▸ Show transcript"** line.
+- Click it to expand and read the raw text that Whisper produced.
+- Click **"▾ Show transcript"** to collapse it again.
+- The transcript is **read-only** — you cannot edit it directly.
+
+#### Draft fields to review:
+
+| Section | Fields | What to check |
+|---|---|---|
+| Clinical | Chief Complaint | Should match what was spoken |
+| Clinical | Diagnosis | Verify accuracy — LLMs can hallucinate |
+| Clinical | Treatment Plan | Verify accuracy |
+| Vitals | Blood Pressure, Heart Rate, Temperature, Respiratory Rate, O₂ Saturation, Weight | Should be extracted from audio; correct any misread numbers |
+| Prescriptions | Drug name, Dosage, Frequency, Duration | Most critical — verify every field before confirming |
+| Follow-up | Follow up notes | May be empty if not mentioned in audio |
+
+#### Editing the draft:
+1. Click any text field and type your corrections.
+2. For prescriptions:
+   - Click the **"✕ Remove"** button next to a prescription row to delete it.
+   - Click **"+ Add medication"** to add a new prescription row manually.
+3. All changes are **local only** — nothing is saved until you confirm.
+
+#### Success criteria:
+- [ ] All spoken values appear pre-filled in the correct fields
+- [ ] You can type in any field and the value changes
+- [ ] Removing a prescription row works
+- [ ] Adding a prescription row adds a blank row below
+
+---
+
+### 3.5 CONFIRMING THE DRAFT (COMMIT)
+
+After reviewing and correcting all fields:
+
+1. Click the **"Confirm & save to record"** (blue primary button at the bottom).
+   - A loading spinner appears on the button.
+2. When complete, the draft form is replaced by a green confirmation message:
+   > *"✓ The medical record (and any prescription) was saved."*
+3. A green toast also appears: *"Saved to the patient's record."*
+
+#### What gets saved:
+- A new **MedicalRecord** row is created under the patient (Chief Complaint, Diagnosis, Treatment Plan).
+- If there were prescriptions, a new **Prescription** row is also created.
+- The **Medical Records section** and **Prescriptions section** on the same patient page will now show the new entries (you may need to scroll up to see them).
+
+#### After confirming:
+- A **"Record another session"** button appears.
+- Click it to reset the panel and start a new recording for the same patient.
+
+#### Success criteria:
+- [ ] Green toast + confirmation message appears
+- [ ] The new medical record appears in the patient's Medical Records section
+- [ ] The new prescription appears in the patient's Prescriptions section (if any were in the draft)
+- [ ] "Record another session" button appears after commit
+
+---
+
+### 3.6 DISCARD A DRAFT
+
+If you decide the draft is unusable:
+
+1. In the draft review form, click **"Discard"** (secondary button next to "Confirm & save").
+2. The draft is removed and the panel resets to show the Record / Upload buttons.
+3. **Nothing is saved** — no medical record or prescription is created.
+
+#### Also works during processing:
+- The **Discard** button is **not shown during transcription/extraction** — you must wait for the draft to appear before discarding.
+
+---
+
+### 3.7 FAILED PROCESSING
+
+If the transcription or extraction step fails (e.g., audio was too noisy, API key missing):
+
+1. The processing spinner is replaced by a red error box:
+   > *"Processing failed."*
+2. If there is a technical error message from the server, it appears in a grey code block below.
+3. Two buttons appear: **"Try again"** and **"Discard"**.
+4. Click **"Try again"** — the pipeline reruns from the beginning on the same uploaded file.
+5. Click **"Discard"** to give up and reset the panel.
+
+#### To test failure intentionally:
+- Remove `GOOGLE_API_KEY` from `.env`, restart the server, then upload an audio file.
+- The session will fail at the EXTRACTING step and show the error panel.
+
+---
+
+### 3.8 PERMISSIONS CHECK
+
+| Action | PATIENT | DOCTOR | SECRETARY | MANAGER |
+|---|---|---|---|---|
+| See AI Scribe panel | ✗ | ✓ | ✗ | ✗ |
+| Upload audio | ✗ | ✓ | ✗ | ✗ |
+| Commit draft | ✗ | ✓ | ✗ | ✗ |
+| View session status | ✗ | own only | ✗ | ✗ |
+
+> The AI Scribe panel is rendered only inside the Doctor patient view — there is no route for other roles.
+
+---
+
+---
+
+## PART 4 — PATIENT ROLE
+
+Log in with a Patient account (e.g., `patient@clinic.test` / `Password123!`).
+
+---
+
+### 4.1 PATIENT NAVIGATION
+
+After login, the Patient dashboard appears at `/patient`. The sidebar shows:
+- Dashboard (🏠)
+- My Vitals (or similar icon)
+- Lab Results (🧪)
+- Appointments
+- Medical Records
+- Prescriptions
+- Profile
+
+---
+
+### 4.2 PATIENT — VIEW VITAL SIGNS HISTORY
+
+1. Click **"My Vitals"** in the sidebar → URL: `/patient/vitals`
+2. You will see:
+   - A heading (Vital Signs)
+   - If the patient has 2+ records: a **metric selector + trend chart** at the top
+   - Below the chart: a scrollable history of vital sign cards, newest first
+
+#### What the patient can and cannot do:
+| Feature | Patient sees? |
+|---|---|
+| Vital signs cards (read-only) | ✓ Yes |
+| Metric trend chart | ✓ Yes (if 2+ records) |
+| Record new vitals form | ✗ No |
+| Edit button | ✗ Not shown |
+| Delete button | ✗ Not shown |
+
+#### Verify read-only:
+- Scroll through the history cards.
+- Confirm there is **no "Edit" or "Delete" button** on any card.
+- Confirm there is **no "Record" form** above the history.
+
+#### Success criteria:
+- [ ] Vitals page loads at `/patient/vitals`
+- [ ] History cards show values with amber/red highlighting for abnormal values
+- [ ] Trend chart visible when 2+ records exist
+- [ ] No Edit or Delete buttons anywhere on the page
+
+---
+
+### 4.3 PATIENT — VIEW LAB RESULTS
+
+1. Click **"Lab Results"** in the sidebar → URL: `/patient/lab-results`
+2. You will see a list of lab orders that belong to this patient.
+
+#### Important visibility rule:
+Patients can **only see results for orders in COMPLETED or REVIEWED status**. Orders that are still DRAFT, ORDERED, SAMPLE_COLLECTED, or PROCESSING are **not shown** to the patient — they are still being processed.
+
+#### To verify:
+1. Log in as a Doctor in a second browser tab. Create and submit a lab order for this patient.
+2. Switch to the Patient tab. Refresh the page.
+3. The new order (status = ORDERED) should **not appear** in the patient's list.
+4. As a Secretary, advance the order through SAMPLE_COLLECTED → PROCESSING → COMPLETED.
+5. Go back to the Patient tab. Refresh.
+6. The order **now appears** with the status "Completed".
+
+#### What the patient sees on each order:
+- Order number (e.g., `LAB-2026-0001`)
+- Patient name (their own)
+- Doctor name
+- Status badge
+- Date
+- An expandable row or link to the results table
+
+#### Results table (if order is COMPLETED or REVIEWED):
+- Each row: Test Name, Result Value, Unit, Reference Range, Result Date
+- Abnormal rows have an **amber left border**
+- Critical rows have a **red left border**
+
+#### Success criteria:
+- [ ] Orders only visible at COMPLETED or REVIEWED status
+- [ ] Orders still in progress are hidden
+- [ ] Result rows show amber/red borders for abnormal/critical values
+- [ ] Patient cannot see a "Mark as Reviewed" or any action button
+- [ ] Patient cannot create or modify any order
+
+---
+
+---
+
+## PART 5 — MANAGER ROLE
+
+Log in with the Manager account: `manager@clinic.test` / `Password123!`.
+
+The Manager is a **superuser** within the application — they can perform any action across all roles. The sections below focus on the actions that are **exclusive to Manager** or work differently compared to Doctor/Secretary.
+
+---
+
+### 5.1 MANAGER NAVIGATION
+
+After login, the sidebar shows all sections: Patients, Vital Signs, Lab Orders, Appointments, Medical Records, Users, Reports, Dashboard.
+
+---
+
+### 5.2 MANAGER — EDIT VITAL SIGNS WITH NO TIME LIMIT
+
+Unlike Doctors (24-hour window) and Secretaries (24-hour window), a Manager can edit **any vital signs record regardless of age**.
+
+1. Go to **Patients** → select a patient.
+2. Scroll to the Vital Signs section.
+3. Find a record that was created **more than 24 hours ago**.
+4. Confirm the **Edit button is NOT greyed out** — it is fully clickable (no disabled state, no tooltip).
+5. Click **Edit**.
+6. Change **Respiratory Rate** to `15`.
+7. Click **Save**.
+
+#### Expected results:
+- Green toast: record saved
+- Updated card appears with the new value
+- No "edit window expired" error at any point
+
+#### Success criteria:
+- [ ] Edit button is active (not disabled) on records older than 24h
+- [ ] No tooltip appears on hover
+- [ ] Edit saves successfully
+
+---
+
+### 5.3 MANAGER — DELETE VITAL SIGNS
+
+Only a Manager can permanently delete vital sign records.
+
+1. In the Vital Signs history, find any record.
+2. Click the red **"Delete"** button (visible only to Manager and not to Doctor).
+3. Confirm the dialog.
+
+#### Expected results:
+- Green toast: "Vital signs deleted"
+- The card disappears from the history
+
+#### Contrast with Doctor:
+- As a Doctor, the Delete button is shown but returns a **403 permission error** when clicked — this is intentional (they can see but not do).
+- As a Manager, Delete actually works.
+
+---
+
+### 5.4 MANAGER — ADVANCE ANY LAB ORDER STAGE
+
+The Manager can perform every stage transition that Doctors and Secretaries can:
+
+| Transition | Button label | Status it appears at |
+|---|---|---|
+| DRAFT → ORDERED | Submit Order | DRAFT |
+| ORDERED → SAMPLE_COLLECTED | Collect Sample | ORDERED |
+| SAMPLE_COLLECTED → PROCESSING | Start Processing | SAMPLE_COLLECTED |
+| PROCESSING → COMPLETED | Enter Results | PROCESSING |
+| COMPLETED → REVIEWED | Mark as Reviewed | COMPLETED |
+| DRAFT (delete) | Delete Order | DRAFT |
+
+#### To verify Manager can submit a Doctor-created order:
+1. As a Doctor, create a lab order and save it as Draft.
+2. Log out and log in as a Manager.
+3. Navigate to the order detail page.
+4. Confirm the **"Submit Order"** button is visible and clickable.
+5. Click it — order advances to ORDERED.
+
+---
+
+### 5.5 MANAGER — USER MANAGEMENT
+
+1. Go to **Users** in the sidebar (if visible at `/manager/users` or similar).
+2. You can view all registered users, their roles, and active status.
+3. Confirm that Doctors, Secretaries, and Patients are listed with their correct roles.
+
+---
+
+### 5.6 MANAGER — DASHBOARD
+
+The Manager dashboard shows all the same widgets as Doctor + Secretary:
+- Pending Orders count
+- Critical Results count
+- Recent Lab Orders list
+
+All counts reflect **all doctors' orders** (not just the manager's own), because the Manager has global visibility.
+
+---
+
+---
+
 ## COMPLETE TEST CHECKLIST
 
-### Vital Signs
+### Vital Signs (Doctor)
 - [ ] Select a patient on the Patients page
 - [ ] Vital Signs section appears as the first section
 - [ ] Create a record with normal values — no colored tiles
@@ -570,13 +944,13 @@ The "Submit Order" and "Save as Draft" buttons are **disabled** (greyed out) unt
 - [ ] Trend chart appears after 2+ records exist
 - [ ] Metric selector on chart works (try all 5 metrics)
 - [ ] History shows 5 records per page with pagination arrows
-- [ ] Edit a record — values pre-fill, save updates the card
-- [ ] Edit 403 error appears for records older than 24h
+- [ ] Edit a recent record — values pre-fill, save updates the card
+- [ ] Edit button is **greyed out** on records older than 24h (tooltip visible on hover)
 - [ ] Delete shows confirmation dialog
 - [ ] Delete Cancel closes dialog without deleting
 - [ ] Delete as Doctor returns 403 error (correct behavior)
 
-### Lab Orders
+### Lab Orders (Doctor + Secretary)
 - [ ] Lab Orders nav link works from sidebar
 - [ ] "New Lab Order" button is visible (Doctor role)
 - [ ] Patient dropdown is searchable
@@ -601,3 +975,39 @@ The "Submit Order" and "Save as Draft" buttons are **disabled** (greyed out) unt
 - [ ] Delete a DRAFT order — confirmation dialog → order removed from list
 - [ ] Delete button not visible on non-DRAFT orders
 - [ ] Dashboard widgets show correct counts
+
+### AI Scribe (Doctor)
+- [ ] AI Scribe panel visible on patient page (Doctor only)
+- [ ] Microphone permission prompt appears on "Record session"
+- [ ] Timer counts up while recording
+- [ ] Stop button stops recording and uploads
+- [ ] Processing phases shown: Uploading → Queued → Transcribing → Extracting
+- [ ] Draft form appears after successful extraction
+- [ ] Yellow warning banner visible in draft form
+- [ ] All spoken values appear in correct fields
+- [ ] All draft fields are editable
+- [ ] Transcript toggle expands/collapses raw transcript
+- [ ] Prescriptions can be added and removed
+- [ ] "Confirm & save" writes the medical record and prescription
+- [ ] Saved record appears in Medical Records section
+- [ ] Saved prescription appears in Prescriptions section
+- [ ] "Record another session" resets the panel
+- [ ] "Discard" resets without saving anything
+- [ ] Upload audio file button works as an alternative to live recording
+
+### Patient Role
+- [ ] Patient can view their vitals at `/patient/vitals`
+- [ ] No Edit or Delete buttons on vitals cards
+- [ ] Trend chart visible with 2+ records
+- [ ] Patient cannot see orders in DRAFT/ORDERED/PROCESSING status
+- [ ] Patient can see results for COMPLETED and REVIEWED orders
+- [ ] Abnormal/critical row colors visible to patient
+- [ ] Patient has no action buttons on lab orders
+
+### Manager Role
+- [ ] Edit button active on vitals records older than 24h (no greyed-out state)
+- [ ] Edit saves successfully for old records
+- [ ] Delete vital signs actually deletes (green toast, card removed)
+- [ ] Manager can submit Doctor-created DRAFT orders
+- [ ] Manager can perform all 5 lab order stage transitions
+- [ ] Manager dashboard shows counts across all doctors

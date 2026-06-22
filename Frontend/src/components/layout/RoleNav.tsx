@@ -15,6 +15,7 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { to: '/patient/prescriptions', key: 'nav.prescriptions' },
     { to: '/patient/vitals', key: 'nav.vitals' },
     { to: '/patient/lab-results', key: 'nav.labResults' },
+    { to: '/patient/timeline', key: 'nav.timeline' },
   ],
   DOCTOR: [
     { to: '/doctor', key: 'nav.dashboard' },
@@ -67,6 +68,8 @@ const NAV_ICONS: Record<string, string> = {
   'nav.vitals':          '❤️',
   'nav.labOrders':       '🧪',
   'nav.labResults':      '🧪',
+  'nav.timeline':        '🕑',
+  'nav.encounter':       '🩻',
 }
 
 export function RoleNav({ role }: { role: Role }) {

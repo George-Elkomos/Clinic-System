@@ -67,6 +67,7 @@ LOCAL_APPS = [
     "apps.audit",
     "apps.vital_signs",   # Phase 5
     "apps.ai_scribe",     # AI medical scribe (voice -> transcript -> structured draft)
+    "apps.encounters",    # Phase 8 — structured clinical encounter
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

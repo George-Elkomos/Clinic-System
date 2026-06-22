@@ -50,7 +50,7 @@ export const medicalApi = {
   // Prescriptions
   prescriptions: (patient?: number) =>
     api.get<Paginated<Prescription>>('/prescriptions/', { params: { patient } }).then((r) => r.data.results),
-  createPrescription: (data: { patient: number; notes?: string; items: PrescriptionItem[] }) =>
+  createPrescription: (data: { patient: number; notes?: string; encounter?: number; items: PrescriptionItem[] }) =>
     api.post<Prescription>('/prescriptions/', data).then((r) => r.data),
   // Fetch the rendered PDF as a blob for inline view / download.
   prescriptionPdf: (id: number) =>

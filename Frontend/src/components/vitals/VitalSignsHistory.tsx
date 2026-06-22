@@ -30,6 +30,11 @@ export function VitalSignsHistory({ patientId, readOnly = false }: VitalSignsHis
   const [editing, setEditing] = useState<VitalSigns | null>(null)
 
   const canDelete = user?.role === 'MANAGER'
+  const isManager = user?.role === 'MANAGER'
+  const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000
+
+  const isExpired = (record: VitalSigns) =>
+    !isManager && Date.now() - new Date(record.created_at).getTime() > EDIT_WINDOW_MS
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['vitals', patientId, page],
@@ -83,7 +88,8 @@ export function VitalSignsHistory({ patientId, readOnly = false }: VitalSignsHis
           ) : (
             <VitalSignsCard
               record={record}
-              onEdit={readOnly ? undefined : () => setEditing(record)}
+              onEdit={readOnly || isExpired(record) ? undefined : () => setEditing(record)}
+              editLocked={!readOnly && isExpired(record)}
               onDelete={readOnly || !canDelete ? undefined : () => handleDelete(record)}
             />
           )}

@@ -7,6 +7,7 @@ from .views import (
     LabResultViewSet,
     MedicalRecordViewSet,
     MyPatientsView,
+    PatientTimelineView,
     PrescriptionViewSet,
     ScanViewSet,
 )
@@ -21,5 +22,6 @@ router.register("lab-orders", LabOrderViewSet, basename="lab-order")
 
 urlpatterns = [
     path("medical/patients/", MyPatientsView.as_view(), name="my-patients"),
+    path("patients/<int:pk>/timeline/", PatientTimelineView.as_view(), name="patient-timeline"),
     path("", include(router.urls)),
 ]

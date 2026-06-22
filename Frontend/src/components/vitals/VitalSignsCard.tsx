@@ -10,6 +10,7 @@ interface VitalSignsCardProps {
   record: VitalSigns
   onEdit?: () => void
   onDelete?: () => void
+  editLocked?: boolean
 }
 
 interface MetricTileProps {
@@ -31,7 +32,7 @@ function MetricTile({ label, value, unit, alertClass }: MetricTileProps) {
   )
 }
 
-export function VitalSignsCard({ record, onEdit, onDelete }: VitalSignsCardProps) {
+export function VitalSignsCard({ record, onEdit, onDelete, editLocked = false }: VitalSignsCardProps) {
   const { t } = useTranslation()
   const { language } = useLanguage()
 
@@ -111,12 +112,18 @@ export function VitalSignsCard({ record, onEdit, onDelete }: VitalSignsCardProps
 
       {record.notes && <p style={{ marginBottom: 'var(--space-3)' }}>{record.notes}</p>}
 
-      {(onEdit || onDelete) && (
+      {(onEdit || editLocked || onDelete) && (
         <div className="vitals-card__actions">
-          {onEdit && (
-            <Button variant="secondary" onClick={onEdit}>
-              {t('common.edit')}
-            </Button>
+          {(onEdit || editLocked) && (
+            <span title={editLocked ? t('vitals.editLockedTooltip') : undefined}>
+              <Button
+                variant="secondary"
+                onClick={editLocked ? undefined : onEdit}
+                disabled={editLocked}
+              >
+                {t('common.edit')}
+              </Button>
+            </span>
           )}
           {onDelete && (
             <Button variant="danger" onClick={onDelete}>

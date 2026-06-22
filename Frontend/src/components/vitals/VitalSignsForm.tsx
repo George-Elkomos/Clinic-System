@@ -13,7 +13,7 @@ interface VitalSignsFormProps {
   patientId: number
   appointmentId?: number | null
   initial?: VitalSigns
-  onSuccess?: () => void
+  onSuccess?: (created?: VitalSigns) => void
   onCancel?: () => void
 }
 
@@ -103,22 +103,22 @@ export function VitalSignsForm({ patientId, appointmentId, initial, onSuccess, o
 
   const create = useMutation({
     mutationFn: () => vitalsApi.create(buildPayload()),
-    onSuccess: () => {
+    onSuccess: (created) => {
       showToast(t('vitals.saved'), 'success')
       setForm(fromInitial())
       setErrors({})
       invalidate()
-      onSuccess?.()
+      onSuccess?.(created)
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
   const update = useMutation({
     mutationFn: () => vitalsApi.update(initial!.id, buildPayload()),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       showToast(t('vitals.saved'), 'success')
       invalidate()
-      onSuccess?.()
+      onSuccess?.(updated)
     },
     onError: (err) => {
       if ((err as { response?: { status?: number } })?.response?.status === 403) {

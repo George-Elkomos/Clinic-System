@@ -569,6 +569,7 @@ export interface LabOrderSummary {
 export interface CreateLabOrderPayload {
   patient: number
   appointment?: number | null
+  encounter?: number | null
   priority: LabOrderPriority
   clinical_notes?: string
   items: Omit<LabOrderItem, 'id'>[]
@@ -585,4 +586,90 @@ export interface CreateLabOrderResultPayload {
   result_date: string
   interpretation?: string
   file?: File | null
+}
+
+// --- Patient History Timeline (Phase 7) ---
+
+export type TimelineEventType =
+  | 'VITAL_SIGNS' | 'LAB_ORDER' | 'PRESCRIPTION'
+  | 'CLINICAL_NOTE' | 'MEDICAL_RECORD' | 'APPOINTMENT_COMPLETED'
+
+export interface TimelineEvent {
+  id: string
+  event_type: TimelineEventType
+  event_date: string | null
+  title: string
+  summary: string
+  detail: Record<string, unknown>
+}
+
+export interface TimelineFilters {
+  types?: string
+  date_from?: string
+  date_to?: string
+}
+
+// --- Structured Clinical Encounter (Phase 8) ---
+
+export type EncounterStatus = 'DRAFT' | 'SUBMITTED' | 'AMENDED'
+
+export type ComplaintCategory =
+  | 'CARDIAC' | 'RESPIRATORY' | 'GI' | 'MUSCULOSKELETAL' | 'NEUROLOGICAL' | 'OTHER'
+
+export interface Complaint {
+  id: number
+  name: string
+  name_ar: string
+  category: ComplaintCategory
+  is_active: boolean
+}
+
+export interface Diagnosis {
+  id: number
+  name: string
+  name_ar: string
+  category: ComplaintCategory
+  is_active: boolean
+}
+
+export interface Encounter {
+  id: number
+  patient: number
+  patient_name: string
+  doctor: number | null
+  doctor_name: string
+  appointment: number | null
+  encounter_date: string
+  status: EncounterStatus
+  chief_complaint: string
+  chief_complaint_ar: string
+  symptoms: string[]
+  examination_findings: string
+  examination_findings_ar: string
+  diagnosis: number | null
+  diagnosis_detail: Diagnosis | null
+  diagnosis_notes: string
+  treatment_plan: string
+  treatment_plan_ar: string
+  vitals: number | null
+  vitals_detail: VitalSigns | null
+  version: number
+  is_current: boolean
+  supersedes: number | null
+  prescriptions: Prescription[]
+  lab_orders: LabOrderSummary[]
+  created_at: string
+}
+
+export interface UpdateEncounterPayload {
+  chief_complaint?: string
+  chief_complaint_ar?: string
+  symptoms?: string[]
+  examination_findings?: string
+  examination_findings_ar?: string
+  diagnosis?: number | null
+  diagnosis_notes?: string
+  treatment_plan?: string
+  treatment_plan_ar?: string
+  vitals?: number | null
 }

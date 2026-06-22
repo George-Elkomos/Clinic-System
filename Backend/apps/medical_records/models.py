@@ -102,6 +102,7 @@ class Prescription(SoftDeleteModel, TimeStampedModel):
     patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE, related_name="prescriptions")
     doctor = models.ForeignKey(DoctorProfile, on_delete=models.SET_NULL, null=True, related_name="prescriptions")
     appointment = models.ForeignKey("appointments.Appointment", on_delete=models.SET_NULL, null=True, blank=True, related_name="prescriptions")
+    encounter = models.ForeignKey("encounters.Encounter", on_delete=models.SET_NULL, null=True, blank=True, related_name="prescriptions")
     issued_date = models.DateField(auto_now_add=True)
     notes = models.TextField(blank=True)
     notes_ar = models.TextField(blank=True)
@@ -158,6 +159,9 @@ class LabOrder(SoftDeleteModel, TimeStampedModel):
     doctor = models.ForeignKey(DoctorProfile, on_delete=models.PROTECT, related_name="lab_orders")
     appointment = models.ForeignKey(
         "appointments.Appointment", on_delete=models.SET_NULL, null=True, blank=True, related_name="lab_orders"
+    )
+    encounter = models.ForeignKey(
+        "encounters.Encounter", on_delete=models.SET_NULL, null=True, blank=True, related_name="lab_orders"
     )
     status = models.CharField(
         max_length=20, choices=LabOrderStatus.choices, default=LabOrderStatus.DRAFT, db_index=True

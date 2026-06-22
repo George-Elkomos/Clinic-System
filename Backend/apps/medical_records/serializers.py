@@ -132,7 +132,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         model = Prescription
         fields = [
             "id", "patient", "patient_name", "doctor", "doctor_name", "appointment",
-            "issued_date", "notes", "notes_ar", "status", "items", "created_at",
+            "encounter", "issued_date", "notes", "notes_ar", "status", "items", "created_at",
         ]
         read_only_fields = ["id", "doctor", "doctor_name", "patient_name",
                             "issued_date", "created_at"]
@@ -217,7 +217,7 @@ class LabOrderSerializer(serializers.ModelSerializer):
         model = LabOrder
         fields = [
             "id", "order_number", "patient", "patient_name", "doctor", "doctor_name",
-            "appointment", "status", "priority", "clinical_notes",
+            "appointment", "encounter", "status", "priority", "clinical_notes",
             "ordered_at", "sample_collected_at", "completed_at", "reviewed_at",
             "cancellation_reason", "cancelled_at",
             "items", "results", "has_critical", "created_at",
