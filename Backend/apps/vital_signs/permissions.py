@@ -11,7 +11,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from apps.core.enums import RoleChoices
-from apps.medical_records.permissions import doctor_treats
+from apps.medical_records.permissions import doctor_may_record, doctor_treats
 
 EDIT_WINDOW_HOURS = 24
 
@@ -77,7 +77,7 @@ class VitalSignsPermission(BasePermission):
             )
 
         if role == RoleChoices.DOCTOR:
-            return doctor_treats(user, obj.patient)
+            return doctor_may_record(user, obj.patient)
         if role == RoleChoices.SECRETARY:
             return True
         return False

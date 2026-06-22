@@ -16,6 +16,22 @@ def doctor_treats(user, patient):
     return patient.treating_doctors.filter(doctor__user=user).exists()
 
 
+def doctor_may_record(user, patient):
+    """True if the doctor may write clinical data for this patient.
+
+    Accepts either an established DoctorPatient link (post-completion) OR an
+    IN_PROGRESS appointment.  The second branch covers the mid-encounter window
+    where vitals/prescriptions are recorded before submit_encounter() runs and
+    creates the DoctorPatient link.
+    """
+    if doctor_treats(user, patient):
+        return True
+    from apps.appointments.models import Appointment
+    return Appointment.objects.filter(
+        doctor__user=user, patient=patient, status="IN_PROGRESS"
+    ).exists()
+
+
 class MedicalDataPermission(BasePermission):
     """For MedicalRecord / Scan / LabResult / Prescription."""
 

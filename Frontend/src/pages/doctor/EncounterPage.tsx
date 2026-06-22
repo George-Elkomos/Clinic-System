@@ -20,7 +20,7 @@ import { errorMessage } from '../../services/apiClient'
 import { complaintsApi, diagnosesApi, encountersApi } from '../../services/encounters.api'
 import { labOrdersApi } from '../../services/labOrders.api'
 import { medicalApi } from '../../services/medical.api'
-import type { Encounter, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
+import type { Encounter, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
 
 const complaintFetcher = (q: string): Promise<ComboOption[]> =>
   complaintsApi.search(q).then((rows) => rows.map((c) => ({ value: c.id, label: c.name })))
@@ -40,14 +40,14 @@ type FormState = {
 }
 
 const formFromEncounter = (e: Encounter): FormState => ({
-  chief_complaint: e.chief_complaint,
-  chief_complaint_ar: e.chief_complaint_ar,
-  symptoms: e.symptoms ?? [],
-  examination_findings: e.examination_findings,
-  examination_findings_ar: e.examination_findings_ar,
-  diagnosis_notes: e.diagnosis_notes,
-  treatment_plan: e.treatment_plan,
-  treatment_plan_ar: e.treatment_plan_ar,
+  chief_complaint: e.chief_complaint ?? '',
+  chief_complaint_ar: e.chief_complaint_ar ?? '',
+  symptoms: Array.isArray(e.symptoms) ? e.symptoms : [],
+  examination_findings: e.examination_findings ?? '',
+  examination_findings_ar: e.examination_findings_ar ?? '',
+  diagnosis_notes: e.diagnosis_notes ?? '',
+  treatment_plan: e.treatment_plan ?? '',
+  treatment_plan_ar: e.treatment_plan_ar ?? '',
 })
 
 // ---- Inline prescription modal --------------------------------------------
@@ -147,6 +147,86 @@ function LabOrderModal({ encounter, onClose, onSaved }: { encounter: Encounter; 
   )
 }
 
+// ---- Prescription sidebar item with inline void form ---------------------
+function PrescriptionSidebarItem({
+  prescription: p,
+  canVoid,
+  onVoided,
+}: {
+  prescription: Prescription
+  canVoid: boolean
+  onVoided: () => void
+}) {
+  const { t } = useTranslation()
+  const { showToast } = useToast()
+  const [voiding, setVoiding] = useState(false)
+  const [reason, setReason] = useState('')
+
+  const cancel = useMutation({
+    mutationFn: () => medicalApi.cancelPrescription(p.id, reason),
+    onSuccess: () => {
+      showToast(t('medical.voidedBadge'), 'success')
+      setVoiding(false)
+      setReason('')
+      onVoided()
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const drugs = (p.items ?? []).map((i) => i.drug_name).join(', ') || `#${p.id}`
+
+  return (
+    <li className={`encounter-rx-item${p.status === 'CANCELLED' ? ' encounter-rx-item--voided' : ''}`}>
+      <div className="encounter-rx-item__row">
+        <span className="encounter-rx-item__drugs">{drugs}</span>
+        {p.status === 'CANCELLED' ? (
+          <span className="badge badge--CANCELLED">{t('medical.voidedBadge')}</span>
+        ) : canVoid ? (
+          <button
+            type="button"
+            className="encounter-rx-void-btn"
+            onClick={() => setVoiding((v) => !v)}
+            title={t('medical.voidPrescription')}
+          >
+            🚫
+          </button>
+        ) : null}
+      </div>
+
+      {p.status === 'CANCELLED' && p.cancellation_reason && (
+        <p className="encounter-rx-item__reason">
+          {t('medical.voidReason', { reason: p.cancellation_reason })}
+        </p>
+      )}
+
+      {voiding && (
+        <div className="encounter-rx-void-form">
+          <textarea
+            className="encounter-rx-void-reason"
+            rows={2}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={t('medical.voidReasonPlaceholder')}
+          />
+          <div className="encounter-rx-void-actions">
+            <Button variant="secondary" onClick={() => { setVoiding(false); setReason('') }}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              loading={cancel.isPending}
+              disabled={reason.trim().length < 5}
+              onClick={() => cancel.mutate()}
+            >
+              {t('medical.voidConfirmBtn')}
+            </Button>
+          </div>
+        </div>
+      )}
+    </li>
+  )
+}
+
 export function EncounterPage() {
   const { t } = useTranslation()
   const { appointmentId } = useParams<{ appointmentId: string }>()
@@ -163,6 +243,7 @@ export function EncounterPage() {
   const [showRx, setShowRx] = useState(false)
   const [showLab, setShowLab] = useState(false)
   const hydrated = useRef(false)
+  const hasEdited = useRef(false)
 
   // Symptom options come from the active complaints list.
   const { data: symptomOptions = [] } = useQuery({
@@ -226,7 +307,7 @@ export function EncounterPage() {
   })
 
   useEffect(() => {
-    if (!form || !encounterId || !isDraft || !hydrated.current) return
+    if (!form || !encounterId || !isDraft || !hydrated.current || !hasEdited.current) return
     const handle = window.setTimeout(() => save.mutate(buildPayload(form)), 600)
     return () => window.clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -270,8 +351,20 @@ export function EncounterPage() {
 
   if (!encounter || !form) return <CenteredSpinner />
 
-  const set = (key: keyof FormState, value: string | string[]) =>
+  const set = (key: keyof FormState, value: string | string[]) => {
+    hasEdited.current = true
     setForm((f) => (f ? { ...f, [key]: value } : f))
+  }
+
+  const setComplaintAndMark = (opt: ComboOption | null) => {
+    hasEdited.current = true
+    setComplaint(opt)
+  }
+
+  const setDiagnosisAndMark = (opt: ComboOption | null) => {
+    hasEdited.current = true
+    setDiagnosis(opt)
+  }
 
   const readOnly = !isDraft || !isOwner
 
@@ -300,7 +393,7 @@ export function EncounterPage() {
                 <AsyncCombobox
                   id={p.id}
                   value={complaint}
-                  onChange={setComplaint}
+                  onChange={setComplaintAndMark}
                   fetcher={complaintFetcher}
                   placeholder={t('encounters.complaintPlaceholder')}
                   disabled={readOnly}
@@ -361,7 +454,7 @@ export function EncounterPage() {
                 <AsyncCombobox
                   id={p.id}
                   value={diagnosis}
-                  onChange={setDiagnosis}
+                  onChange={setDiagnosisAndMark}
                   fetcher={diagnosisFetcher}
                   placeholder={t('encounters.diagnosisPlaceholder')}
                   disabled={readOnly}
@@ -395,22 +488,27 @@ export function EncounterPage() {
             </div>
 
             <h3 className="medical-section-divider">{t('encounters.linkedPrescriptions')}</h3>
-            {encounter.prescriptions.length === 0 ? (
+            {(encounter.prescriptions ?? []).length === 0 ? (
               <p className="encounter-none">{t('encounters.noneLinked')}</p>
             ) : (
               <ul className="encounter-linked-list">
-                {encounter.prescriptions.map((p) => (
-                  <li key={p.id}>{p.items.map((i) => i.drug_name).join(', ') || `#${p.id}`}</li>
+                {(encounter.prescriptions ?? []).map((p) => (
+                  <PrescriptionSidebarItem
+                    key={p.id}
+                    prescription={p}
+                    canVoid={isDraft && isOwner}
+                    onVoided={refreshEncounter}
+                  />
                 ))}
               </ul>
             )}
 
             <h3 className="medical-section-divider">{t('encounters.linkedLabs')}</h3>
-            {encounter.lab_orders.length === 0 ? (
+            {(encounter.lab_orders ?? []).length === 0 ? (
               <p className="encounter-none">{t('encounters.noneLinked')}</p>
             ) : (
               <ul className="encounter-linked-list">
-                {encounter.lab_orders.map((o) => (
+                {(encounter.lab_orders ?? []).map((o) => (
                   <li key={o.id}>{o.order_number} · {t(`status.${o.status}`)}</li>
                 ))}
               </ul>

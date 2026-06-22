@@ -25,6 +25,7 @@ from .serializers import (
     LabResultSerializer,
     MedicalRecordSerializer,
     PatientSummarySerializer,
+    PrescriptionCancelSerializer,
     PrescriptionSerializer,
     ScanSerializer,
 )
@@ -174,6 +175,27 @@ class PrescriptionViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Only doctors can issue prescriptions.")
         patient = self._resolve_patient(serializer)
         serializer.save(doctor=self.request.user.doctor_profile, patient=patient)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        from django.utils import timezone as tz
+        from apps.core.enums import PrescriptionStatus
+        prescription = self.get_object()
+        if prescription.status != PrescriptionStatus.ACTIVE:
+            raise ValidationError({"status": "Only an active prescription can be cancelled."})
+        user = request.user
+        if user.role != RoleChoices.MANAGER and (
+            prescription.doctor is None or prescription.doctor.user_id != user.id
+        ):
+            raise PermissionDenied("Only the issuing doctor or a manager can cancel this prescription.")
+        serializer = PrescriptionCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        prescription.status = PrescriptionStatus.CANCELLED
+        prescription.cancellation_reason = serializer.validated_data["cancellation_reason"]
+        prescription.cancelled_at = tz.now()
+        prescription.cancelled_by = user
+        prescription.save(update_fields=["status", "cancellation_reason", "cancelled_at", "cancelled_by", "updated_at"])
+        return Response(PrescriptionSerializer(prescription).data)
 
     @action(detail=True, methods=["get"])
     def pdf(self, request, pk=None):

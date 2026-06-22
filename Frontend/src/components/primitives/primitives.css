@@ -1266,6 +1266,29 @@
 .badge--DRAFT     { border-color: var(--border); color: var(--text-muted); }
 .badge--SUBMITTED { border-color: var(--success); color: var(--success); }
 .badge--AMENDED   { border-color: var(--warning); color: var(--warning); }
+.badge--CANCELLED { border-color: var(--error, #e53e3e); color: var(--error, #e53e3e); }
+
+/* Prescription void UI — encounter sidebar */
+.encounter-rx-item { list-style: none; padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
+.encounter-rx-item:last-child { border-bottom: none; }
+.encounter-rx-item--voided .encounter-rx-item__drugs { text-decoration: line-through; color: var(--text-muted); }
+.encounter-rx-item__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.encounter-rx-item__drugs { font-size: var(--font-small); font-weight: 500; }
+.encounter-rx-item__reason { font-size: 0.75rem; color: var(--text-muted); margin: var(--space-1) 0 0; }
+.encounter-rx-void-btn {
+  background: none; border: none; cursor: pointer; font-size: 1rem; padding: 0 var(--space-1);
+  opacity: 0.6; transition: opacity 0.15s;
+}
+.encounter-rx-void-btn:hover { opacity: 1; }
+.encounter-rx-void-form { margin-top: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
+.encounter-rx-void-reason { width: 100%; resize: vertical; font-size: var(--font-small); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.encounter-rx-void-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+
+/* Voided prescription — patient prescriptions page */
+.rx-voided-banner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); padding: var(--space-2) var(--space-3); background: var(--color-error-bg, #fff5f5); border-radius: var(--radius-sm); border: 1px solid var(--error, #e53e3e); }
+.rx-voided-meta { font-size: var(--font-small); color: var(--text-muted); }
+.rx-voided-reason { font-size: var(--font-small); color: var(--text-muted); margin: var(--space-1) 0 0; width: 100%; }
+.rx-items--voided li { opacity: 0.5; text-decoration: line-through; }
 
 /* Modal header/close + wide variant (extends the shared .modal styles) */
 .modal--wide { max-width: 760px; width: 100%; }

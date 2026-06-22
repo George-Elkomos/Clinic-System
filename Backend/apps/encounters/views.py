@@ -52,13 +52,17 @@ class EncounterViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only doctors can create encounters.")
         serializer.save(doctor=user.doctor_profile)
 
-    def update(self, request, *args, **kwargs):
+    def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         from .models import EncounterStatus
 
         if instance.status != EncounterStatus.DRAFT:
             raise PermissionDenied("Only a draft encounter can be edited.")
-        return super().update(request, *args, **kwargs)
+        serializer = EncounterWriteSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        # Return the full read representation so the frontend cache keeps status/relations intact.
+        return Response(EncounterReadSerializer(updated).data)
 
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):

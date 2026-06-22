@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.core.enums import RoleChoices
-from apps.medical_records.permissions import doctor_treats
+from apps.medical_records.permissions import doctor_may_record
 
 from .models import VitalSigns
 from .permissions import VitalSignsPermission
@@ -43,7 +43,7 @@ class VitalSignsViewSet(viewsets.ModelViewSet):
         patient = serializer.validated_data.get("patient")
         if patient is None:
             raise ValidationError({"patient": "A patient must be specified."})
-        if user.role == RoleChoices.DOCTOR and not doctor_treats(user, patient):
+        if user.role == RoleChoices.DOCTOR and not doctor_may_record(user, patient):
             raise PermissionDenied(
                 "You can only record vital signs for your own patients."
             )

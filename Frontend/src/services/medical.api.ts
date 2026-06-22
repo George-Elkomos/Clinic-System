@@ -55,4 +55,7 @@ export const medicalApi = {
   // Fetch the rendered PDF as a blob for inline view / download.
   prescriptionPdf: (id: number) =>
     api.get(`/prescriptions/${id}/pdf/`, { responseType: 'blob' }).then((r) => r.data as Blob),
+
+  cancelPrescription: (id: number, cancellation_reason: string) =>
+    api.post<Prescription>(`/prescriptions/${id}/cancel/`, { cancellation_reason }).then((r) => r.data),
 }

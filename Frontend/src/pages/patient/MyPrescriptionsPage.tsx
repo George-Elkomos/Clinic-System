@@ -40,8 +40,25 @@ export function MyPrescriptionsPage() {
         <Card><p>{t('medical.noPrescriptions')}</p></Card>
       ) : (
         prescriptions.map((p) => (
-          <Card key={p.id} title={`${p.doctor_name} · ${t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}`}>
-            <ul>
+          <Card
+            key={p.id}
+            title={`${p.doctor_name} · ${t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}`}
+          >
+            {p.status === 'CANCELLED' && (
+              <div className="rx-voided-banner">
+                <span className="badge badge--CANCELLED">{t('medical.voidedBadge')}</span>
+                {p.cancelled_at && (
+                  <span className="rx-voided-meta">
+                    {t('medical.voidedOn', { date: formatDate(p.cancelled_at.slice(0, 10), language) })}
+                    {p.cancelled_by_name ? ` ${t('medical.voidedBy', { name: p.cancelled_by_name })}` : ''}
+                  </span>
+                )}
+                {p.cancellation_reason && (
+                  <p className="rx-voided-reason">{t('medical.voidReason', { reason: p.cancellation_reason })}</p>
+                )}
+              </div>
+            )}
+            <ul className={p.status === 'CANCELLED' ? 'rx-items--voided' : ''}>
               {p.items.map((it, i) => (
                 <li key={i}>
                   <strong>{it.drug_name}</strong> {it.dosage} — {it.frequency}, {it.duration}
@@ -50,7 +67,9 @@ export function MyPrescriptionsPage() {
               ))}
             </ul>
             {p.notes && <p>{p.notes}</p>}
-            <Button variant="secondary" onClick={() => openPdf(p.id)}>{t('medical.openPdf')}</Button>
+            {p.status !== 'CANCELLED' && (
+              <Button variant="secondary" onClick={() => openPdf(p.id)}>{t('medical.openPdf')}</Button>
+            )}
           </Card>
         ))
       )}

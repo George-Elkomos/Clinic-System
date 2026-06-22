@@ -315,9 +315,16 @@ export interface Prescription {
   patient_name: string
   doctor: number | null
   doctor_name: string
+  appointment: number | null
+  encounter: number | null
   issued_date: string
   notes: string
+  notes_ar: string
   status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+  cancelled_at: string | null
+  cancelled_by: number | null
+  cancelled_by_name: string
+  cancellation_reason: string
   items: PrescriptionItem[]
   created_at: string
 }

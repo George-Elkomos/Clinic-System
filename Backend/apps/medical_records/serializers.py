@@ -123,19 +123,29 @@ class PrescriptionItemSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+class PrescriptionCancelSerializer(serializers.Serializer):
+    cancellation_reason = serializers.CharField(min_length=5, max_length=500)
+
+
 class PrescriptionSerializer(serializers.ModelSerializer):
     items = PrescriptionItemSerializer(many=True)
     doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True, default="")
     patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True, default="")
+    cancelled_by_name = serializers.CharField(source="cancelled_by.get_full_name", read_only=True, default="")
 
     class Meta:
         model = Prescription
         fields = [
             "id", "patient", "patient_name", "doctor", "doctor_name", "appointment",
-            "encounter", "issued_date", "notes", "notes_ar", "status", "items", "created_at",
+            "encounter", "issued_date", "notes", "notes_ar", "status",
+            "cancelled_at", "cancelled_by", "cancelled_by_name", "cancellation_reason",
+            "items", "created_at",
         ]
-        read_only_fields = ["id", "doctor", "doctor_name", "patient_name",
-                            "issued_date", "created_at"]
+        read_only_fields = [
+            "id", "doctor", "doctor_name", "patient_name", "issued_date",
+            "cancelled_at", "cancelled_by", "cancelled_by_name", "cancellation_reason",
+            "created_at",
+        ]
 
     def create(self, validated_data):
         items = validated_data.pop("items", [])
