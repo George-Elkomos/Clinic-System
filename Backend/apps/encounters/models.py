@@ -49,13 +49,36 @@ class Complaint(TimeStampedModel):
         return self.name
 
 
+class DiagnosisCategory(TimeStampedModel):
+    """Bilingual diagnosis grouping (e.g. Cardiovascular, Endocrine, Respiratory)."""
+
+    name = models.CharField(max_length=120)
+    name_ar = models.CharField(max_length=120, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "diagnosis categories"
+
+    def __str__(self):
+        return self.name
+
+
 class Diagnosis(TimeStampedModel):
-    """Master lookup feeding the diagnosis combobox."""
+    """Master lookup feeding the diagnosis combobox (Phase 10: + ICD-10 coding)."""
 
     name = models.CharField(max_length=200)
     name_ar = models.CharField(max_length=200, blank=True)
+    # Legacy free-choice category kept for back-compat; category_ref is the
+    # structured grouping going forward (Phase 10).
     category = models.CharField(
         max_length=20, choices=ComplaintCategory.choices, default=ComplaintCategory.OTHER
+    )
+    icd10_code = models.CharField(max_length=10, blank=True, db_index=True)
+    is_chronic = models.BooleanField(default=False)
+    category_ref = models.ForeignKey(
+        DiagnosisCategory, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="diagnoses",
     )
     is_active = models.BooleanField(default=True)
 

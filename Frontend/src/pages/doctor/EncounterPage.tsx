@@ -15,7 +15,9 @@ import { StatusBadge } from '../../components/primitives/StatusBadge'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { useToast } from '../../components/primitives/Toast'
 import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
+import { MedicationItemRow } from '../../components/medical/MedicationItemRow'
 import { useAuth } from '../../hooks/useAuth'
+import { useInteractionCheck } from '../../hooks/useInteractionCheck'
 import { errorMessage } from '../../services/apiClient'
 import { complaintsApi, diagnosesApi, encountersApi } from '../../services/encounters.api'
 import { labOrdersApi } from '../../services/labOrders.api'
@@ -25,8 +27,12 @@ import type { Encounter, Prescription, PrescriptionItem, UpdateEncounterPayload 
 const complaintFetcher = (q: string): Promise<ComboOption[]> =>
   complaintsApi.search(q).then((rows) => rows.map((c) => ({ value: c.id, label: c.name })))
 
+// Show the ICD-10 code inline so doctors can confirm the coded diagnosis.
+const diagnosisLabel = (d: { name: string; icd10_code?: string | null }) =>
+  d.icd10_code ? `${d.name} (${d.icd10_code})` : d.name
+
 const diagnosisFetcher = (q: string): Promise<ComboOption[]> =>
-  diagnosesApi.search(q).then((rows) => rows.map((d) => ({ value: d.id, label: d.name })))
+  diagnosesApi.search(q).then((rows) => rows.map((d) => ({ value: d.id, label: diagnosisLabel(d) })))
 
 type FormState = {
   chief_complaint: string
@@ -51,16 +57,22 @@ const formFromEncounter = (e: Encounter): FormState => ({
 })
 
 // ---- Inline prescription modal --------------------------------------------
+const newEncounterRxItem = (): PrescriptionItem => ({
+  medication: null, drug_name: '', dosage_strength: '', dosage_form: null, dosage_pattern: null,
+  dosage: '', frequency: '', duration: '', instructions: '',
+})
+
 function PrescriptionModal({ encounter, onClose, onSaved }: { encounter: Encounter; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation()
   const { showToast } = useToast()
-  const [items, setItems] = useState<PrescriptionItem[]>([
-    { drug_name: '', dosage: '', frequency: '', duration: '', instructions: '' },
-  ])
+  const { checkBeforeSubmit, checking, modal } = useInteractionCheck()
+  const [items, setItems] = useState<PrescriptionItem[]>([newEncounterRxItem()])
   const [notes, setNotes] = useState('')
 
-  const setItem = (idx: number, key: keyof PrescriptionItem, value: string) =>
-    setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, [key]: value } : it)))
+  const patchItem = (idx: number, patch: Partial<PrescriptionItem>) =>
+    setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
+
+  const hasContent = (i: PrescriptionItem) => !!i.medication || !!i.drug_name.trim()
 
   const save = useMutation({
     mutationFn: () =>
@@ -68,31 +80,35 @@ function PrescriptionModal({ encounter, onClose, onSaved }: { encounter: Encount
         patient: encounter.patient,
         encounter: encounter.id,
         notes,
-        items: items.filter((i) => i.drug_name),
+        items: items.filter(hasContent),
       }),
     onSuccess: () => { showToast(t('encounters.saved'), 'success'); onSaved(); onClose() },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
+  const handleSave = () =>
+    checkBeforeSubmit(encounter.patient, items.filter(hasContent), () => save.mutate())
+
   return (
     <Modal title={t('encounters.rxModalTitle')} onClose={onClose} wide>
       {items.map((it, idx) => (
-        <div key={idx} className="medical-rx-item">
-          <div className="medical-rx-field--wide"><FormField label={t('medical.medication')}>{(p) => <input {...p} value={it.drug_name} onChange={(e) => setItem(idx, 'drug_name', e.target.value)} />}</FormField></div>
-          <div className="medical-rx-field"><FormField label={t('medical.dosage')}>{(p) => <input {...p} value={it.dosage} onChange={(e) => setItem(idx, 'dosage', e.target.value)} />}</FormField></div>
-          <div className="medical-rx-field--mid"><FormField label={t('medical.frequency')}>{(p) => <input {...p} value={it.frequency} onChange={(e) => setItem(idx, 'frequency', e.target.value)} />}</FormField></div>
-          <div className="medical-rx-field"><FormField label={t('medical.duration')}>{(p) => <input {...p} value={it.duration} onChange={(e) => setItem(idx, 'duration', e.target.value)} />}</FormField></div>
-          {items.length > 1 && <Button variant="secondary" onClick={() => setItems((arr) => arr.filter((_, i) => i !== idx))}>{t('medical.removeItem')}</Button>}
-        </div>
+        <MedicationItemRow
+          key={idx}
+          item={it}
+          onChange={(patch) => patchItem(idx, patch)}
+          onRemove={() => setItems((arr) => arr.filter((_, i) => i !== idx))}
+          canRemove={items.length > 1}
+        />
       ))}
-      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, { drug_name: '', dosage: '', frequency: '', duration: '', instructions: '' }])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
+      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, newEncounterRxItem()])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
       <FormField label={t('medical.instructions')}>
         {(p) => <textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </FormField>
       <div className="modal__actions">
         <Button variant="secondary" onClick={onClose}>{t('encounters.cancel')}</Button>
-        <Button loading={save.isPending} disabled={!items.some((i) => i.drug_name)} onClick={() => save.mutate()}>{t('encounters.save')}</Button>
+        <Button loading={save.isPending || checking} disabled={!items.some(hasContent)} onClick={handleSave}>{t('encounters.save')}</Button>
       </div>
+      {modal}
     </Modal>
   )
 }
@@ -280,7 +296,7 @@ export function EncounterPage() {
       hydrated.current = true
       setForm(formFromEncounter(encounter))
       if (encounter.chief_complaint) setComplaint({ value: -1, label: encounter.chief_complaint })
-      if (encounter.diagnosis_detail) setDiagnosis({ value: encounter.diagnosis_detail.id, label: encounter.diagnosis_detail.name })
+      if (encounter.diagnosis_detail) setDiagnosis({ value: encounter.diagnosis_detail.id, label: diagnosisLabel(encounter.diagnosis_detail) })
     }
   }, [encounter])
 

@@ -1,7 +1,7 @@
 """Manager analytics computed from existing app data (no models of its own)."""
 from datetime import timedelta
 
-from django.db.models import Avg
+from django.db.models import Avg, Count
 from django.utils import timezone
 
 from apps.appointments.models import Appointment
@@ -95,4 +95,37 @@ def build_report(period="month"):
         "most_reviewed": most_reviewed,
         "new_patients_total": new_patients_total,
         "attendance": attendance,
+    }
+
+
+def diagnosis_distribution(period="month", limit=15):
+    """Top diagnoses by encounter count in the period (current submitted encounters)."""
+    from apps.encounters.models import Encounter, EncounterStatus
+
+    start = _period_start(period)
+    encounters = Encounter.objects.filter(
+        status=EncounterStatus.SUBMITTED, is_current=True, diagnosis__isnull=False
+    )
+    if start:
+        encounters = encounters.filter(created_at__date__gte=start)
+
+    rows = (
+        encounters
+        .values("diagnosis__name", "diagnosis__name_ar", "diagnosis__icd10_code")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:limit]
+    )
+
+    return {
+        "period": period,
+        "generated_at": timezone.now().isoformat(),
+        "diagnoses": [
+            {
+                "name": r["diagnosis__name"],
+                "name_ar": r["diagnosis__name_ar"],
+                "icd10_code": r["diagnosis__icd10_code"],
+                "count": r["count"],
+            }
+            for r in rows
+        ],
     }

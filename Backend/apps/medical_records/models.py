@@ -37,6 +37,13 @@ class MedicalRecord(SoftDeleteModel, TimeStampedModel):
     supersedes = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="superseded_by")
     chief_complaint = models.TextField(blank=True)
     diagnosis = models.TextField(blank=True)
+    # Phase 10: optional structured link to the coded diagnosis master. The
+    # free-text `diagnosis` above stays the canonical display string (timeline,
+    # PDF, AI scribe all read it).
+    diagnosis_ref = models.ForeignKey(
+        "encounters.Diagnosis", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="medical_records",
+    )
     treatment_plan = models.TextField(blank=True)
     vitals = models.JSONField(default=dict, blank=True)
     appointment = models.ForeignKey("appointments.Appointment", on_delete=models.SET_NULL, null=True, blank=True, related_name="medical_records")
@@ -121,7 +128,20 @@ class Prescription(SoftDeleteModel, TimeStampedModel):
 
 class PrescriptionItem(models.Model):
     prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE, related_name="items")
+    # Phase 9: optional link to the medication master. `drug_name` is kept as a
+    # free-text fallback for unlisted drugs and backward compatibility.
+    medication = models.ForeignKey(
+        "medications.Medication", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="prescription_items",
+    )
     drug_name = models.CharField(max_length=200)
+    dosage_strength = models.CharField(max_length=100, blank=True)  # e.g. "500mg"
+    dosage_form = models.ForeignKey(
+        "medications.DosageForm", on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    dosage_pattern = models.ForeignKey(
+        "medications.DosagePattern", on_delete=models.SET_NULL, null=True, blank=True,
+    )
     dosage = models.CharField(max_length=100, blank=True)
     frequency = models.CharField(max_length=100, blank=True)
     duration = models.CharField(max_length=100, blank=True)

@@ -76,6 +76,7 @@
     "forgotPassword": "هل نسيت كلمة المرور؟",
     "welcome": "مرحبًا، {{name}}",
     "loginFailed": "تعذّر تسجيل الدخول. يرجى التحقق من البريد الإلكتروني وكلمة المرور.",
+    "serverUnreachable": "تعذّر الوصول إلى الخادم. تأكد من تشغيل الخادم الخلفي ثم حاول مرة أخرى.",
     "registerTitle": "إنشاء حساب جديد",
     "registerIntro": "سجّل للحجز وإدارة سجلاتك الصحية.",
     "registerLink": "مريض جديد؟ سجّل هنا",
@@ -292,7 +293,7 @@
     "issuedOn": "صدرت في {{date}}",
     "voidPrescription": "إلغاء الوصفة الطبية",
     "voidReasonLabel": "سبب الإلغاء",
-    "voidReasonPlaceholder": "مثلاً: جرعة خاطئة، المريض لديه حساسية من الدواء…",
+    "voidReasonPlaceholder": "مثال: تم الإلغاء للتعديل أو إعادة الإصدار",
     "voidConfirmBtn": "تأكيد إلغاء الوصفة",
     "voidedBadge": "ملغاة",
     "voidedOn": "أُلغيت {{date}}",
@@ -305,7 +306,29 @@
     "reissued": "تم إلغاء الوصفة — تم تعبئة النموذج بالمحتوى السابق. راجعه وأعد الإصدار.",
     "selectPatient": "اختر مريضًا",
     "noPatients": "لا يوجد لديك مرضى بعد. يظهر المرضى هنا بعد اكتمال زيارة.",
-    "uploadedBy": "رفعها {{name}}"
+    "uploadedBy": "رفعها {{name}}",
+    "chronicDiagnoses": "الأمراض المزمنة",
+    "noChronicDiagnoses": "لا توجد تشخيصات مزمنة مسجلة.",
+    "encounterCount": "{{count}} زيارة"
+  },
+  "medications": {
+    "searchPlaceholder": "ابحث عن الأدوية…",
+    "freeTextHint": "أو اكتب اسم دواء غير مُدرج",
+    "strength": "التركيز",
+    "dosageForm": "الشكل",
+    "dosagePattern": "النمط",
+    "selectForm": "اختر الشكل",
+    "selectPattern": "اختر النمط",
+    "interactionTitle": "تحذير حساسية",
+    "interactionIntro": "لدى هذا المريض حساسيات موثقة قد تتعارض مع الدواء الموصوف. راجعها قبل الإصدار:",
+    "allergyMatch": "الحساسية المطابقة: {{keyword}}",
+    "proceedAnyway": "المتابعة على أي حال",
+    "severity": {
+      "MILD": "خفيفة",
+      "MODERATE": "متوسطة",
+      "SEVERE": "شديدة",
+      "CONTRAINDICATED": "مضادة للاستطباب"
+    }
   },
   "queue": {
     "title": "قائمة غرفة الانتظار",
@@ -430,6 +453,10 @@
     "attendance": "حضور الأطباء",
     "absenceDays": "أيام الغياب",
     "mostReviewed": "الأكثر تقييمًا: {{name}}",
+    "topDiagnoses": "أكثر التشخيصات",
+    "diagnosis": "التشخيص",
+    "count": "العدد",
+    "noDiagnoses": "لا توجد تشخيصات مسجلة لهذه الفترة.",
     "none": "لا توجد بيانات لهذه الفترة."
   },
   "followups": {
@@ -572,6 +599,7 @@
     "deleteConfirmTitle": "حذف العلامات الحيوية؟",
     "deleteConfirmMessage": "سيتم حذف هذا السجل نهائياً. لا يمكن التراجع.",
     "deleted": "تم حذف العلامات الحيوية.",
+    "formErrors": "يرجى مراجعة الحقول المُظلَّلة والمحاولة مجدداً.",
     "saved": "تم حفظ العلامات الحيوية.",
     "editWindowExpired": "يتجاوز هذا السجل 24 ساعة ولا يمكن تعديله.",
     "editLockedTooltip": "التعديل مقفل — يتجاوز هذا السجل 24 ساعة.",
@@ -735,6 +763,7 @@
   "encounters": {
     "title": "الزيارة السريرية",
     "open": "فتح الزيارة السريرية",
+    "activeEncounters": "مقابلة نشطة",
     "loadError": "تعذّر تحميل الزيارة.",
     "status": {
       "DRAFT": "مسودة",

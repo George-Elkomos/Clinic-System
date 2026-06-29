@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { MedicationItemRow } from '../../components/medical/MedicationItemRow'
 import { useAuth } from '../../hooks/useAuth'
+import { useInteractionCheck } from '../../hooks/useInteractionCheck'
 
 import { AIScribePanel } from '../../components/ai/AIScribePanel'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
@@ -24,7 +26,8 @@ import { errorMessage } from '../../services/apiClient'
 import { authApi } from '../../services/auth.api'
 import { medicalApi } from '../../services/medical.api'
 import { vitalsApi } from '../../services/vitals.api'
-import type { Prescription, PrescriptionItem } from '../../services/types'
+import { encountersApi } from '../../services/encounters.api'
+import type { Diagnosis, Prescription, PrescriptionItem } from '../../services/types'
 
 // ---- Vital Signs -----------------------------------------------------------
 function VitalsSection({ patientId }: { patientId: number }) {
@@ -166,7 +169,8 @@ function NotesSection({ patientId, categories }: { patientId: number; categories
 // when items are added/removed from the middle of the list.
 type RxItem = PrescriptionItem & { _key: string }
 const newRxItem = (): RxItem => ({
-  drug_name: '', dosage: '', frequency: '', duration: '', instructions: '',
+  medication: null, drug_name: '', dosage_strength: '', dosage_form: null, dosage_pattern: null,
+  dosage: '', frequency: '', duration: '', instructions: '',
   _key: crypto.randomUUID(),
 })
 
@@ -177,11 +181,14 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
   const qc = useQueryClient()
   const { user } = useAuth()
   const confirm = useConfirm()
+  const { checkBeforeSubmit, checking, modal } = useInteractionCheck()
   const newRxRef = useRef<HTMLHeadingElement>(null)
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<RxItem[]>([newRxItem()])
   const [voidingId, setVoidingId] = useState<number | null>(null)
   const [voidReason, setVoidReason] = useState('')
+
+  const hasContent = (i: RxItem) => !!i.medication || !!i.drug_name.trim()
 
   const { data: prescriptions = [] } = useQuery({
     queryKey: ['prescriptions', patientId],
@@ -193,7 +200,7 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
       patient: patientId,
       notes,
       // Strip the client-only _key before sending to the API.
-      items: items.filter((i) => i.drug_name).map(({ _key: _, ...rest }) => rest),
+      items: items.filter(hasContent).map(({ _key: _, ...rest }) => rest),
     }),
     onSuccess: () => {
       showToast(t('medical.prescriptionIssued'), 'success')
@@ -241,8 +248,11 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
     try { openBlob(await medicalApi.prescriptionPdf(id)) } catch (err) { showToast(errorMessage(err), 'error') }
   }
 
-  const setItem = (idx: number, key: keyof PrescriptionItem, value: string) =>
-    setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, [key]: value } : it)))
+  const patchItem = (idx: number, patch: Partial<PrescriptionItem>) =>
+    setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
+
+  const handleIssue = () =>
+    checkBeforeSubmit(patientId, items.filter(hasContent), () => issue.mutate())
 
   return (
     <Card title={t('medical.prescriptions')}>
@@ -333,19 +343,20 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
 
       <h3 ref={newRxRef} className="medical-section-divider">{t('medical.newPrescription')}</h3>
       {items.map((it, idx) => (
-        <div key={it._key} className="medical-rx-item">
-          <div className="medical-rx-field--wide"><FormField label={t('medical.medication')}>{(p) => <input {...p} value={it.drug_name} onChange={(e) => setItem(idx, 'drug_name', e.target.value)} />}</FormField></div>
-          <div className="medical-rx-field"><FormField label={t('medical.dosage')}>{(p) => <input {...p} value={it.dosage} onChange={(e) => setItem(idx, 'dosage', e.target.value)} />}</FormField></div>
-          <div className="medical-rx-field--mid"><FormField label={t('medical.frequency')}>{(p) => <input {...p} value={it.frequency} onChange={(e) => setItem(idx, 'frequency', e.target.value)} />}</FormField></div>
-          <div className="medical-rx-field"><FormField label={t('medical.duration')}>{(p) => <input {...p} value={it.duration} onChange={(e) => setItem(idx, 'duration', e.target.value)} />}</FormField></div>
-          {items.length > 1 && <Button variant="secondary" onClick={() => setItems((arr) => arr.filter((i) => i._key !== it._key))}>{t('medical.removeItem')}</Button>}
-        </div>
+        <MedicationItemRow
+          key={it._key}
+          item={it}
+          onChange={(patch) => patchItem(idx, patch)}
+          onRemove={() => setItems((arr) => arr.filter((i) => i._key !== it._key))}
+          canRemove={items.length > 1}
+        />
       ))}
       <Button variant="secondary" onClick={() => setItems((arr) => [...arr, newRxItem()])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
       <FormField label={t('medical.instructions')}>
         {(p) => <textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </FormField>
-      <Button loading={issue.isPending} disabled={!items.some((i) => i.drug_name)} onClick={() => issue.mutate()} className="medical-form-submit">{t('medical.issuePrescription')}</Button>
+      <Button loading={issue.isPending || checking} disabled={!items.some(hasContent)} onClick={handleIssue} className="medical-form-submit">{t('medical.issuePrescription')}</Button>
+      {modal}
     </Card>
   )
 }
@@ -440,6 +451,46 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
   )
 }
 
+// ---- Chronic diagnoses -----------------------------------------------------
+// Derived from submitted encounters whose coded diagnosis is flagged chronic.
+function ChronicDiagnosesSection({ patientId }: { patientId: number }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+
+  const { data: encounters = [] } = useQuery({
+    queryKey: ['encounters', patientId, 'chronic'],
+    queryFn: () => encountersApi.list({ patient: patientId, status: 'SUBMITTED' }),
+  })
+
+  const chronic = useMemo(() => {
+    const map = new Map<number, { d: Diagnosis; count: number }>()
+    for (const e of encounters) {
+      const d = e.diagnosis_detail
+      if (d?.is_chronic) map.set(d.id, { d, count: (map.get(d.id)?.count ?? 0) + 1 })
+    }
+    return Array.from(map.values())
+  }, [encounters])
+
+  return (
+    <Card title={t('medical.chronicDiagnoses')}>
+      {chronic.length === 0 ? (
+        <p>{t('medical.noChronicDiagnoses')}</p>
+      ) : (
+        <ul className="chronic-dx-list">
+          {chronic.map(({ d, count }) => (
+            <li key={d.id} dir="auto">
+              <strong>{language === 'ar' && d.name_ar ? d.name_ar : d.name}</strong>
+              {d.icd10_code && <span className="medical-list-meta"> ({d.icd10_code})</span>}
+              {' — '}
+              {t('medical.encounterCount', { count })}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
 // ---- Page ------------------------------------------------------------------
 export function PatientRecordPage() {
   const { t } = useTranslation()
@@ -485,6 +536,7 @@ export function PatientRecordPage() {
           <AIScribePanel patientId={patientId} />
           <VitalsSection patientId={patientId} />
           <RecordsSection patientId={patientId} />
+          <ChronicDiagnosesSection patientId={patientId} />
           <NotesSection patientId={patientId} categories={categories} />
           <PrescriptionsSection patientId={patientId} />
           <ScansLabsSection patientId={patientId} />

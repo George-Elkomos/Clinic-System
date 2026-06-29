@@ -13,7 +13,7 @@ export function FormField({ label, error, hint, children }: FormFieldProps) {
   const id = useId()
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
   return (
-    <div className="field">
+    <div className={`field${error ? ' field--invalid' : ''}`}>
       <label className="field__label" htmlFor={id}>
         {label}
       </label>

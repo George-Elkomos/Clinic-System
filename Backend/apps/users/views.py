@@ -132,22 +132,10 @@ class MeView(APIView):
 
     @staticmethod
     def _payload(user):
-        data = UserSerializer(user).data
-        profile = getattr(user, "patient_profile", None)
-        data["patient_profile"] = (
-            PatientProfileSerializer(profile).data if profile else None
-        )
-        prefs = getattr(user, "notification_preference", None)
-        data["notification_preference"] = (
-            NotificationPreferenceSerializer(prefs).data if prefs else None
-        )
-        # Doctors get their profile (incl. specialties → categories for note tagging).
-        doctor_profile = getattr(user, "doctor_profile", None)
-        if doctor_profile is not None:
-            from apps.doctors.serializers import DoctorProfileSerializer
+        # Shared with LoginSerializer so the user object is identical from both.
+        from .serializers import build_user_payload
 
-            data["doctor_profile"] = DoctorProfileSerializer(doctor_profile).data
-        return data
+        return build_user_payload(user)
 
 
 class RegisterView(generics.CreateAPIView):

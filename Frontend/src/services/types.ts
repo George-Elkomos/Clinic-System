@@ -244,6 +244,7 @@ export interface MedicalRecord {
   supersedes: number | null
   chief_complaint: string
   diagnosis: string
+  diagnosis_ref: number | null
   treatment_plan: string
   vitals: Record<string, string>
   appointment: number | null
@@ -301,7 +302,12 @@ export interface LabResult {
 
 export interface PrescriptionItem {
   id?: number
+  medication?: number | null
+  medication_name?: string
   drug_name: string
+  dosage_strength?: string
+  dosage_form?: number | null
+  dosage_pattern?: number | null
   dosage: string
   frequency: string
   duration: string
@@ -636,7 +642,72 @@ export interface Diagnosis {
   name: string
   name_ar: string
   category: ComplaintCategory
+  icd10_code?: string | null
+  is_chronic?: boolean
+  category_ref?: number | null
+  category_ref_name?: string
   is_active: boolean
+}
+
+export interface DiagnosisCategory {
+  id: number
+  name: string
+  name_ar: string
+  is_active: boolean
+}
+
+export interface DiagnosisDistribution {
+  period: string
+  generated_at: string
+  diagnoses: { name: string; name_ar: string; icd10_code: string | null; count: number }[]
+}
+
+// --- Medications (Phase 9) ---
+
+export interface MedicationClass {
+  id: number
+  name: string
+  name_ar: string
+  is_active: boolean
+}
+
+export interface DosageForm {
+  id: number
+  name: string
+  name_ar: string
+  is_active: boolean
+}
+
+export interface DosagePattern {
+  id: number
+  name: string
+  name_ar: string
+  code: string
+  is_active: boolean
+}
+
+export interface Medication {
+  id: number
+  name: string
+  name_ar: string
+  brand_names: string[]
+  drug_class: number | null
+  drug_class_name: string
+  dosage_forms: number[]
+  requires_prescription: boolean
+  is_active: boolean
+}
+
+export type AllergySeverity = 'MILD' | 'MODERATE' | 'SEVERE' | 'CONTRAINDICATED'
+
+export interface AllergyInteractionWarning {
+  medication_id: number
+  medication_name: string
+  allergy_keyword: string
+  drug_class: string
+  severity: AllergySeverity
+  message: string
+  message_ar: string
 }
 
 export interface Encounter {

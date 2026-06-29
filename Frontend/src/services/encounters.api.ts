@@ -14,6 +14,9 @@ export const encountersApi = {
   get: (id: number) =>
     api.get<Encounter>(`/encounters/${id}/`).then((r) => r.data),
 
+  list: (params?: { patient?: number; status?: string }) =>
+    api.get<Paginated<Encounter>>('/encounters/', { params }).then((r) => r.data.results),
+
   update: (id: number, data: UpdateEncounterPayload) =>
     api.patch<Encounter>(`/encounters/${id}/`, data).then((r) => r.data),
 

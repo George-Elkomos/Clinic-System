@@ -123,6 +123,13 @@ class PrescriptionStatus(models.TextChoices):
     CANCELLED = "CANCELLED", _("Cancelled")
 
 
+class AllergySeverity(models.TextChoices):
+    MILD = "MILD", _("Mild")
+    MODERATE = "MODERATE", _("Moderate")
+    SEVERE = "SEVERE", _("Severe")
+    CONTRAINDICATED = "CONTRAINDICATED", _("Contraindicated")
+
+
 class NotificationVerb(models.TextChoices):
     APPT_CONFIRMED = "APPT_CONFIRMED", _("Appointment confirmed")
     APPT_CANCELLED = "APPT_CANCELLED", _("Appointment cancelled")

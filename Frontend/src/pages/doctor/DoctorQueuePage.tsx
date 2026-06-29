@@ -205,6 +205,15 @@ export function DoctorQueuePage() {
     refetchInterval: 15_000,
   })
 
+  // Safety-net: if the queue endpoint returns no current patient, check directly for any
+  // IN_PROGRESS appointment assigned to this doctor (e.g. appointment created outside today).
+  const { data: inProgressFallbackData } = useQuery({
+    queryKey: ['doctor-queue-in-progress'],
+    queryFn: () => appointmentsApi.list({ status: 'IN_PROGRESS' }),
+    enabled: data !== undefined && data.current === null,
+    refetchInterval: 15_000,
+  })
+
   const complete = useMutation({
     mutationFn: (id: number) => appointmentsApi.complete(id),
     onSuccess: () => {
@@ -245,6 +254,7 @@ export function DoctorQueuePage() {
   if (isLoading) return <CenteredSpinner />
 
   const { previous = null, current = null, next = null, waiting_count = 0 } = data ?? {}
+  const fallbackRows = (!current ? inProgressFallbackData?.results : null) ?? []
 
   return (
     <div>
@@ -254,6 +264,22 @@ export function DoctorQueuePage() {
           {t('queue.waiting', { count: waiting_count })}
         </span>
       </div>
+
+      {fallbackRows.map((a) => (
+        <div key={a.id} style={{ borderInlineStart: '3px solid var(--color-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-4)' }}>
+          <Card>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <div>
+                <h2 className="queue-patient-name" style={{ margin: 0 }}>{a.patient_name}</h2>
+                <div className="queue-panel-meta">{formatTime(a.scheduled_start, language)}</div>
+              </div>
+              <Link to={`/doctor/encounters/${a.id}`} className="queue-encounter-cta">
+                <Button>🩻 {t('encounters.open')}</Button>
+              </Link>
+            </div>
+          </Card>
+        </div>
+      ))}
 
       <div className="queue-grid">
         <PreviousPanel appt={previous ?? null} />

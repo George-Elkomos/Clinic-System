@@ -76,6 +76,7 @@
     "forgotPassword": "Forgot your password?",
     "welcome": "Welcome, {{name}}",
     "loginFailed": "We couldn't sign you in. Please check your email and password.",
+    "serverUnreachable": "Can't reach the server. Make sure the backend is running, then try again.",
     "registerTitle": "Create your account",
     "registerIntro": "Register to book appointments and manage your health records.",
     "registerLink": "New patient? Register here",
@@ -292,7 +293,7 @@
     "issuedOn": "Issued {{date}}",
     "voidPrescription": "Void prescription",
     "voidReasonLabel": "Reason for voiding",
-    "voidReasonPlaceholder": "e.g. Wrong dosage prescribed, patient allergic to drug…",
+    "voidReasonPlaceholder": "e.g. Voided for modification/re-issue",
     "voidConfirmBtn": "Void this prescription",
     "voidedBadge": "VOIDED",
     "voidedOn": "Voided {{date}}",
@@ -305,7 +306,29 @@
     "reissued": "Prescription voided — form pre-filled with previous contents. Review and re-issue.",
     "selectPatient": "Select a patient",
     "noPatients": "You have no patients yet. Patients appear here after a completed visit.",
-    "uploadedBy": "Uploaded by {{name}}"
+    "uploadedBy": "Uploaded by {{name}}",
+    "chronicDiagnoses": "Chronic Diagnoses",
+    "noChronicDiagnoses": "No chronic diagnoses recorded.",
+    "encounterCount": "{{count}} encounter(s)"
+  },
+  "medications": {
+    "searchPlaceholder": "Search medications…",
+    "freeTextHint": "or type an unlisted drug name",
+    "strength": "Strength",
+    "dosageForm": "Form",
+    "dosagePattern": "Pattern",
+    "selectForm": "Select form",
+    "selectPattern": "Select pattern",
+    "interactionTitle": "Allergy warning",
+    "interactionIntro": "This patient has documented allergies that may conflict with the prescribed medication. Review before issuing:",
+    "allergyMatch": "Matched allergy: {{keyword}}",
+    "proceedAnyway": "Proceed anyway",
+    "severity": {
+      "MILD": "Mild",
+      "MODERATE": "Moderate",
+      "SEVERE": "Severe",
+      "CONTRAINDICATED": "Contraindicated"
+    }
   },
   "queue": {
     "title": "Waiting Room Queue",
@@ -430,6 +453,10 @@
     "attendance": "Doctor attendance",
     "absenceDays": "Absence days",
     "mostReviewed": "Most reviewed: {{name}}",
+    "topDiagnoses": "Top Diagnoses",
+    "diagnosis": "Diagnosis",
+    "count": "Count",
+    "noDiagnoses": "No diagnoses recorded for this period.",
     "none": "No data for this period."
   },
   "followups": {
@@ -616,6 +643,7 @@
     "deleteConfirmTitle": "Delete vital signs?",
     "deleteConfirmMessage": "This record will be permanently removed. This cannot be undone.",
     "deleted": "Vital signs deleted.",
+    "formErrors": "Please review the highlighted fields and try again.",
     "saved": "Vital signs saved.",
     "editWindowExpired": "This record is older than 24 hours and can no longer be edited.",
     "editLockedTooltip": "Editing is locked — this record is older than 24 hours.",
@@ -735,6 +763,7 @@
   "encounters": {
     "title": "Clinical Encounter",
     "open": "Open Clinical Encounter",
+    "activeEncounters": "Active Encounter",
     "loadError": "Failed to load the encounter.",
     "status": {
       "DRAFT": "Draft",

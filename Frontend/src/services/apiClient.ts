@@ -73,6 +73,17 @@ api.interceptors.response.use(
 )
 
 /**
+ * True when the request never got a usable response from the API: no response at
+ * all (backend down / connection refused / timeout / CORS) or a 5xx server error.
+ * Used to show a "can't reach the server" message instead of blaming the user's
+ * input (e.g. on the login screen).
+ */
+export function isConnectivityError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false
+  return !error.response || error.response.status >= 500
+}
+
+/**
  * Turns any Axios error into a human-readable string for toast notifications.
  *
  * DRF can return several shapes:

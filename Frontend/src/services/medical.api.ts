@@ -1,5 +1,6 @@
 import { api } from './apiClient'
 import type {
+  AllergyInteractionWarning,
   ClinicalNote,
   LabResult,
   MedicalRecord,
@@ -64,4 +65,13 @@ export const medicalApi = {
 
   reissuePrescription: (id: number) =>
     api.post<Prescription>(`/prescriptions/${id}/reissue/`).then((r) => r.data),
+
+  // Phase 9: pre-save drug-allergy check for a patient + selected medication ids.
+  checkInteractions: (patientId: number, medicationIds: number[]) =>
+    api
+      .post<{ warnings: AllergyInteractionWarning[] }>('/prescriptions/check-interactions/', {
+        patient: patientId,
+        medications: medicationIds,
+      })
+      .then((r) => r.data.warnings),
 }

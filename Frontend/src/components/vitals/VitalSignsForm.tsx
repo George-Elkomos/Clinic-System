@@ -188,6 +188,21 @@ export function VitalSignsForm({ patientId, appointmentId, initial, onSuccess, o
         {(p) => <textarea {...p} rows={2} value={form.notes} onChange={set('notes')} placeholder={t('vitals.notesPlaceholder')} />}
       </FormField>
 
+      {Object.keys(errors).length > 0 && (
+        <div role="alert" style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+          marginTop: 'var(--space-3)',
+          padding: 'var(--space-3) var(--space-4)',
+          background: 'color-mix(in srgb, var(--danger) 8%, var(--bg))',
+          border: '1px solid var(--danger)',
+          borderRadius: 'var(--radius)',
+          color: 'var(--danger)', fontSize: 'var(--font-small)',
+        }}>
+          <span aria-hidden="true">⚠</span>
+          {t('vitals.formErrors')}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 'var(--space-4)' }}>
         {onCancel && (
           <Button variant="secondary" onClick={onCancel} disabled={pending}>

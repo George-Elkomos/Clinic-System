@@ -3,7 +3,7 @@ from rest_framework import serializers
 from apps.medical_records.serializers import LabOrderListSerializer, PrescriptionSerializer
 from apps.vital_signs.serializers import VitalSignsReadSerializer
 
-from .models import Complaint, Diagnosis, Encounter
+from .models import Complaint, Diagnosis, DiagnosisCategory, Encounter
 
 
 class ComplaintSerializer(serializers.ModelSerializer):
@@ -12,10 +12,21 @@ class ComplaintSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "name_ar", "category", "is_active"]
 
 
+class DiagnosisCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DiagnosisCategory
+        fields = ["id", "name", "name_ar", "is_active"]
+
+
 class DiagnosisSerializer(serializers.ModelSerializer):
+    category_ref_name = serializers.CharField(source="category_ref.name", read_only=True, default="")
+
     class Meta:
         model = Diagnosis
-        fields = ["id", "name", "name_ar", "category", "is_active"]
+        fields = [
+            "id", "name", "name_ar", "category", "icd10_code", "is_chronic",
+            "category_ref", "category_ref_name", "is_active",
+        ]
 
 
 class EncounterReadSerializer(serializers.ModelSerializer):

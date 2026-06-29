@@ -9,10 +9,11 @@ from apps.appointments.models import Appointment
 from apps.core.enums import RoleChoices
 
 from . import services
-from .models import Complaint, Diagnosis, Encounter
+from .models import Complaint, Diagnosis, DiagnosisCategory, Encounter
 from .permissions import EncounterPermission
 from .serializers import (
     ComplaintSerializer,
+    DiagnosisCategorySerializer,
     DiagnosisSerializer,
     EncounterReadSerializer,
     EncounterWriteSerializer,
@@ -100,9 +101,24 @@ class ComplaintViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["name", "name_ar"]
 
 
-class DiagnosisViewSet(viewsets.ReadOnlyModelViewSet):
+class DiagnosisViewSet(viewsets.ModelViewSet):
     serializer_class = DiagnosisSerializer
     permission_classes = [IsAuthenticated]
-    queryset = Diagnosis.objects.all()
-    filterset_fields = ["category", "is_active"]
+    http_method_names = ["get", "post", "head", "options"]
+    queryset = Diagnosis.objects.select_related("category_ref")
+    filterset_fields = ["category", "category_ref", "is_chronic", "is_active"]
+    search_fields = ["name", "name_ar", "icd10_code"]
+
+    def perform_create(self, serializer):
+        # Doctors add a missing diagnosis on the fly; managers curate. Others read-only.
+        if self.request.user.role not in (RoleChoices.DOCTOR, RoleChoices.MANAGER):
+            raise PermissionDenied("Only doctors or managers can add diagnoses.")
+        serializer.save()
+
+
+class DiagnosisCategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = DiagnosisCategorySerializer
+    permission_classes = [IsAuthenticated]
+    queryset = DiagnosisCategory.objects.all()
+    filterset_fields = ["is_active"]
     search_fields = ["name", "name_ar"]

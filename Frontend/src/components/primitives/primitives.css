@@ -41,7 +41,16 @@
 .field__label { display: block; font-size: var(--font-body); font-weight: 600; margin-bottom: var(--space-2); }
 .field__error { color: var(--danger); font-size: var(--font-small); margin-top: var(--space-2); }
 .field__hint { color: var(--text-muted); font-size: var(--font-small); margin-top: var(--space-1); }
-.field input[aria-invalid='true'], .field select[aria-invalid='true'] { border-color: var(--danger); }
+
+/* Error state — class-based so it works reliably for input, select, and textarea alike. */
+.field--invalid input,
+.field--invalid select,
+.field--invalid textarea {
+  border-color: var(--danger);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--danger) 5%, var(--bg));
+}
+.field--invalid .field__label { color: var(--danger); }
 
 /* Spinner */
 .spinner {
@@ -1308,3 +1317,29 @@
   .encounter-layout { grid-template-columns: 1fr; }
   .encounter-sidebar { position: static; }
 }
+
+/* Medication master (Phase 9) — free-text fallback + allergy-warning modal */
+.medication-row__freetext {
+  width: 100%; margin-top: var(--space-1); padding: var(--space-2);
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  font-size: var(--font-small);
+}
+.medication-warning__intro { margin: 0 0 var(--space-3); color: var(--text-muted); }
+.medication-warning__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.medication-warning__item {
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+  border: 1px solid var(--border); border-inline-start-width: 4px;
+}
+.medication-warning__item--MILD            { border-inline-start-color: var(--text-muted); }
+.medication-warning__item--MODERATE        { border-inline-start-color: var(--warning); }
+.medication-warning__item--SEVERE          { border-inline-start-color: var(--danger, #e53e3e); }
+.medication-warning__item--CONTRAINDICATED { border-inline-start-color: var(--danger, #e53e3e); background: color-mix(in srgb, var(--danger, #e53e3e) 8%, transparent); }
+.medication-warning__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.medication-warning__msg { font-size: var(--font-small); margin-top: var(--space-1); }
+.medication-warning__meta { font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-1); }
+
+/* Allergy severity badges */
+.badge--MILD            { border-color: var(--text-muted); color: var(--text-muted); }
+.badge--MODERATE        { border-color: var(--warning); color: var(--warning); }
+.badge--SEVERE          { border-color: var(--danger, #e53e3e); color: var(--danger, #e53e3e); }
+.badge--CONTRAINDICATED { border-color: var(--danger, #e53e3e); color: var(--on-danger, #fff); background: var(--danger, #e53e3e); font-weight: 700; }

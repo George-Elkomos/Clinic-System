@@ -41,7 +41,7 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
         model = MedicalRecord
         fields = [
             "id", "patient", "doctor", "doctor_name", "version", "is_current",
-            "supersedes", "chief_complaint", "diagnosis", "treatment_plan",
+            "supersedes", "chief_complaint", "diagnosis", "diagnosis_ref", "treatment_plan",
             "vitals", "appointment", "created_at",
         ]
         # Versioning + authorship are controlled by the service/view, not the client.
@@ -116,11 +116,29 @@ class LabResultSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
+    medication_name = serializers.CharField(source="medication.name", read_only=True, default="")
+    # Optional at field level; a line is valid with either a medication or a
+    # free-text drug name (enforced in validate()). Auto-filled from the linked
+    # medication on save when left blank.
+    drug_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
+
     class Meta:
         model = PrescriptionItem
-        fields = ["id", "drug_name", "dosage", "frequency", "duration",
+        fields = ["id", "medication", "medication_name", "drug_name",
+                  "dosage_strength", "dosage_form", "dosage_pattern",
+                  "dosage", "frequency", "duration",
                   "instructions", "instructions_ar", "quantity"]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "medication_name"]
+
+    def validate(self, attrs):
+        # A line needs either a linked medication or a free-text drug name.
+        medication = attrs.get("medication") or getattr(self.instance, "medication", None)
+        drug_name = attrs.get("drug_name") or getattr(self.instance, "drug_name", "")
+        if not medication and not (drug_name or "").strip():
+            raise serializers.ValidationError(
+                {"drug_name": "Provide a medication or a drug name."}
+            )
+        return attrs
 
 
 class PrescriptionCancelSerializer(serializers.Serializer):
@@ -151,6 +169,10 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         items = validated_data.pop("items", [])
         prescription = Prescription.objects.create(**validated_data)
         for item in items:
+            # Keep drug_name populated (PDF/timeline/free-text consumers rely on it)
+            # by defaulting it to the linked medication's name when left blank.
+            if not (item.get("drug_name") or "").strip() and item.get("medication"):
+                item["drug_name"] = item["medication"].name
             PrescriptionItem.objects.create(prescription=prescription, **item)
         return prescription
 
@@ -162,6 +184,8 @@ class PrescriptionSerializer(serializers.ModelSerializer):
         if items is not None:  # replace the full item set
             instance.items.all().delete()
             for item in items:
+                if not (item.get("drug_name") or "").strip() and item.get("medication"):
+                    item["drug_name"] = item["medication"].name
                 PrescriptionItem.objects.create(prescription=instance, **item)
         return instance
 

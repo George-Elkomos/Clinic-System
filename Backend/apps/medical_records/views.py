@@ -186,6 +186,33 @@ class PrescriptionViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
         patient = self._resolve_patient(serializer)
         serializer.save(doctor=self.request.user.doctor_profile, patient=patient)
 
+    @action(detail=False, methods=["post"], url_path="check-interactions")
+    def check_interactions(self, request):
+        """Stateless pre-save drug-allergy check.
+
+        Body: {"patient": <id>, "medications": [<medication_id>, ...]}
+        Returns: {"warnings": [...]}.
+        """
+        from apps.medications.services import check_allergy_interactions
+
+        user = request.user
+        patient_id = request.data.get("patient")
+        if not patient_id:
+            raise ValidationError({"patient": "A patient id is required."})
+        patient = get_object_or_404(PatientProfile, pk=patient_id)
+        # Same ownership rules as _resolve_patient: own patient (patient role),
+        # treating doctor, or manager.
+        if user.role == RoleChoices.PATIENT and patient.user_id != user.id:
+            raise PermissionDenied("You can only check your own prescriptions.")
+        if user.role == RoleChoices.DOCTOR and not doctor_treats(user, patient):
+            raise PermissionDenied("You can only check interactions for your own patients.")
+        if user.role == RoleChoices.SECRETARY:
+            raise PermissionDenied("Secretaries cannot check drug interactions.")
+
+        medication_ids = request.data.get("medications", [])
+        warnings = check_allergy_interactions(patient, medication_ids)
+        return Response({"warnings": warnings})
+
     def _assert_cancellable(self, prescription, user):
         """Shared guard for cancel and reissue: ACTIVE + (issuing doctor or manager)."""
         from apps.core.enums import PrescriptionStatus

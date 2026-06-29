@@ -6,7 +6,7 @@ import { Button } from '../../components/primitives/Button'
 import { FormField } from '../../components/primitives/FormField'
 import { LanguageSwitcher } from '../../components/primitives/LanguageSwitcher'
 import { useAuth } from '../../hooks/useAuth'
-import { errorMessage } from '../../services/apiClient'
+import { errorMessage, isConnectivityError } from '../../services/apiClient'
 import { roleHome } from '../../routes/roleHome'
 
 export function LoginPage() {
@@ -28,7 +28,11 @@ export function LoginPage() {
       const next = params.get('next')
       navigate(next || roleHome(user.role), { replace: true })
     } catch (err) {
-      setError(errorMessage(err, t('auth.loginFailed')))
+      // Distinguish "backend unreachable" from a real credential rejection so we
+      // don't tell the user to check a password that was never actually checked.
+      setError(isConnectivityError(err)
+        ? t('auth.serverUnreachable')
+        : errorMessage(err, t('auth.loginFailed')))
     } finally {
       setLoading(false)
     }

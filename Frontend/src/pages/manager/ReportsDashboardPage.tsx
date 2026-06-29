@@ -9,6 +9,7 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { useLanguage } from '../../hooks/useLanguage'
 import { saveBlob } from '../../lib/download'
 import { errorMessage } from '../../services/apiClient'
 import { reportsApi } from '../../services/reports.api'
@@ -32,6 +33,7 @@ function Kpi({ label, value }: { label: string; value: number | string }) {
 
 export function ReportsDashboardPage() {
   const { t } = useTranslation()
+  const { language } = useLanguage()
   const { showToast } = useToast()
   const [period, setPeriod] = useState('month')
 
@@ -39,6 +41,13 @@ export function ReportsDashboardPage() {
     queryKey: ['report', period],
     queryFn: () => reportsApi.dashboard(period),
   })
+
+  const { data: diagnosisData } = useQuery({
+    queryKey: ['diagnosis-distribution', period],
+    queryFn: () => reportsApi.diagnosisDistribution(period),
+  })
+
+  const maxDiagnosis = Math.max(1, ...(diagnosisData?.diagnoses ?? []).map((d) => d.count))
 
   const exportReport = async (fmt: 'pdf' | 'csv') => {
     try {
@@ -151,6 +160,34 @@ export function ReportsDashboardPage() {
                 ))}
               </tbody>
             </table>
+          </Card>
+
+          <Card title={t('reports.topDiagnoses')}>
+            {!diagnosisData || diagnosisData.diagnoses.length === 0 ? (
+              <p>{t('reports.noDiagnoses')}</p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.diagnosis')}</th>
+                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.count')}</th>
+                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {diagnosisData.diagnoses.map((d) => (
+                    <tr key={d.name} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                      <td style={{ padding: 'var(--space-2)' }} dir="auto">
+                        {language === 'ar' && d.name_ar ? d.name_ar : d.name}
+                        {d.icd10_code && <span style={{ color: 'var(--text-muted)' }}> ({d.icd10_code})</span>}
+                      </td>
+                      <td style={{ padding: 'var(--space-2)' }}>{d.count}</td>
+                      <td style={{ padding: 'var(--space-2)', width: '40%' }}><Bar pct={(d.count / maxDiagnosis) * 100} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </Card>
         </>
       )}

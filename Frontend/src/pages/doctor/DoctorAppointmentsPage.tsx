@@ -62,6 +62,15 @@ export function DoctorAppointmentsPage() {
     queryFn: () => appointmentsApi.list(status ? { status } : undefined),
   })
 
+  // Always-on query — IN_PROGRESS appointments are pinned regardless of the status filter.
+  const { data: inProgressData } = useQuery({
+    queryKey: ['appointments', 'doctor', 'in-progress-pinned'],
+    queryFn: () => appointmentsApi.list({ status: 'IN_PROGRESS' }),
+    refetchInterval: 15_000,
+  })
+  const pinnedRows = inProgressData?.results ?? []
+  const pinnedIds = new Set(pinnedRows.map((a) => a.id))
+
   const transition = useMutation({
     mutationFn: ({ id, action }: { id: number; action: 'checkIn' | 'start' | 'complete' }) =>
       appointmentsApi[action](id),
@@ -76,12 +85,39 @@ export function DoctorAppointmentsPage() {
     return null
   }
 
-  const rows = data?.results ?? []
+  // Exclude appointments already shown in the pinned section to avoid duplication.
+  const rows = (data?.results ?? []).filter((a) => !pinnedIds.has(a.id))
 
   return (
     <div>
       <Breadcrumbs trail={[{ label: t('nav.appointments') }]} />
       <h1>{t('appointments.title')}</h1>
+
+      {pinnedRows.length > 0 && (
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--color-primary)' }}>
+            {t('encounters.activeEncounters')}
+          </h2>
+          {pinnedRows.map((a) => (
+            <div key={a.id} style={{ borderInlineStart: '3px solid var(--color-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-2)' }}>
+              <Card>
+                <div className="appt-card__row">
+                  <div className="appt-card__info">
+                    <h3 className="appt-card__name">{a.patient_name}</h3>
+                    <div className="appt-card__date">{formatDateTime(a.scheduled_start, language)}</div>
+                  </div>
+                  <div className="appt-card__actions">
+                    <StatusBadge status={a.status} />
+                    <Link to={`/doctor/encounters/${a.id}`}>
+                      <Button>🩻 {t('encounters.open')}</Button>
+                    </Link>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="appt-filter-wrap">
         <Card>

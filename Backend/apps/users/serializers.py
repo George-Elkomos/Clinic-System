@@ -22,6 +22,26 @@ class UserSerializer(serializers.ModelSerializer):
         return obj.get_full_name()
 
 
+def build_user_payload(user):
+    """Full current-user representation: base fields + nested patient/doctor
+    profile + notification prefs. Shared by login and /auth/me so the `user`
+    object is identical no matter which call produced it (otherwise the doctor
+    profile is missing right after login and only appears after a refresh)."""
+    data = UserSerializer(user).data
+    profile = getattr(user, "patient_profile", None)
+    data["patient_profile"] = PatientProfileSerializer(profile).data if profile else None
+    prefs = getattr(user, "notification_preference", None)
+    data["notification_preference"] = (
+        NotificationPreferenceSerializer(prefs).data if prefs else None
+    )
+    doctor_profile = getattr(user, "doctor_profile", None)
+    if doctor_profile is not None:
+        from apps.doctors.serializers import DoctorProfileSerializer
+
+        data["doctor_profile"] = DoctorProfileSerializer(doctor_profile).data
+    return data
+
+
 class MeUpdateSerializer(serializers.ModelSerializer):
     """Self-service profile edit (name, phone, language)."""
 
@@ -91,7 +111,7 @@ class LoginSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
-        data["user"] = UserSerializer(self.user).data
+        data["user"] = build_user_payload(self.user)
         return data
 
 

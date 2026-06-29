@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from apps.users.permissions import IsManager
 
 from .exporters import render_report_csv, render_report_pdf
-from .services import build_report
+from .services import build_report, diagnosis_distribution
 
 VALID_PERIODS = {"week", "month", "all"}
 
@@ -21,6 +21,13 @@ class ReportsDashboardView(APIView):
 
     def get(self, request):
         return Response(build_report(_period(request)))
+
+
+class DiagnosisDistributionView(APIView):
+    permission_classes = [IsManager]
+
+    def get(self, request):
+        return Response(diagnosis_distribution(_period(request)))
 
 
 class ReportsExportView(APIView):
