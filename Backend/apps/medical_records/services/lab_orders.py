@@ -1,11 +1,12 @@
 """Atomic state transitions for LabOrder."""
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.core.enums import LabOrderPriority, LabOrderStatus, NotificationVerb
 from apps.notifications.services import notify
 
-from ..models import LabOrder, LabOrderResult
+from ..models import LabOrder, LabOrderResult, SampleCollection
 
 # Statuses from which an order may still be cancelled (pre-results).
 CANCELLABLE_STATUSES = frozenset({
@@ -38,11 +39,20 @@ def submit_order(order: LabOrder) -> LabOrder:
     return order
 
 
-def collect_sample(order: LabOrder) -> LabOrder:
+def collect_sample(order: LabOrder, collected_by, sample_type: str, notes: str = "") -> LabOrder:
     _assert_status(order, LabOrderStatus.ORDERED, "collect sample")
+    now = timezone.now()
     order.status = LabOrderStatus.SAMPLE_COLLECTED
-    order.sample_collected_at = timezone.now()
+    order.sample_collected_at = now
     order.save(update_fields=["status", "sample_collected_at", "updated_at"])
+
+    SampleCollection.objects.create(
+        lab_order=order,
+        sample_type=sample_type,
+        collected_by=collected_by,
+        collected_at=now,
+        notes=notes,
+    )
 
     # CW-6: STAT and URGENT orders skip the manual "send to lab" gate — the
     # lab processes them immediately.  Auto-advance straight to PROCESSING so
@@ -51,6 +61,34 @@ def collect_sample(order: LabOrder) -> LabOrder:
         order.status = LabOrderStatus.PROCESSING
         order.save(update_fields=["status", "updated_at"])
 
+    return order
+
+
+def send_to_lab(order: LabOrder) -> LabOrder:
+    """Mark the sample as physically sent to the external lab and transition to PROCESSING."""
+    _assert_status(order, LabOrderStatus.SAMPLE_COLLECTED, "send to lab")
+    try:
+        sample = order.sample_collection
+    except SampleCollection.DoesNotExist:
+        raise ValidationError({"detail": "Collect the sample before sending it to the lab."})
+    sample.sent_to_lab_at = timezone.now()
+    sample.save(update_fields=["sent_to_lab_at"])
+    order.status = LabOrderStatus.PROCESSING
+    order.save(update_fields=["status", "updated_at"])
+    return order
+
+
+def receive_at_lab(order: LabOrder) -> LabOrder:
+    """Mark that the external lab has confirmed receipt of the sample."""
+    _assert_status(order, LabOrderStatus.PROCESSING, "receive at lab")
+    try:
+        sample = order.sample_collection
+    except SampleCollection.DoesNotExist:
+        raise ValidationError({"detail": "No sample collection record for this order."})
+    if sample.received_at_lab is not None:
+        raise ValidationError({"detail": "Sample already marked as received."})
+    sample.received_at_lab = timezone.now()
+    sample.save(update_fields=["received_at_lab"])
     return order
 
 
@@ -83,16 +121,17 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
     if errors:
         raise ValidationError({"results": errors})
 
-    order.status = LabOrderStatus.COMPLETED
-    order.completed_at = timezone.now()
-    order.save(update_fields=["status", "completed_at", "updated_at"])
-
     has_critical = False
-    for rd in results_data:
-        result = LabOrderResult(order=order, entered_by=entered_by, **rd)
-        result.save()
-        if result.is_critical:
-            has_critical = True
+    with transaction.atomic():
+        order.status = LabOrderStatus.COMPLETED
+        order.completed_at = timezone.now()
+        order.save(update_fields=["status", "completed_at", "updated_at"])
+
+        for rd in results_data:
+            result = LabOrderResult(order=order, entered_by=entered_by, **rd)
+            result.save()
+            if result.is_critical:
+                has_critical = True
 
     notify(
         recipient=order.patient.user,

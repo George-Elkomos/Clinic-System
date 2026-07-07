@@ -88,7 +88,11 @@ export function LabOrdersListPage() {
               <tbody>
                 {(data?.results ?? []).map((order) => (
                   <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: 'var(--space-2) var(--space-3)', fontWeight: 600 }}>{order.order_number}</td>
+                    <td style={{ padding: 'var(--space-2) var(--space-3)', fontWeight: 600 }}>
+                      <Link to={`/doctor/lab-orders/${order.id}`} style={{ color: 'var(--primary)' }}>
+                        {order.order_number}
+                      </Link>
+                    </td>
                     <td style={{ padding: 'var(--space-2) var(--space-3)' }}>{order.patient_name}</td>
                     <td style={{ padding: 'var(--space-2) var(--space-3)' }}><StatusBadge status={order.status} /></td>
                     <td style={{ padding: 'var(--space-2) var(--space-3)' }}><StatusBadge status={order.priority} ns="status" /></td>

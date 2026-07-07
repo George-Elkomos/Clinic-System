@@ -124,13 +124,15 @@ function LabOrderModal({ encounter, onClose, onSaved }: { encounter: Encounter; 
     setTests((arr) => arr.map((it, i) => (i === idx ? { ...it, [key]: value } : it)))
 
   const save = useMutation({
-    mutationFn: () =>
-      labOrdersApi.create({
+    mutationFn: async () => {
+      const order = await labOrdersApi.create({
         patient: encounter.patient,
         encounter: encounter.id,
         priority,
         items: tests.filter((tst) => tst.test_name),
-      }),
+      })
+      return labOrdersApi.submit(order.id)
+    },
     onSuccess: () => { showToast(t('encounters.saved'), 'success'); onSaved(); onClose() },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })

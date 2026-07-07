@@ -543,6 +543,7 @@
     "patients": "المرضى"
   },
   "errors": {
+    "required": "هذا الحقل مطلوب.",
     "generic": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
     "network": "تعذّر الوصول إلى الخادم. يرجى التحقق من اتصالك.",
     "forbiddenTitle": "الوصول غير مسموح",
@@ -661,7 +662,28 @@
     "filterStatus": "تصفية حسب الحالة",
     "filterPriority": "تصفية حسب الأولوية",
     "searchPlaceholder": "ابحث برقم الطلب أو المريض…",
-    "loadError": "تعذّر تحميل طلبات المختبر."
+    "loadError": "تعذّر تحميل طلبات المختبر.",
+    "sampleType": "نوع العينة",
+    "selectSampleType": "اختر نوع العينة",
+    "sampleId": "رقم العينة",
+    "sendToLab": "إرسال إلى المختبر",
+    "sentToLab": "تم إرسال العينة إلى المختبر.",
+    "receiveAtLab": "تأكيد الاستلام في المختبر",
+    "receivedAtLab": "تم استلام العينة في المختبر.",
+    "printLabel": "طباعة الملصق",
+    "collectedAt": "وقت الجمع",
+    "sentAt": "وقت الإرسال",
+    "receivedAt": "وقت الاستلام",
+    "noSample": "لم يتم الجمع بعد",
+    "collectSampleTitle": "جمع العينة",
+    "sampleNotes": "ملاحظات (اختياري)",
+    "sampleTypeSerum": "مصل",
+    "sampleTypeWholeBlood": "دم كامل",
+    "sampleTypeUrine": "بول",
+    "sampleTypeCSF": "سائل نخاعي",
+    "sampleTypeSwab": "مسحة",
+    "sampleTypeStool": "براز",
+    "sampleTypeOther": "أخرى"
   },
   "ai": {
     "title": "المساعد الذكي — سجّل الكشف",

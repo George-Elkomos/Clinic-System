@@ -509,12 +509,27 @@ export interface CreateVitalSignsPayload {
 
 export interface UpdateVitalSignsPayload extends Partial<CreateVitalSignsPayload> {}
 
-// --- Lab Orders (Phase 6) ---
+// --- Lab Orders (Phase 6 + Phase 11) ---
 
 export type LabOrderStatus =
   | 'DRAFT' | 'ORDERED' | 'SAMPLE_COLLECTED' | 'PROCESSING' | 'COMPLETED' | 'REVIEWED'
 
 export type LabOrderPriority = 'ROUTINE' | 'URGENT' | 'STAT'
+
+export type SampleType = 'SERUM' | 'WHOLE_BLOOD' | 'URINE' | 'CSF' | 'SWAB' | 'STOOL' | 'OTHER'
+
+export interface SampleCollection {
+  id: number
+  lab_order: number
+  sample_type: SampleType
+  sample_id: string
+  collected_by: number
+  collected_by_name: string
+  collected_at: string
+  sent_to_lab_at: string | null
+  received_at_lab: string | null
+  notes: string
+}
 
 export interface LabOrderItem {
   id?: number
@@ -558,6 +573,7 @@ export interface LabOrder {
   items: LabOrderItem[]
   results: LabOrderResult[]
   has_critical: boolean
+  sample_collection: SampleCollection | null
   created_at: string
 }
 
@@ -576,6 +592,7 @@ export interface LabOrderSummary {
   completed_at: string | null
   reviewed_at: string | null
   item_count: number
+  sample_collection: SampleCollection | null
   created_at: string
 }
 

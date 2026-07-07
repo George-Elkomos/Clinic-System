@@ -164,6 +164,16 @@ class LabOrderPriority(models.TextChoices):
     STAT = "STAT", _("STAT")
 
 
+class SampleType(models.TextChoices):
+    SERUM = "SERUM", _("Serum")
+    WHOLE_BLOOD = "WHOLE_BLOOD", _("Whole Blood")
+    URINE = "URINE", _("Urine")
+    CSF = "CSF", _("CSF")
+    SWAB = "SWAB", _("Swab")
+    STOOL = "STOOL", _("Stool")
+    OTHER = "OTHER", _("Other")
+
+
 class AuditAction(models.TextChoices):
     CREATE = "CREATE", _("Create")
     UPDATE = "UPDATE", _("Update")

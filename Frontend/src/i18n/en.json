@@ -596,7 +596,28 @@
     "filterStatus": "Filter by status",
     "filterPriority": "Filter by priority",
     "searchPlaceholder": "Search by order #, patient…",
-    "loadError": "Failed to load lab orders."
+    "loadError": "Failed to load lab orders.",
+    "sampleType": "Sample Type",
+    "selectSampleType": "Select sample type",
+    "sampleId": "Sample ID",
+    "sendToLab": "Send to Lab",
+    "sentToLab": "Sample sent to lab.",
+    "receiveAtLab": "Mark Received at Lab",
+    "receivedAtLab": "Sample received at lab.",
+    "printLabel": "Print Label",
+    "collectedAt": "Collected",
+    "sentAt": "Sent",
+    "receivedAt": "Received",
+    "noSample": "Not collected yet",
+    "collectSampleTitle": "Collect Sample",
+    "sampleNotes": "Notes (optional)",
+    "sampleTypeSerum": "Serum",
+    "sampleTypeWholeBlood": "Whole Blood",
+    "sampleTypeUrine": "Urine",
+    "sampleTypeCSF": "CSF",
+    "sampleTypeSwab": "Swab",
+    "sampleTypeStool": "Stool",
+    "sampleTypeOther": "Other"
   },
   "vitals": {
     "title": "Vital Signs",
@@ -652,6 +673,7 @@
     "of": "of"
   },
   "errors": {
+    "required": "This field is required.",
     "generic": "Something went wrong. Please try again.",
     "network": "We couldn't reach the server. Please check your connection.",
     "forbiddenTitle": "Access not allowed",

@@ -195,6 +195,7 @@ function PreviousPanel({ appt }: { appt: QueueAppointment | null }) {
 
 export function DoctorQueuePage() {
   const { t } = useTranslation()
+  const { language } = useLanguage()
   const { showToast } = useToast()
   const confirm = useConfirm()
   const qc = useQueryClient()

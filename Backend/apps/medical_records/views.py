@@ -14,10 +14,11 @@ from apps.core.pagination import DefaultPagination
 from apps.users.models import PatientProfile
 from apps.users.permissions import IsDoctorOrManager
 
-from .models import ClinicalNote, LabOrder, LabResult, MedicalRecord, Prescription, Scan
+from .models import ClinicalNote, LabOrder, LabResult, MedicalRecord, Prescription, Scan, SampleCollection
 from .permissions import ClinicalNotePermission, LabOrderPermission, MedicalDataPermission, doctor_treats
 from .serializers import (
     ClinicalNoteSerializer,
+    CollectSampleInputSerializer,
     LabOrderCancelSerializer,
     LabOrderListSerializer,
     LabOrderResultSerializer,
@@ -27,6 +28,7 @@ from .serializers import (
     PatientSummarySerializer,
     PrescriptionCancelSerializer,
     PrescriptionSerializer,
+    SampleCollectionSerializer,
     ScanSerializer,
 )
 from .services import lab_orders as lab_order_service
@@ -290,7 +292,8 @@ class LabOrderViewSet(viewsets.ModelViewSet):
         # read obj.item_count without firing a COUNT query per row.
         # distinct=True prevents double-counting when the doctor join multiplies rows.
         qs = LabOrder.objects.select_related(
-            "patient__user", "doctor__user", "appointment"
+            "patient__user", "doctor__user", "appointment",
+            "sample_collection__collected_by",
         ).prefetch_related("items", "results").annotate(
             item_count=Count("items", distinct=True)
         )
@@ -342,8 +345,15 @@ class LabOrderViewSet(viewsets.ModelViewSet):
         if request.user.role not in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
             raise PermissionDenied("Only lab staff can collect samples.")
         order = self.get_object()
-        result = lab_order_service.collect_sample(order)
-        return Response(LabOrderSerializer(result).data)
+        input_serializer = CollectSampleInputSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        result = lab_order_service.collect_sample(
+            order,
+            collected_by=request.user,
+            sample_type=input_serializer.validated_data["sample_type"],
+            notes=input_serializer.validated_data.get("notes", ""),
+        )
+        return Response(LabOrderSerializer(result, context={"request": request}).data)
 
     @action(detail=True, methods=["post"], url_path="start-processing")
     def start_processing(self, request, pk=None):
@@ -352,6 +362,78 @@ class LabOrderViewSet(viewsets.ModelViewSet):
         order = self.get_object()
         result = lab_order_service.start_processing(order)
         return Response(LabOrderSerializer(result).data)
+
+    @action(detail=True, methods=["patch"], url_path="send-to-lab")
+    def send_to_lab(self, request, pk=None):
+        if request.user.role not in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
+            raise PermissionDenied("Only lab staff can mark samples as sent.")
+        order = self.get_object()
+        result = lab_order_service.send_to_lab(order)
+        return Response(LabOrderSerializer(result, context={"request": request}).data)
+
+    @action(detail=True, methods=["patch"], url_path="receive-at-lab")
+    def receive_at_lab(self, request, pk=None):
+        if request.user.role not in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
+            raise PermissionDenied("Only lab staff can mark samples as received.")
+        order = self.get_object()
+        result = lab_order_service.receive_at_lab(order)
+        return Response(LabOrderSerializer(result, context={"request": request}).data)
+
+    @action(detail=True, methods=["get"], url_path="sample")
+    def get_sample(self, request, pk=None):
+        order = self.get_object()
+        try:
+            sample = order.sample_collection
+        except SampleCollection.DoesNotExist:
+            raise ValidationError({"detail": "No sample collection record for this order."})
+        return Response(SampleCollectionSerializer(sample).data)
+
+    @action(detail=True, methods=["get"], url_path="sample/label")
+    def sample_label(self, request, pk=None):
+        from django.http import HttpResponse
+        order = self.get_object()
+        try:
+            sample = order.sample_collection
+        except SampleCollection.DoesNotExist:
+            raise ValidationError({"detail": "No sample collection record for this order."})
+        patient = order.patient
+        dob = patient.date_of_birth.strftime("%Y-%m-%d") if patient.date_of_birth else "N/A"
+        test_names = ", ".join(order.items.values_list("test_name", flat=True))
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sample Label — {sample.sample_id}</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; }}
+  .label {{ width: 9cm; border: 2px solid #000; padding: 8px; margin: 10px auto; page-break-inside: avoid; }}
+  .label h2 {{ font-size: 11pt; margin: 0 0 4px; }}
+  .label p {{ font-size: 9pt; margin: 2px 0; }}
+  .barcode {{ font-family: monospace; font-size: 14pt; font-weight: bold; letter-spacing: 3px;
+              border: 1px solid #ccc; padding: 6px 4px; text-align: center; margin-top: 6px;
+              background: #f8f8f8; word-break: break-all; }}
+  .sample-id {{ font-size: 18pt; font-weight: bold; text-align: center; margin-top: 4px; }}
+  @media print {{ body {{ margin: 0; }} button {{ display: none; }} }}
+</style>
+</head>
+<body>
+<div class="label">
+  <h2>{patient.user.get_full_name()}</h2>
+  <p><b>DOB:</b> {dob}</p>
+  <p><b>Test(s):</b> {test_names or "—"}</p>
+  <p><b>Type:</b> {sample.get_sample_type_display()}</p>
+  <p><b>Collected:</b> {sample.collected_at.strftime("%Y-%m-%d %H:%M")}</p>
+  <p><b>Order:</b> {order.order_number}</p>
+  <div class="barcode">| | |  {sample.sample_id}  | | |</div>
+  <div class="sample-id">{sample.sample_id}</div>
+</div>
+<p style="text-align:center; font-size:9pt; color:#888;">
+  <button onclick="window.print()">Print Label</button>
+</p>
+<script>window.onload = function() {{ window.print(); }}</script>
+</body>
+</html>"""
+        return HttpResponse(html, content_type="text/html")
 
     @action(detail=True, methods=["post"], url_path="enter-results",
             parser_classes=[MultiPartParser, FormParser, JSONParser])

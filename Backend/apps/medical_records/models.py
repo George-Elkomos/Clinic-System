@@ -9,7 +9,7 @@ from uuid import uuid4
 from django.db import models, transaction
 from django.utils import timezone
 
-from apps.core.enums import LabCategory, LabOrderPriority, LabOrderStatus, PrescriptionStatus, ScanCategory
+from apps.core.enums import LabCategory, LabOrderPriority, LabOrderStatus, PrescriptionStatus, SampleType, ScanCategory
 from apps.core.models import SoftDeleteModel, TimeStampedModel
 from apps.doctors.models import DoctorProfile, SpecialtyCategory
 from apps.users.models import PatientProfile, User
@@ -218,6 +218,45 @@ class LabOrder(SoftDeleteModel, TimeStampedModel):
 
     def __str__(self):
         return f"{self.order_number} ({self.status})"
+
+
+def _generate_sample_id():
+    date_str = timezone.now().strftime("%Y%m%d")
+    prefix = f"LAB-{date_str}-"
+    with transaction.atomic():
+        last = (
+            SampleCollection.objects.select_for_update()
+            .filter(sample_id__startswith=prefix)
+            .order_by("-id")
+            .values_list("sample_id", flat=True)
+            .first()
+        )
+        seq = int(last.split("-")[-1]) + 1 if last else 1
+        return f"{prefix}{seq:04d}"
+
+
+class SampleCollection(models.Model):
+    """Specimen lifecycle tracking for external lab workflows (Phase 11)."""
+
+    lab_order = models.OneToOneField(LabOrder, on_delete=models.CASCADE, related_name="sample_collection")
+    sample_type = models.CharField(max_length=20, choices=SampleType.choices)
+    sample_id = models.CharField(max_length=30, unique=True, editable=False)
+    collected_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="collected_samples")
+    collected_at = models.DateTimeField()
+    sent_to_lab_at = models.DateTimeField(null=True, blank=True)
+    received_at_lab = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-collected_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.sample_id:
+            self.sample_id = _generate_sample_id()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.sample_id} ({self.sample_type})"
 
 
 class LabOrderItem(models.Model):

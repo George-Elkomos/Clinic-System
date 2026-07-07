@@ -31,14 +31,18 @@ const newResultEntry = (): ResultEntry => ({
   _key: crypto.randomUUID(),
 })
 
+type EntryErrors = { test_name?: string; result_value?: string; result_date?: string }
+
 function ResultEntryRow({
   index,
   value,
   onChange,
+  errors,
 }: {
   index: number
   value: CreateLabOrderResultPayload
   onChange: (v: CreateLabOrderResultPayload) => void
+  errors?: EntryErrors
 }) {
   const { t } = useTranslation()
   const set = (key: keyof CreateLabOrderResultPayload, val: string | boolean | File | null) =>
@@ -49,12 +53,12 @@ function ResultEntryRow({
       <strong style={{ fontSize: 'var(--font-small)', color: 'var(--text-muted)' }}>#{index + 1}</strong>
       <div className="lab-item-row" style={{ marginTop: 'var(--space-2)' }}>
         <div className="lab-item-row__name">
-          <FormField label={t('lab.testName')}>
+          <FormField label={t('lab.testName')} error={errors?.test_name}>
             {(p) => <input {...p} value={value.test_name} onChange={(e) => set('test_name', e.target.value)} />}
           </FormField>
         </div>
         <div className="lab-item-row__code">
-          <FormField label={t('lab.resultValue')}>
+          <FormField label={t('lab.resultValue')} error={errors?.result_value}>
             {(p) => <input {...p} value={value.result_value} onChange={(e) => set('result_value', e.target.value)} />}
           </FormField>
         </div>
@@ -69,7 +73,7 @@ function ResultEntryRow({
           </FormField>
         </div>
         <div className="lab-item-row__code">
-          <FormField label={t('lab.resultDate')}>
+          <FormField label={t('lab.resultDate')} error={errors?.result_date}>
             {(p) => <input {...p} type="date" value={value.result_date} onChange={(e) => set('result_date', e.target.value)} />}
           </FormField>
         </div>
@@ -105,6 +109,7 @@ export function LabOrderDetailsPage() {
 
   const [resultEntries, setResultEntries] = useState<ResultEntry[]>([])
   const [showResultForm, setShowResultForm] = useState(false)
+  const [resultErrors, setResultErrors] = useState<Record<string, EntryErrors>>({})
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['lab-orders', Number(id)],
@@ -119,12 +124,6 @@ export function LabOrderDetailsPage() {
   const submitMut = useMutation({
     mutationFn: () => labOrdersApi.submit(Number(id)),
     onSuccess: () => { showToast(t('lab.submitted'), 'success'); invalidate() },
-    onError: (err) => showToast(errorMessage(err), 'error'),
-  })
-
-  const collectMut = useMutation({
-    mutationFn: () => labOrdersApi.collectSample(Number(id)),
-    onSuccess: () => { showToast(t('lab.sampleCollected'), 'success'); invalidate() },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
@@ -143,10 +142,24 @@ export function LabOrderDetailsPage() {
       showToast(t('lab.resultsSaved'), 'success')
       setShowResultForm(false)
       setResultEntries([])
+      setResultErrors({})
       invalidate()
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
+
+  const validateEntries = (): boolean => {
+    const errs: Record<string, EntryErrors> = {}
+    resultEntries.forEach((entry) => {
+      const row: EntryErrors = {}
+      if (!entry.test_name.trim()) row.test_name = t('errors.required')
+      if (!entry.result_value.trim()) row.result_value = t('errors.required')
+      if (!entry.result_date.trim()) row.result_date = t('errors.required')
+      if (Object.keys(row).length > 0) errs[entry._key] = row
+    })
+    setResultErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
   const reviewMut = useMutation({
     mutationFn: () => labOrdersApi.review(Number(id)),
@@ -271,6 +284,20 @@ export function LabOrderDetailsPage() {
             {showResultForm ? (
               <>
                 <h3>{t('lab.enterResults')}</h3>
+                {Object.keys(resultErrors).length > 0 && (
+                  <div role="alert" style={{
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                    marginBottom: 'var(--space-4)',
+                    padding: 'var(--space-3) var(--space-4)',
+                    background: 'color-mix(in srgb, var(--danger) 8%, var(--bg))',
+                    border: '1px solid var(--danger)',
+                    borderRadius: 'var(--radius)',
+                    color: 'var(--danger)', fontSize: 'var(--font-small)',
+                  }}>
+                    <span aria-hidden="true">⚠</span>
+                    {t('vitals.formErrors')}
+                  </div>
+                )}
                 {resultEntries.length === 0 && (
                   <Button variant="secondary" onClick={() => setResultEntries([newResultEntry()])}>
                     {t('lab.addTest')}
@@ -281,9 +308,19 @@ export function LabOrderDetailsPage() {
                     key={entry._key}
                     index={idx}
                     value={entry}
-                    onChange={(v) => setResultEntries((arr) =>
-                      arr.map((e) => e._key === entry._key ? { ...v, _key: entry._key } : e)
-                    )}
+                    errors={resultErrors[entry._key]}
+                    onChange={(v) => {
+                      setResultEntries((arr) =>
+                        arr.map((e) => e._key === entry._key ? { ...v, _key: entry._key } : e)
+                      )
+                      if (resultErrors[entry._key]) {
+                        setResultErrors((prev) => {
+                          const next = { ...prev }
+                          delete next[entry._key]
+                          return next
+                        })
+                      }
+                    }}
                   />
                 ))}
                 {resultEntries.length > 0 && (
@@ -291,10 +328,10 @@ export function LabOrderDetailsPage() {
                     <Button variant="secondary" onClick={() => setResultEntries((arr) => [...arr, newResultEntry()])}>
                       {t('lab.addTest')}
                     </Button>
-                    <Button variant="secondary" onClick={() => { setShowResultForm(false); setResultEntries([]) }}>
+                    <Button variant="secondary" onClick={() => { setShowResultForm(false); setResultEntries([]); setResultErrors({}) }}>
                       {t('common.cancel')}
                     </Button>
-                    <Button loading={enterResultsMut.isPending} onClick={() => enterResultsMut.mutate()}>
+                    <Button loading={enterResultsMut.isPending} onClick={() => { if (validateEntries()) enterResultsMut.mutate() }}>
                       {t('lab.enterResults')}
                     </Button>
                   </div>
@@ -315,7 +352,7 @@ export function LabOrderDetailsPage() {
             </>
           )}
           {(isSecretary || isManager) && order.status === 'ORDERED' && (
-            <Button loading={collectMut.isPending} onClick={() => collectMut.mutate()}>{t('lab.collectSample')}</Button>
+            <Button onClick={() => navigate('/secretary/lab')}>{t('lab.collectSample')}</Button>
           )}
           {(isSecretary || isManager) && order.status === 'SAMPLE_COLLECTED' && (
             <Button loading={processMut.isPending} onClick={() => processMut.mutate()}>{t('lab.startProcessing')}</Button>

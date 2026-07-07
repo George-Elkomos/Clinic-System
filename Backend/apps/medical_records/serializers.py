@@ -16,6 +16,7 @@ from .models import (
     Prescription,
     PrescriptionItem,
     Scan,
+    SampleCollection,
 )
 
 ALLOWED_UPLOAD_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".dcm", ".dicom"}
@@ -211,6 +212,26 @@ class PatientSummarySerializer(serializers.Serializer):
 # Phase 6 — Lab Orders
 # ---------------------------------------------------------------------------
 
+class SampleCollectionSerializer(serializers.ModelSerializer):
+    collected_by_name = serializers.CharField(source="collected_by.get_full_name", read_only=True, default="")
+
+    class Meta:
+        model = SampleCollection
+        fields = [
+            "id", "lab_order", "sample_type", "sample_id",
+            "collected_by", "collected_by_name", "collected_at",
+            "sent_to_lab_at", "received_at_lab", "notes",
+        ]
+        read_only_fields = ["id", "lab_order", "sample_id", "collected_by", "collected_by_name", "collected_at"]
+
+
+class CollectSampleInputSerializer(serializers.Serializer):
+    sample_type = serializers.ChoiceField(choices=[
+        "SERUM", "WHOLE_BLOOD", "URINE", "CSF", "SWAB", "STOOL", "OTHER"
+    ])
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
 class LabOrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabOrderItem
@@ -246,6 +267,7 @@ class LabOrderSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True, default="")
     doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True, default="")
     has_critical = serializers.SerializerMethodField()
+    sample_collection = SampleCollectionSerializer(read_only=True)
 
     class Meta:
         model = LabOrder
@@ -254,13 +276,13 @@ class LabOrderSerializer(serializers.ModelSerializer):
             "appointment", "encounter", "status", "priority", "clinical_notes",
             "ordered_at", "sample_collected_at", "completed_at", "reviewed_at",
             "cancellation_reason", "cancelled_at",
-            "items", "results", "has_critical", "created_at",
+            "items", "results", "has_critical", "sample_collection", "created_at",
         ]
         read_only_fields = [
             "id", "order_number", "doctor", "doctor_name", "patient_name",
             "status", "ordered_at", "sample_collected_at", "completed_at",
             "reviewed_at", "cancellation_reason", "cancelled_at",
-            "results", "has_critical", "created_at",
+            "results", "has_critical", "sample_collection", "created_at",
         ]
 
     def get_results(self, obj):
@@ -317,13 +339,15 @@ class LabOrderListSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True, default="")
     doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True, default="")
     item_count = serializers.SerializerMethodField()
+    sample_collection = SampleCollectionSerializer(read_only=True)
 
     class Meta:
         model = LabOrder
         fields = [
             "id", "order_number", "patient", "patient_name", "doctor", "doctor_name",
             "appointment", "status", "priority", "clinical_notes",
-            "ordered_at", "completed_at", "reviewed_at", "item_count", "created_at",
+            "ordered_at", "completed_at", "reviewed_at", "item_count",
+            "sample_collection", "created_at",
         ]
 
     def get_item_count(self, obj):

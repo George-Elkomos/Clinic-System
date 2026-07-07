@@ -457,10 +457,11 @@ function ChronicDiagnosesSection({ patientId }: { patientId: number }) {
   const { t } = useTranslation()
   const { language } = useLanguage()
 
-  const { data: encounters = [] } = useQuery({
+  const { data: encountersPage } = useQuery({
     queryKey: ['encounters', patientId, 'chronic'],
     queryFn: () => encountersApi.list({ patient: patientId, status: 'SUBMITTED' }),
   })
+  const encounters = encountersPage?.results ?? []
 
   const chronic = useMemo(() => {
     const map = new Map<number, { d: Diagnosis; count: number }>()

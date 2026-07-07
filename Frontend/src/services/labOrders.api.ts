@@ -4,6 +4,8 @@ import type {
   CreateLabOrderResultPayload,
   LabOrder,
   LabOrderSummary,
+  SampleCollection,
+  SampleType,
   Paginated,
 } from './types'
 
@@ -35,8 +37,22 @@ export const labOrdersApi = {
   submit: (id: number) =>
     api.post<LabOrder>(`/lab-orders/${id}/submit/`).then((r) => r.data),
 
-  collectSample: (id: number) =>
-    api.post<LabOrder>(`/lab-orders/${id}/collect-sample/`).then((r) => r.data),
+  collectSample: (id: number, payload: { sample_type: SampleType; notes?: string }) =>
+    api.post<LabOrder>(`/lab-orders/${id}/collect-sample/`, payload).then((r) => r.data),
+
+  sendToLab: (id: number) =>
+    api.patch<LabOrder>(`/lab-orders/${id}/send-to-lab/`).then((r) => r.data),
+
+  receiveAtLab: (id: number) =>
+    api.patch<LabOrder>(`/lab-orders/${id}/receive-at-lab/`).then((r) => r.data),
+
+  getSample: (id: number) =>
+    api.get<SampleCollection>(`/lab-orders/${id}/sample/`).then((r) => r.data),
+
+  fetchSampleLabel: (id: number) =>
+    api
+      .get<string>(`/lab-orders/${id}/sample/label/`, { responseType: 'text' })
+      .then((r) => r.data),
 
   startProcessing: (id: number) =>
     api.post<LabOrder>(`/lab-orders/${id}/start-processing/`).then((r) => r.data),
