@@ -77,9 +77,10 @@ From the repo root, after a one-time setup (see below):
 .\status.cmd     # show what's running    (.\restart.cmd to restart)
 ```
 
-These wrap `dev.ps1` (`.\dev.ps1 start|stop|restart|status`). Logs stream to
-`.run\backend.log` and `.run\frontend.log`. The runner does **not** install
-anything — do the one-time setup below first.
+These wrap `dev.ps1` (`.\dev.ps1 start|stop|restart|status`) and start the
+backend, frontend, **and** the Django-Q background worker together. Logs
+stream to `.run\backend.log`, `.run\frontend.log`, and `.run\worker.log`. The
+runner does **not** install anything — do the one-time setup below first.
 
 ---
 
@@ -104,10 +105,16 @@ python manage.py migrate
 python manage.py seed_data        # demo users, doctors, slots, appointments, kiosk queue
 python manage.py generate_slots   # (seed already does this; run anytime to top up)
 python manage.py runserver        # http://127.0.0.1:8000
+python manage.py qcluster         # background worker — run alongside runserver (see below)
 ```
 
 The API is under `http://127.0.0.1:8000/api/`. Django admin is at `/admin/`
 (log in as the manager — it is a superuser).
+
+`qcluster` is the Django-Q worker: AI Scribe transcription and outbound
+email/SMS/WhatsApp run there instead of inside the request. Without it running,
+those notifications/sessions queue up but never complete — `dev.ps1`/`start.cmd`
+start it automatically; if you run `runserver` manually, start `qcluster` too.
 
 ### Seeded demo accounts (password `Clinic123!`)
 
@@ -169,9 +176,19 @@ npm run lint
   (idempotent). Booking flips a slot to `BOOKED` under `select_for_update` inside a
   transaction; a DB unique constraint prevents double-booking. Saving a working day
   generates its slots immediately.
-- **Signals**: appointment status changes raise notifications (in-app + email;
-  console email backend in dev). A thread-local middleware + generic signal
-  receivers write the `AuditLog`.
+- **Signals**: appointment status changes raise notifications (in-app is written
+  immediately; email/SMS/WhatsApp are queued to the Django-Q worker so a slow
+  SMTP/Twilio call never blocks the request — console email backend in dev). A
+  thread-local middleware + generic signal receivers write the `AuditLog`.
+- **Real-time doctor queue**: `apps/appointments/consumers.py` (Django Channels)
+  pushes a "something changed" WebSocket event to `/ws/appointments/queue/`
+  whenever an `Appointment` for that doctor is saved (`apps/appointments/signals.py`
+  → `broadcast_queue_update`); the frontend (`useDoctorQueueSocket`) just
+  re-fetches the existing `GET my-queue/` endpoint — no polling interval, no
+  duplicated queue logic. Auth is a JWT passed as `?token=` (native WebSocket
+  can't set headers) validated by `apps/core/ws_auth.py`. Uses the in-memory
+  channel layer (`CHANNEL_LAYERS` in `settings/base.py`) — correct only because
+  the backend runs as one process; swap to `channels_redis` if that changes.
 - **Append-only medical data**: `MedicalRecord`/`ClinicalNote` use a version chain +
   soft-delete; nothing in `medical_records` is ever hard-deleted.
 - **Elder-friendly UI**: in-house CSS-token design system (`src/theme/tokens.css`) —
@@ -183,25 +200,28 @@ npm run lint
 
 ---
 
-## Scheduled jobs (later phases)
+## Scheduled jobs & background work
 
-Reminders, waitlist expiry, and slot top-up are management commands designed to run
-on a scheduler (no Celery required):
+Reminders, waitlist expiry, and slot top-up are periodic management commands —
+run them every few minutes via **Windows Task Scheduler** (or cron):
 
 ```bash
-python manage.py generate_slots        # available now — top up the booking horizon
-# python manage.py send_reminders      # Phase 3 — wire to Windows Task Scheduler / cron
+python manage.py generate_slots        # top up the booking horizon
+python manage.py send_reminders        # 24h/1h appointment reminders
 ```
 
-Run `generate_slots` (and, in Phase 3, `send_reminders`) every few minutes via
-**Windows Task Scheduler** (or cron). All logic lives in service functions, so a
-later move to Celery beat is a scheduler swap, not a rewrite.
+One-off slow work (AI Scribe transcription, outbound email/SMS/WhatsApp) runs on
+the **Django-Q** worker (`python manage.py qcluster`) instead of a cron command —
+see `Q_CLUSTER` in `clinic_project/settings/base.py`. It uses the existing
+database as its broker (no Redis/RabbitMQ to install or run). Tests force
+`Q_CLUSTER["sync"] = True` (`settings/test.py`) so tasks run inline without a
+worker process during `pytest`.
 
 ---
 
 ## Extensibility hooks
 
-- **Payments**: `DoctorProfile.consultation_fee` is already present; add a billing app.
+- **Payments**: `apps/billing` (Phase 12) — invoices, payments, free-follow-up tracking.
 - **SMS**: set `SMS_ENABLED=True` + Twilio creds in `.env` (`pip install twilio`).
 - **PostgreSQL**: set `DATABASE_URL=postgres://…` — the ORM is DB-agnostic.
 - **Video / new notification channels**: the notification backend registry

@@ -1,9 +1,12 @@
 """Single entry point for raising notifications. Domain signals call notify();
-it creates the in-app row and fans out to enabled channels per user preference."""
+it creates the in-app row immediately and queues external delivery (email/SMS/
+WhatsApp) on the Django-Q worker, so a slow SMTP relay or Twilio API never
+blocks the request that triggered the notification (booking, cancelling, etc.)."""
 from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
+from django_q.tasks import async_task
 
 from . import backends
 from .models import Notification
@@ -16,7 +19,7 @@ def _wants(channels, channel):
 
 def notify(*, recipient, verb, title, body="", title_ar="", body_ar="",
            related=None, channels=None):
-    """Create + dispatch a notification.
+    """Create the in-app notification now; queue external channels for the worker.
 
     `channels` optionally restricts delivery (e.g. ["in_app"]); by default all
     channels the recipient has enabled are used. `related` is any model instance
@@ -38,22 +41,46 @@ def notify(*, recipient, verb, title, body="", title_ar="", body_ar="",
 
     prefs = getattr(recipient, "notification_preference", None)
     sent = []
-
     if (prefs is None or prefs.in_app_enabled) and _wants(channels, "in_app"):
         sent.append("in_app")
+
+    external = []
     if (prefs is None or prefs.email_enabled) and _wants(channels, "email"):
-        if backends.send_email(notification):
-            sent.append("email")
+        external.append("email")
     if (prefs is None or prefs.sms_enabled) and _wants(channels, "sms"):
-        if backends.send_sms(notification):
-            sent.append("sms")
+        external.append("sms")
     if prefs is not None and prefs.whatsapp_enabled and _wants(channels, "whatsapp"):
-        if backends.send_whatsapp(notification):
-            sent.append("whatsapp")
+        external.append("whatsapp")
 
     notification.channels_sent = sent
     notification.save(update_fields=["channels_sent"])
+
+    if external:
+        async_task(deliver_external_channels, notification.pk, external)
     return notification
+
+
+def deliver_external_channels(notification_id, channels):
+    """Worker task: send the slow/networked channels, then record what landed.
+
+    Runs off the request thread (see Q_CLUSTER in settings/base.py). Re-fetches
+    the notification since this executes in a separate worker process/thread.
+    """
+    try:
+        notification = Notification.objects.get(pk=notification_id)
+    except Notification.DoesNotExist:
+        return
+
+    sent = list(notification.channels_sent)
+    if "email" in channels and backends.send_email(notification):
+        sent.append("email")
+    if "sms" in channels and backends.send_sms(notification):
+        sent.append("sms")
+    if "whatsapp" in channels and backends.send_whatsapp(notification):
+        sent.append("whatsapp")
+
+    notification.channels_sent = sent
+    notification.save(update_fields=["channels_sent"])
 
 
 def _reminder_window(now, hours, window_min, flag_field, pref_field):

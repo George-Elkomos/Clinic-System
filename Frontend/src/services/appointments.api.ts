@@ -1,5 +1,13 @@
 import { api, publicApi } from './apiClient'
-import type { Appointment, DoctorQueue, KioskQueue, Paginated, PatientSummary, QueuePosition } from './types'
+import type {
+  Appointment,
+  AppointmentBilling,
+  DoctorQueue,
+  KioskQueue,
+  Paginated,
+  PatientSummary,
+  QueuePosition,
+} from './types'
 
 export const appointmentsApi = {
   list: (params?: { status?: string; doctor?: number; date?: string }) =>
@@ -20,8 +28,12 @@ export const appointmentsApi = {
   start: (id: number) =>
     api.post<Appointment>(`/appointments/${id}/start/`, {}).then((r) => r.data),
 
+  // Response carries a `billing` block: the invoice issued for this visit,
+  // or free_followup_used when the visit consumed a free follow-up.
   complete: (id: number) =>
-    api.post<Appointment>(`/appointments/${id}/complete/`, {}).then((r) => r.data),
+    api
+      .post<Appointment & { billing: AppointmentBilling }>(`/appointments/${id}/complete/`, {})
+      .then((r) => r.data),
 
   walkIn: (data: { patient: number; doctor: number; reason?: string; emergency?: boolean }) =>
     api.post<Appointment>('/appointments/walk-in/', data).then((r) => r.data),

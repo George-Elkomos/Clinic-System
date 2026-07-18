@@ -39,7 +39,13 @@ import { ReviewModerationPage } from '../pages/manager/ReviewModerationPage'
 import { UserManagementPage } from '../pages/manager/UserManagementPage'
 import { CreateDoctorPage } from '../pages/manager/CreateDoctorPage'
 import { PatientDirectoryPage } from '../pages/secretary/PatientDirectoryPage'
+import { BillingDeskPage } from '../pages/secretary/BillingDeskPage'
+import { MyInvoicesPage } from '../pages/patient/MyInvoicesPage'
+import { BillingReportsPage } from '../pages/manager/BillingReportsPage'
 import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
+import { MyReferralsPage } from '../pages/patient/MyReferralsPage'
+import { DoctorReferralsPage } from '../pages/doctor/DoctorReferralsPage'
+import { SecretaryReferralsPage } from '../pages/secretary/SecretaryReferralsPage'
 import { RoleRoute } from './RoleRoute'
 import { RootRedirect } from './RootRedirect'
 
@@ -68,6 +74,8 @@ export const router = createBrowserRouter([
       { path: 'vitals', element: <PatientVitalSignsTab /> },
       { path: 'lab-results', element: <PatientLabResultsPage /> },
       { path: 'timeline', element: <PatientTimelinePage /> },
+      { path: 'invoices', element: <MyInvoicesPage /> },
+      { path: 'referrals', element: <MyReferralsPage /> },
     ],
   },
 
@@ -86,6 +94,7 @@ export const router = createBrowserRouter([
       { path: 'lab-orders/new', element: <CreateLabOrderPage /> },
       { path: 'lab-orders/:id', element: <LabOrderDetailsPage /> },
       { path: 'encounters/:appointmentId', element: <EncounterPage /> },
+      { path: 'referrals', element: <DoctorReferralsPage /> },
     ],
   },
 
@@ -102,6 +111,8 @@ export const router = createBrowserRouter([
       { path: 'patients', element: <PatientDirectoryPage /> },
       { path: 'lab', element: <SampleCollectionPage /> },
       { path: 'lab/:id', element: <LabOrderDetailsPage /> },
+      { path: 'billing', element: <BillingDeskPage /> },
+      { path: 'referrals', element: <SecretaryReferralsPage /> },
     ],
   },
 
@@ -121,6 +132,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <ManagerDashboard /> },
       { path: 'reports', element: <ReportsDashboardPage /> },
+      { path: 'billing', element: <BillingReportsPage /> },
       { path: 'reviews', element: <ReviewModerationPage /> },
       { path: 'audit', element: <AuditLogPage /> },
       { path: 'users', element: <UserManagementPage /> },

@@ -21,6 +21,8 @@ api_patterns = [
     path("", include("apps.ai_scribe.urls")),  # AI medical scribe
     path("", include("apps.encounters.urls")),  # Phase 8 — encounters + complaints + diagnoses
     path("", include("apps.medications.urls")),  # Phase 9 — medications + dosage + allergy alerts
+    path("", include("apps.billing.urls")),  # Phase 12 — invoices, payments, billing reports
+    path("", include("apps.referrals.urls")),  # Phase 13 — referrals + complaints master
 ]
 
 urlpatterns = [

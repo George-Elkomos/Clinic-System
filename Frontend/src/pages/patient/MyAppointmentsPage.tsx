@@ -36,8 +36,8 @@ function TodayStatusCard({ appt }: { appt: Appointment }) {
 
   return (
     <div style={{
-      background: 'var(--color-primary)',
-      color: '#fff',
+      background: 'var(--primary)',
+      color: 'var(--on-primary)',
       borderRadius: 'var(--radius-lg)',
       padding: 'var(--space-4) var(--space-5)',
       marginBottom: 'var(--space-4)',
@@ -177,7 +177,16 @@ export function MyAppointmentsPage() {
                 </div>
               </div>
               <div className="appt-list-actions">
-                {f.suggested_slot && <Button onClick={() => confirmFollowup.mutate(f.id)}>{t('followups.confirm')}</Button>}
+                {f.suggested_slot && f.suggested_start && new Date(f.suggested_start) > new Date() ? (
+                  <Button
+                    onClick={() => confirmFollowup.mutate(f.id)}
+                    loading={confirmFollowup.isPending && confirmFollowup.variables === f.id}
+                  >
+                    {t('followups.confirm')}
+                  </Button>
+                ) : (
+                  f.suggested_slot && <span className="appt-list-meta">{t('followups.expired')}</span>
+                )}
                 <Button variant="secondary" onClick={() => dismissFollowup.mutate(f.id)}>{t('followups.dismiss')}</Button>
               </div>
             </div>

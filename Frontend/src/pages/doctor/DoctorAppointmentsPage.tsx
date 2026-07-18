@@ -95,11 +95,11 @@ export function DoctorAppointmentsPage() {
 
       {pinnedRows.length > 0 && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--color-primary)' }}>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: 'var(--primary)' }}>
             {t('encounters.activeEncounters')}
           </h2>
           {pinnedRows.map((a) => (
-            <div key={a.id} style={{ borderInlineStart: '3px solid var(--color-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-2)' }}>
+            <div key={a.id} style={{ borderInlineStart: '3px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-2)' }}>
               <Card>
                 <div className="appt-card__row">
                   <div className="appt-card__info">

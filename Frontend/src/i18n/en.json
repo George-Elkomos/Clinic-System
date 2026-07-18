@@ -24,7 +24,9 @@
     "noOptions": "No options found",
     "searchPlaceholder": "Search…",
     "minutes": "min",
-    "years": "yrs"
+    "years": "yrs",
+    "page": "Page",
+    "of": "of"
   },
   "language": {
     "label": "Language",
@@ -59,7 +61,12 @@
     "labOrders": "Lab Orders",
     "labResults": "Lab Results",
     "timeline": "History Timeline",
-    "encounter": "Clinical Encounter"
+    "encounter": "Clinical Encounter",
+    "billing": "Billing Desk",
+    "myInvoices": "My Invoices",
+    "billingReports": "Financials",
+    "myReferrals": "My Referrals",
+    "referrals": "Referrals"
   },
   "roles": {
     "PATIENT": "Patient",
@@ -184,7 +191,11 @@
     "REVIEWED": "Reviewed",
     "ROUTINE": "Routine",
     "URGENT": "Urgent",
-    "STAT": "STAT"
+    "STAT": "STAT",
+    "ISSUED": "Issued",
+    "PAID": "Paid",
+    "PARTIALLY_PAID": "Partially Paid",
+    "VOID": "Void"
   },
   "notifications": {
     "title": "Notifications",
@@ -357,7 +368,7 @@
     "completedAt": "Finished at {{time}}",
     "chronicConditions": "Chronic Conditions",
     "currentMedications": "Current Medications",
-    "autoRefresh": "Auto-refreshes every 15 seconds",
+    "autoRefresh": "Updates live — no refresh needed",
     "yourStatus": "Your Appointment Today",
     "youAreCurrent": "You are currently with the doctor",
     "youAreNext": "You are next!",
@@ -470,6 +481,7 @@
     "noSlot": "No open time found — the patient can book manually.",
     "confirm": "Confirm & book",
     "confirmed": "Follow-up booked.",
+    "expired": "This suggested time has passed — please book a visit manually.",
     "dismiss": "Dismiss",
     "dismissed": "Follow-up dismissed.",
     "statusSuggested": "Suggested",
@@ -765,21 +777,37 @@
       "completed_at": "Completed"
     },
     "event": {
-      "VITAL_SIGNS":           { "title": "Vital Signs Recorded",  "summary": "BP: {{bp}}/{{dbp}} mmHg · HR: {{hr}} bpm · Temp: {{temp}}°C" },
-      "LAB_ORDER":             { "title": "Lab Order",              "summary": "Order #{{order_number}} · {{status}}" },
-      "PRESCRIPTION":          { "title": "Prescription",           "summary": "{{count}} item(s) prescribed" },
-      "CLINICAL_NOTE":         { "title": "Clinical Note" },
-      "MEDICAL_RECORD":        { "title": "Medical Record (v{{version}})" },
-      "APPOINTMENT_COMPLETED": { "title": "Completed Appointment",  "summary": "Consultation with Dr. {{doctor_name}}" }
+      "VITAL_SIGNS": {
+        "title": "Vital Signs Recorded",
+        "summary": "BP: {{bp}}/{{dbp}} mmHg · HR: {{hr}} bpm · Temp: {{temp}}°C"
+      },
+      "LAB_ORDER": {
+        "title": "Lab Order",
+        "summary": "Order #{{order_number}} · {{status}}"
+      },
+      "PRESCRIPTION": {
+        "title": "Prescription",
+        "summary": "{{count}} item(s) prescribed"
+      },
+      "CLINICAL_NOTE": {
+        "title": "Clinical Note"
+      },
+      "MEDICAL_RECORD": {
+        "title": "Medical Record (v{{version}})"
+      },
+      "APPOINTMENT_COMPLETED": {
+        "title": "Completed Appointment",
+        "summary": "Consultation with Dr. {{doctor_name}}"
+      }
     },
     "status": {
-      "ACTIVE":      "Active",
-      "CANCELLED":   "Cancelled",
-      "COMPLETED":   "Completed",
-      "PENDING":     "Pending",
-      "COLLECTED":   "Sample Collected",
-      "PROCESSING":  "Processing",
-      "REVIEWED":    "Reviewed"
+      "ACTIVE": "Active",
+      "CANCELLED": "Cancelled",
+      "COMPLETED": "Completed",
+      "PENDING": "Pending",
+      "COLLECTED": "Sample Collected",
+      "PROCESSING": "Processing",
+      "REVIEWED": "Reviewed"
     }
   },
   "encounters": {
@@ -798,6 +826,7 @@
     "blockDiagnosis": "Diagnosis & Treatment",
     "chiefComplaint": "Chief complaint",
     "chiefComplaintAr": "Chief complaint (Arabic)",
+    "complaintArHint": "Auto-filled from the selected complaint",
     "complaintPlaceholder": "Search complaints…",
     "symptoms": "Symptoms",
     "symptomsHint": "Select all that apply.",
@@ -830,5 +859,93 @@
     "addTest": "Add test",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "billing": {
+    "invoiceTitle": "Invoice",
+    "patient": "Patient",
+    "doctor": "Doctor",
+    "invoiceDate": "Invoice Date",
+    "dueDate": "Due Date",
+    "description": "Description",
+    "quantity": "Qty",
+    "unitPrice": "Unit Price",
+    "lineTotal": "Line Total",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "total": "Total",
+    "paid": "Paid",
+    "balance": "Balance",
+    "payments": "Payments",
+    "paidAt": "Paid At",
+    "method": "Payment Method",
+    "methods": {
+      "CASH": "Cash",
+      "CARD": "Card",
+      "BANK_TRANSFER": "Bank Transfer"
+    },
+    "amount": "Amount",
+    "reference": "Reference",
+    "referenceHint": "Receipt / transaction number (optional)",
+    "recordPayment": "Record Payment",
+    "paymentRecorded": "Payment recorded.",
+    "invoicePaid": "Invoice fully paid. ✅",
+    "tabAll": "All",
+    "tabOutstanding": "Outstanding",
+    "tabPaid": "Paid",
+    "noInvoices": "No invoices found.",
+    "viewInvoice": "View Invoice",
+    "printReceipt": "Print Receipt",
+    "downloadPdf": "Download PDF",
+    "visitCompleted": "Visit Completed",
+    "invoiceGenerated": "Invoice {{number}} generated — {{total}}.",
+    "freeFollowupUsed": "This visit was a free follow-up — no invoice was issued.",
+    "reportsTitle": "Financial Reports",
+    "kpisTitle": "Billing Overview",
+    "totalBilled": "Total Billed",
+    "totalCollected": "Total Collected",
+    "totalOutstanding": "Outstanding",
+    "revenueByDoctor": "Revenue by Doctor",
+    "noRevenue": "No revenue recorded in this period.",
+    "periodDay": "Today",
+    "periodMonth": "This Month",
+    "periodYear": "This Year"
+  },
+  "referrals": {
+    "referPatient": "Refer Patient",
+    "createTitle": "Refer Patient",
+    "typeLabel": "Type",
+    "type": {
+      "INTERNAL": "Internal",
+      "EXTERNAL": "External"
+    },
+    "internal": "Internal",
+    "external": "External",
+    "specialty": "Specialty",
+    "specialtyPlaceholder": "Select a specialty…",
+    "targetDoctor": "Doctor (optional)",
+    "targetDoctorHint": "Leave blank to send it to any doctor in the specialty.",
+    "targetDoctorPlaceholder": "Select a doctor…",
+    "facilityName": "Facility / Hospital Name",
+    "reason": "Reason",
+    "reasonAr": "Reason (Arabic)",
+    "notes": "Notes",
+    "notesAr": "Notes (Arabic)",
+    "submit": "Create Referral",
+    "created": "Referral created.",
+    "accept": "Accept",
+    "accepted": "Referral accepted.",
+    "complete": "Complete",
+    "completed": "Referral completed.",
+    "cancel": "Cancel Referral",
+    "cancelled": "Referral cancelled.",
+    "tabReceived": "Received",
+    "tabSent": "Sent",
+    "none": "No referrals found.",
+    "status": {
+      "PENDING": "Pending",
+      "ACCEPTED": "Accepted",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    }
   }
 }

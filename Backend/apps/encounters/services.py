@@ -206,3 +206,128 @@ def seed_diagnoses(apps=None):
             counts["created"] += 1
 
     return counts
+
+
+# ---------------------------------------------------------------------------
+# Phase 13 — complaint reference-data seeding (~80 common outpatient complaints)
+# Shared by the seed_complaints management command and a RunPython data migration.
+# ---------------------------------------------------------------------------
+
+# (name, name_ar, category) — category must be one of ComplaintCategory.choices.
+COMPLAINTS = [
+    # Cardiac
+    ("Chest pain", "ألم في الصدر", "CARDIAC"),
+    ("Palpitations", "خفقان", "CARDIAC"),
+    ("Chest tightness", "ضيق في الصدر", "CARDIAC"),
+    ("Irregular heartbeat", "عدم انتظام ضربات القلب", "CARDIAC"),
+    ("Leg swelling", "تورم في الساق", "CARDIAC"),
+    ("High blood pressure symptoms", "أعراض ارتفاع ضغط الدم", "CARDIAC"),
+    ("Fainting", "إغماء", "CARDIAC"),
+    ("Rapid heartbeat", "تسارع ضربات القلب", "CARDIAC"),
+    ("Cold extremities", "برودة الأطراف", "CARDIAC"),
+    ("Chest pain on exertion", "ألم في الصدر عند المجهود", "CARDIAC"),
+    ("Ankle swelling", "تورم الكاحل", "CARDIAC"),
+    ("Pain radiating to left arm", "ألم ممتد إلى الذراع الأيسر", "CARDIAC"),
+    ("Varicose veins", "دوالي الساقين", "CARDIAC"),
+    # Respiratory
+    ("Shortness of breath", "ضيق في التنفس", "RESPIRATORY"),
+    ("Cough", "سعال", "RESPIRATORY"),
+    ("Sore throat", "التهاب الحلق", "RESPIRATORY"),
+    ("Runny nose", "سيلان الأنف", "RESPIRATORY"),
+    ("Nasal congestion", "احتقان الأنف", "RESPIRATORY"),
+    ("Wheezing", "صفير عند التنفس", "RESPIRATORY"),
+    ("Dry cough", "سعال جاف", "RESPIRATORY"),
+    ("Productive cough", "سعال مصحوب ببلغم", "RESPIRATORY"),
+    ("Sneezing", "العطس", "RESPIRATORY"),
+    ("Hoarseness", "بحة في الصوت", "RESPIRATORY"),
+    ("Difficulty breathing", "صعوبة في التنفس", "RESPIRATORY"),
+    ("Sinus pressure", "ضغط في الجيوب الأنفية", "RESPIRATORY"),
+    ("Snoring", "الشخير", "RESPIRATORY"),
+    # Gastrointestinal
+    ("Abdominal pain", "ألم في البطن", "GI"),
+    ("Nausea and vomiting", "غثيان وقيء", "GI"),
+    ("Diarrhea", "إسهال", "GI"),
+    ("Constipation", "إمساك", "GI"),
+    ("Heartburn", "حرقة في المعدة", "GI"),
+    ("Bloating", "انتفاخ البطن", "GI"),
+    ("Loss of appetite", "فقدان الشهية", "GI"),
+    ("Indigestion", "عسر الهضم", "GI"),
+    ("Rectal bleeding", "نزيف من المستقيم", "GI"),
+    ("Difficulty swallowing", "صعوبة في البلع", "GI"),
+    ("Abdominal cramps", "تقلصات في البطن", "GI"),
+    ("Blood in stool", "دم في البراز", "GI"),
+    ("Jaundice", "اصفرار الجلد والعينين", "GI"),
+    # Musculoskeletal
+    ("Back pain", "ألم في الظهر", "MUSCULOSKELETAL"),
+    ("Joint pain", "ألم في المفاصل", "MUSCULOSKELETAL"),
+    ("Neck pain", "ألم في الرقبة", "MUSCULOSKELETAL"),
+    ("Muscle pain", "ألم عضلي", "MUSCULOSKELETAL"),
+    ("Knee pain", "ألم في الركبة", "MUSCULOSKELETAL"),
+    ("Shoulder pain", "ألم في الكتف", "MUSCULOSKELETAL"),
+    ("Swelling in joints", "تورم في المفاصل", "MUSCULOSKELETAL"),
+    ("Limited range of motion", "محدودية الحركة", "MUSCULOSKELETAL"),
+    ("Muscle weakness", "ضعف عضلي", "MUSCULOSKELETAL"),
+    ("Sciatica", "عرق النسا", "MUSCULOSKELETAL"),
+    ("Wrist pain", "ألم في المعصم", "MUSCULOSKELETAL"),
+    ("Hip pain", "ألم في الورك", "MUSCULOSKELETAL"),
+    ("Morning stiffness", "تيبس صباحي", "MUSCULOSKELETAL"),
+    # Neurological
+    ("Headache", "صداع", "NEUROLOGICAL"),
+    ("Dizziness", "دوخة", "NEUROLOGICAL"),
+    ("Numbness", "تنميل", "NEUROLOGICAL"),
+    ("Tingling in extremities", "وخز في الأطراف", "NEUROLOGICAL"),
+    ("Blurred vision", "تشوش الرؤية", "NEUROLOGICAL"),
+    ("Memory loss", "فقدان الذاكرة", "NEUROLOGICAL"),
+    ("Tremor", "رعشة", "NEUROLOGICAL"),
+    ("Seizures", "نوبات تشنجية", "NEUROLOGICAL"),
+    ("Difficulty speaking", "صعوبة في الكلام", "NEUROLOGICAL"),
+    ("Loss of balance", "فقدان التوازن", "NEUROLOGICAL"),
+    ("Migraine", "الصداع النصفي", "NEUROLOGICAL"),
+    ("Facial weakness", "ضعف في الوجه", "NEUROLOGICAL"),
+    ("Ringing in the ears", "طنين في الأذن", "NEUROLOGICAL"),
+    ("Sensitivity to light", "حساسية للضوء", "NEUROLOGICAL"),
+    # Other
+    ("Fever", "حمى", "OTHER"),
+    ("Fatigue", "إرهاق", "OTHER"),
+    ("Weight loss", "فقدان الوزن", "OTHER"),
+    ("Weight gain", "زيادة الوزن", "OTHER"),
+    ("Night sweats", "تعرق ليلي", "OTHER"),
+    ("Skin rash", "طفح جلدي", "OTHER"),
+    ("Itching", "حكة", "OTHER"),
+    ("Excessive thirst", "عطش شديد", "OTHER"),
+    ("Frequent urination", "تبول متكرر", "OTHER"),
+    ("Painful urination", "ألم عند التبول", "OTHER"),
+    ("Swollen lymph nodes", "تضخم الغدد الليمفاوية", "OTHER"),
+    ("General body aches", "آلام جسدية عامة", "OTHER"),
+    ("Sleep disturbance", "اضطراب النوم", "OTHER"),
+    ("Anxiety", "قلق", "OTHER"),
+    ("Hair loss", "تساقط الشعر", "OTHER"),
+]
+
+
+def seed_complaints(apps=None):
+    """Idempotently seed a curated ~80-entry bilingual complaint master list.
+
+    Matches existing rows by case-insensitive name (the Phase-8 seed already
+    created a dozen) and fills in name_ar/category instead of duplicating. When
+    called from a migration, `apps` is the historical registry.
+    """
+    if apps is not None:
+        ComplaintModel = apps.get_model("encounters", "Complaint")
+    else:
+        from .models import Complaint as ComplaintModel
+
+    counts = {"created": 0, "updated": 0}
+
+    for name, name_ar, category in COMPLAINTS:
+        existing = ComplaintModel.objects.filter(name__iexact=name).first()
+        if existing:
+            if not existing.name_ar:
+                existing.name_ar = name_ar
+                existing.save(update_fields=["name_ar", "updated_at"])
+            counts["updated"] += 1
+        else:
+            ComplaintModel.objects.create(name=name, name_ar=name_ar, category=category)
+            counts["created"] += 1
+
+    return counts

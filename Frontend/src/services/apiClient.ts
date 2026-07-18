@@ -101,8 +101,15 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
 
   const d = data as Record<string, unknown>
 
-  // Simple {detail: "…"} — most common for permission/auth errors
-  if (typeof d.detail === 'string') return d.detail
+  // The backend handler wraps validation errors as {detail: <generic>, fields: {...}}.
+  // The specific per-field reasons live in `fields` — prefer them over the
+  // generic detail, otherwise the user never learns WHY the request failed
+  // (e.g. "amount: Payment (999) exceeds the remaining balance (30.00)").
+  const fieldSource =
+    d.fields && typeof d.fields === 'object' ? (d.fields as Record<string, unknown>) : null
+
+  // Simple {detail: "…"} with no field breakdown — permission/auth errors, 404
+  if (typeof d.detail === 'string' && !fieldSource) return d.detail
 
   // Field-level validation: collect every message recursively
   const messages: string[] = []
@@ -125,9 +132,10 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
     }
   }
 
-  for (const [field, value] of Object.entries(d)) {
+  for (const [field, value] of Object.entries(fieldSource ?? d)) {
     collect(field, value)
   }
 
-  return messages.length > 0 ? messages.join('\n') : fallback
+  if (messages.length > 0) return messages.join('\n')
+  return typeof d.detail === 'string' ? d.detail : fallback
 }

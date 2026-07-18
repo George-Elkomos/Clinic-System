@@ -1,17 +1,14 @@
 """Background processing for a SessionRecording.
 
 Transcription + LLM extraction take seconds-to-minutes, so they must NOT run
-inside the HTTP request. We run them on a daemon thread and the frontend polls
-the session's `status`. This keeps infrastructure minimal (no Celery/Redis).
-
-For production scale, swap `process_in_background` for a real task queue
-(Celery/RQ) — the `run_pipeline` body can be reused verbatim as the task.
+inside the HTTP request. `process_in_background` hands `run_pipeline` off to
+the Django-Q worker queue (see Q_CLUSTER in settings/base.py — ORM-backed, no
+Redis) and the frontend polls the session's `status`.
 """
 import logging
-import threading
 
-from django.db import close_old_connections
 from django.utils import timezone
+from django_q.tasks import async_task
 
 from ..models import SessionRecording, SessionStatus
 from . import extraction, transcription
@@ -50,14 +47,6 @@ def run_pipeline(session_id):
              processing_finished_at=timezone.now())
 
 
-def _worker(session_id):
-    try:
-        run_pipeline(session_id)
-    finally:
-        # Release the thread's DB connection so it isn't leaked.
-        close_old_connections()
-
-
 def process_in_background(session_id):
-    """Kick off processing on a daemon thread and return immediately."""
-    threading.Thread(target=_worker, args=(session_id,), daemon=True).start()
+    """Queue processing on the Django-Q worker and return immediately."""
+    async_task(run_pipeline, session_id)

@@ -1,0 +1,167 @@
+/* Billing (Phase 12) — invoice viewer, desk rows, and print layout. */
+
+.invoice-viewer {
+  background: var(--surface-1, #fff);
+  color: var(--text, inherit);
+}
+
+.invoice-viewer__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.invoice-viewer__clinic {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.invoice-viewer__number {
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: end;
+}
+
+.invoice-viewer__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.invoice-viewer__meta dt {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.invoice-viewer__meta dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.invoice-viewer__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-4);
+}
+
+.invoice-viewer__table th {
+  text-align: start;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-viewer__table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--surface-2);
+}
+
+.invoice-viewer__table .num {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.invoice-viewer__totals {
+  margin-inline-start: auto;
+  max-width: 320px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-4);
+}
+
+.invoice-viewer__totals .label {
+  color: var(--text-muted);
+}
+
+.invoice-viewer__totals .value {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-viewer__totals .grand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  border-top: 2px solid var(--border);
+  padding-top: var(--space-1);
+}
+
+.invoice-viewer__payments {
+  margin-top: var(--space-4);
+}
+
+.invoice-viewer__footer-note {
+  margin-top: var(--space-4);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Desk row: money summary column */
+.invoice-row__money {
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-row__balance {
+  font-weight: 700;
+}
+
+/* Tabs (All / Outstanding / Paid) */
+.billing-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.billing-tabs__tab {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.billing-tabs__tab--active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+/* Print: only the invoice sheet is visible (PRD @media print requirement). */
+@media print {
+  body.print-invoice * {
+    visibility: hidden;
+  }
+
+  body.print-invoice .invoice-viewer,
+  body.print-invoice .invoice-viewer * {
+    visibility: visible;
+  }
+
+  body.print-invoice .invoice-viewer {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    width: 100%;
+    padding: 24px;
+    background: #fff;
+    color: #000;
+  }
+
+  body.print-invoice .modal__backdrop {
+    position: static;
+    background: none;
+  }
+}

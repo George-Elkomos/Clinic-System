@@ -24,7 +24,9 @@
     "noOptions": "لا توجد خيارات",
     "searchPlaceholder": "بحث…",
     "minutes": "د",
-    "years": "سنة"
+    "years": "سنة",
+    "page": "صفحة",
+    "of": "من"
   },
   "language": {
     "label": "اللغة",
@@ -59,7 +61,12 @@
     "labOrders": "طلبات المختبر",
     "labResults": "نتائج المختبر",
     "timeline": "الخط الزمني للتاريخ",
-    "encounter": "الزيارة السريرية"
+    "encounter": "الزيارة السريرية",
+    "billing": "مكتب الفواتير",
+    "myInvoices": "فواتيري",
+    "billingReports": "التقارير المالية",
+    "myReferrals": "إحالاتي",
+    "referrals": "الإحالات"
   },
   "roles": {
     "PATIENT": "مريض",
@@ -184,7 +191,11 @@
     "REVIEWED": "تمت المراجعة",
     "ROUTINE": "روتيني",
     "URGENT": "عاجل",
-    "STAT": "فوري"
+    "STAT": "فوري",
+    "ISSUED": "صادرة",
+    "PAID": "مدفوعة",
+    "PARTIALLY_PAID": "مدفوعة جزئيًا",
+    "VOID": "لاغية"
   },
   "notifications": {
     "title": "الإشعارات",
@@ -357,7 +368,7 @@
     "completedAt": "انتهى في {{time}}",
     "chronicConditions": "الأمراض المزمنة",
     "currentMedications": "الأدوية الحالية",
-    "autoRefresh": "يتحدث تلقائياً كل 15 ثانية",
+    "autoRefresh": "يتحدث لحظيًا — لا حاجة لتحديث الصفحة",
     "yourStatus": "موعدك اليوم",
     "youAreCurrent": "أنت الآن مع الطبيب",
     "youAreNext": "أنت التالي!",
@@ -470,6 +481,7 @@
     "noSlot": "لم يُعثر على وقت متاح — يمكن للمريض الحجز يدويًا.",
     "confirm": "تأكيد وحجز",
     "confirmed": "تم حجز المتابعة.",
+    "expired": "انتهى الوقت المقترح — يُرجى حجز الزيارة يدويًا.",
     "dismiss": "تجاهل",
     "dismissed": "تم تجاهل المتابعة.",
     "statusSuggested": "مقترح",
@@ -765,21 +777,37 @@
       "completed_at": "اكتمل في"
     },
     "event": {
-      "VITAL_SIGNS":           { "title": "سُجِّلت العلامات الحيوية", "summary": "ض.د: {{bp}}/{{dbp}} · ن.ق: {{hr}} ن/د · حرارة: {{temp}}°C" },
-      "LAB_ORDER":             { "title": "طلب مختبر",               "summary": "طلب #{{order_number}} · {{status}}" },
-      "PRESCRIPTION":          { "title": "وصفة طبية",               "summary": "{{count}} دواء موصوف" },
-      "CLINICAL_NOTE":         { "title": "ملاحظة سريرية" },
-      "MEDICAL_RECORD":        { "title": "سجل طبي (v{{version}})" },
-      "APPOINTMENT_COMPLETED": { "title": "موعد مكتمل",              "summary": "استشارة مع د. {{doctor_name}}" }
+      "VITAL_SIGNS": {
+        "title": "سُجِّلت العلامات الحيوية",
+        "summary": "ض.د: {{bp}}/{{dbp}} · ن.ق: {{hr}} ن/د · حرارة: {{temp}}°C"
+      },
+      "LAB_ORDER": {
+        "title": "طلب مختبر",
+        "summary": "طلب #{{order_number}} · {{status}}"
+      },
+      "PRESCRIPTION": {
+        "title": "وصفة طبية",
+        "summary": "{{count}} دواء موصوف"
+      },
+      "CLINICAL_NOTE": {
+        "title": "ملاحظة سريرية"
+      },
+      "MEDICAL_RECORD": {
+        "title": "سجل طبي (v{{version}})"
+      },
+      "APPOINTMENT_COMPLETED": {
+        "title": "موعد مكتمل",
+        "summary": "استشارة مع د. {{doctor_name}}"
+      }
     },
     "status": {
-      "ACTIVE":      "نشط",
-      "CANCELLED":   "ملغى",
-      "COMPLETED":   "مكتمل",
-      "PENDING":     "معلّق",
-      "COLLECTED":   "تم جمع العينة",
-      "PROCESSING":  "قيد المعالجة",
-      "REVIEWED":    "تمت المراجعة"
+      "ACTIVE": "نشط",
+      "CANCELLED": "ملغى",
+      "COMPLETED": "مكتمل",
+      "PENDING": "معلّق",
+      "COLLECTED": "تم جمع العينة",
+      "PROCESSING": "قيد المعالجة",
+      "REVIEWED": "تمت المراجعة"
     }
   },
   "encounters": {
@@ -798,6 +826,7 @@
     "blockDiagnosis": "التشخيص والعلاج",
     "chiefComplaint": "الشكوى الرئيسية",
     "chiefComplaintAr": "الشكوى الرئيسية (بالعربية)",
+    "complaintArHint": "تُملأ تلقائيًا من الشكوى المختارة",
     "complaintPlaceholder": "ابحث في الشكاوى…",
     "symptoms": "الأعراض",
     "symptomsHint": "اختر كل ما ينطبق.",
@@ -830,5 +859,93 @@
     "addTest": "إضافة فحص",
     "save": "حفظ",
     "cancel": "إلغاء"
+  },
+  "billing": {
+    "invoiceTitle": "فاتورة",
+    "patient": "المريض",
+    "doctor": "الطبيب",
+    "invoiceDate": "تاريخ الفاتورة",
+    "dueDate": "تاريخ الاستحقاق",
+    "description": "الوصف",
+    "quantity": "الكمية",
+    "unitPrice": "سعر الوحدة",
+    "lineTotal": "الإجمالي",
+    "subtotal": "المجموع الفرعي",
+    "discount": "الخصم",
+    "total": "الإجمالي",
+    "paid": "المدفوع",
+    "balance": "المتبقي",
+    "payments": "المدفوعات",
+    "paidAt": "وقت الدفع",
+    "method": "طريقة الدفع",
+    "methods": {
+      "CASH": "نقدًا",
+      "CARD": "بطاقة",
+      "BANK_TRANSFER": "تحويل بنكي"
+    },
+    "amount": "المبلغ",
+    "reference": "مرجع",
+    "referenceHint": "رقم الإيصال / العملية (اختياري)",
+    "recordPayment": "تسجيل دفعة",
+    "paymentRecorded": "تم تسجيل الدفعة.",
+    "invoicePaid": "تم سداد الفاتورة بالكامل. ✅",
+    "tabAll": "الكل",
+    "tabOutstanding": "غير مسددة",
+    "tabPaid": "مسددة",
+    "noInvoices": "لا توجد فواتير.",
+    "viewInvoice": "عرض الفاتورة",
+    "printReceipt": "طباعة الإيصال",
+    "downloadPdf": "تحميل PDF",
+    "visitCompleted": "اكتملت الزيارة",
+    "invoiceGenerated": "تم إنشاء الفاتورة {{number}} — {{total}}.",
+    "freeFollowupUsed": "هذه الزيارة متابعة مجانية — لم يتم إصدار فاتورة.",
+    "reportsTitle": "التقارير المالية",
+    "kpisTitle": "ملخص الفواتير",
+    "totalBilled": "إجمالي الفواتير",
+    "totalCollected": "إجمالي المحصَّل",
+    "totalOutstanding": "المستحقات",
+    "revenueByDoctor": "الإيرادات حسب الطبيب",
+    "noRevenue": "لا توجد إيرادات مسجلة في هذه الفترة.",
+    "periodDay": "اليوم",
+    "periodMonth": "هذا الشهر",
+    "periodYear": "هذه السنة"
+  },
+  "referrals": {
+    "referPatient": "إحالة المريض",
+    "createTitle": "إحالة المريض",
+    "typeLabel": "النوع",
+    "type": {
+      "INTERNAL": "داخلية",
+      "EXTERNAL": "خارجية"
+    },
+    "internal": "داخلية",
+    "external": "خارجية",
+    "specialty": "التخصص",
+    "specialtyPlaceholder": "اختر تخصصًا…",
+    "targetDoctor": "الطبيب (اختياري)",
+    "targetDoctorHint": "اتركه فارغًا لإرسالها لأي طبيب في هذا التخصص.",
+    "targetDoctorPlaceholder": "اختر طبيبًا…",
+    "facilityName": "اسم المنشأة / المستشفى",
+    "reason": "السبب",
+    "reasonAr": "السبب (بالعربية)",
+    "notes": "ملاحظات",
+    "notesAr": "ملاحظات (بالعربية)",
+    "submit": "إنشاء الإحالة",
+    "created": "تم إنشاء الإحالة.",
+    "accept": "قبول",
+    "accepted": "تم قبول الإحالة.",
+    "complete": "إتمام",
+    "completed": "تم إتمام الإحالة.",
+    "cancel": "إلغاء الإحالة",
+    "cancelled": "تم إلغاء الإحالة.",
+    "tabReceived": "واردة",
+    "tabSent": "مُرسَلة",
+    "none": "لا توجد إحالات.",
+    "status": {
+      "PENDING": "قيد الانتظار",
+      "ACCEPTED": "مقبولة",
+      "COMPLETED": "مكتملة",
+      "CANCELLED": "ملغاة"
+    }
   }
 }

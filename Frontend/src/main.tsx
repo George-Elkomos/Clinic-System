@@ -13,6 +13,7 @@ import { router } from './routes/router'
 import './theme/globals.css'
 import './components/primitives/primitives.css'
 import './components/ai/ai-scribe.css'
+import './components/billing/billing.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

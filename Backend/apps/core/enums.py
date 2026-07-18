@@ -146,6 +146,11 @@ class NotificationVerb(models.TextChoices):
     LAB_RESULT_AVAILABLE = "LAB_RESULT_AVAILABLE", _("Lab result available")
     LAB_RESULT_CRITICAL = "LAB_RESULT_CRITICAL", _("Critical lab result")
     LAB_RESULT_REVIEWED = "LAB_RESULT_REVIEWED", _("Lab result reviewed")
+    # Phase 13 — Referrals
+    REFERRAL_CREATED = "REFERRAL_CREATED", _("New referral")
+    REFERRAL_ACCEPTED = "REFERRAL_ACCEPTED", _("Referral accepted")
+    REFERRAL_COMPLETED = "REFERRAL_COMPLETED", _("Referral completed")
+    REFERRAL_CANCELLED = "REFERRAL_CANCELLED", _("Referral cancelled")
 
 
 class LabOrderStatus(models.TextChoices):
@@ -172,6 +177,47 @@ class SampleType(models.TextChoices):
     SWAB = "SWAB", _("Swab")
     STOOL = "STOOL", _("Stool")
     OTHER = "OTHER", _("Other")
+
+
+# --- Phase 12 — Billing -------------------------------------------------------
+
+class ServiceItemType(models.TextChoices):
+    CONSULTATION = "CONSULTATION", _("Consultation")
+    LAB_TEST = "LAB_TEST", _("Lab test")
+    PROCEDURE = "PROCEDURE", _("Procedure")
+    OTHER = "OTHER", _("Other")
+
+
+class InvoiceStatus(models.TextChoices):
+    DRAFT = "DRAFT", _("Draft")
+    ISSUED = "ISSUED", _("Issued")
+    PAID = "PAID", _("Paid")
+    PARTIALLY_PAID = "PARTIALLY_PAID", _("Partially paid")
+    CANCELLED = "CANCELLED", _("Cancelled")
+    VOID = "VOID", _("Void")
+
+
+class PaymentMethod(models.TextChoices):
+    CASH = "CASH", _("Cash")
+    CARD = "CARD", _("Card")
+    BANK_TRANSFER = "BANK_TRANSFER", _("Bank transfer")
+
+
+class BillingSourceType(models.TextChoices):
+    APPOINTMENT = "APPOINTMENT", _("Appointment")
+    LAB_ORDER = "LAB_ORDER", _("Lab order")
+
+
+class ReferralType(models.TextChoices):
+    INTERNAL = "INTERNAL", _("Internal")
+    EXTERNAL = "EXTERNAL", _("External")
+
+
+class ReferralStatus(models.TextChoices):
+    PENDING = "PENDING", _("Pending")
+    ACCEPTED = "ACCEPTED", _("Accepted")
+    COMPLETED = "COMPLETED", _("Completed")
+    CANCELLED = "CANCELLED", _("Cancelled")
 
 
 class AuditAction(models.TextChoices):

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -16,16 +16,16 @@ import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { useToast } from '../../components/primitives/Toast'
 import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
 import { MedicationItemRow } from '../../components/medical/MedicationItemRow'
+import { CreateReferralModal } from '../../components/referrals/CreateReferralModal'
 import { useAuth } from '../../hooks/useAuth'
 import { useInteractionCheck } from '../../hooks/useInteractionCheck'
+import { useLanguage } from '../../hooks/useLanguage'
 import { errorMessage } from '../../services/apiClient'
 import { complaintsApi, diagnosesApi, encountersApi } from '../../services/encounters.api'
 import { labOrdersApi } from '../../services/labOrders.api'
 import { medicalApi } from '../../services/medical.api'
-import type { Encounter, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
-
-const complaintFetcher = (q: string): Promise<ComboOption[]> =>
-  complaintsApi.search(q).then((rows) => rows.map((c) => ({ value: c.id, label: c.name })))
+import { localizedName } from '../../lib/format'
+import type { Complaint, Encounter, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
 
 // Show the ICD-10 code inline so doctors can confirm the coded diagnosis.
 const diagnosisLabel = (d: { name: string; icd10_code?: string | null }) =>
@@ -253,6 +253,7 @@ export function EncounterPage() {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const qc = useQueryClient()
+  const { language } = useLanguage()
 
   const [encounterId, setEncounterId] = useState<number | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
@@ -260,6 +261,7 @@ export function EncounterPage() {
   const [diagnosis, setDiagnosis] = useState<ComboOption | null>(null)
   const [showRx, setShowRx] = useState(false)
   const [showLab, setShowLab] = useState(false)
+  const [showReferral, setShowReferral] = useState(false)
   const hydrated = useRef(false)
   const hasEdited = useRef(false)
 
@@ -269,6 +271,24 @@ export function EncounterPage() {
     queryFn: () => complaintsApi.search(''),
     staleTime: 300_000,
   })
+
+  // Every row the doctor has searched up, keyed by id — the search endpoint is
+  // paginated, so a full "list everything" query can't be trusted to contain
+  // whichever complaint was just picked. This lets a picked complaint drive
+  // both the EN and AR fields from the same canonical master row, regardless
+  // of the UI's display language.
+  const complaintCache = useRef(new Map<number, Complaint>())
+
+  // Label matches the UI language when a translation exists, so an Arabic search
+  // shows Arabic results instead of always falling back to the English name.
+  const complaintFetcher = useCallback(
+    (q: string): Promise<ComboOption[]> =>
+      complaintsApi.search(q).then((rows) => {
+        rows.forEach((c) => complaintCache.current.set(c.id, c))
+        return rows.map((c) => ({ value: c.id, label: localizedName(c, language) }))
+      }),
+    [language],
+  )
 
   // Create-or-fetch the draft encounter for this appointment.
   const draft = useMutation({
@@ -312,17 +332,23 @@ export function EncounterPage() {
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
-  const buildPayload = (f: FormState): UpdateEncounterPayload => ({
-    chief_complaint: complaint?.label ?? f.chief_complaint,
-    chief_complaint_ar: f.chief_complaint_ar,
-    symptoms: f.symptoms,
-    examination_findings: f.examination_findings,
-    examination_findings_ar: f.examination_findings_ar,
-    diagnosis: diagnosis?.value && diagnosis.value > 0 ? diagnosis.value : null,
-    diagnosis_notes: f.diagnosis_notes,
-    treatment_plan: f.treatment_plan,
-    treatment_plan_ar: f.treatment_plan_ar,
-  })
+  const buildPayload = (f: FormState): UpdateEncounterPayload => {
+    // complaint.label may be localized for display — always save the canonical
+    // EN/AR pair from the master row so stored data stays consistent regardless
+    // of which language the doctor's UI happens to be in.
+    const selectedComplaint = complaint ? complaintCache.current.get(complaint.value) : undefined
+    return {
+      chief_complaint: selectedComplaint?.name ?? complaint?.label ?? f.chief_complaint,
+      chief_complaint_ar: selectedComplaint?.name_ar ?? f.chief_complaint_ar,
+      symptoms: f.symptoms,
+      examination_findings: f.examination_findings,
+      examination_findings_ar: f.examination_findings_ar,
+      diagnosis: diagnosis?.value && diagnosis.value > 0 ? diagnosis.value : null,
+      diagnosis_notes: f.diagnosis_notes,
+      treatment_plan: f.treatment_plan,
+      treatment_plan_ar: f.treatment_plan_ar,
+    }
+  }
 
   useEffect(() => {
     if (!form || !encounterId || !isDraft || !hydrated.current || !hasEdited.current) return
@@ -377,6 +403,9 @@ export function EncounterPage() {
   const setComplaintAndMark = (opt: ComboOption | null) => {
     hasEdited.current = true
     setComplaint(opt)
+    // Keep the AR field in lockstep with the picked master row (or clear it).
+    const row = opt ? complaintCache.current.get(opt.value) : undefined
+    setForm((f) => (f ? { ...f, chief_complaint_ar: opt ? (row?.name_ar ?? f.chief_complaint_ar) : '' } : f))
   }
 
   const setDiagnosisAndMark = (opt: ComboOption | null) => {
@@ -418,8 +447,8 @@ export function EncounterPage() {
                 />
               )}
             </FormField>
-            <FormField label={t('encounters.chiefComplaintAr')}>
-              {(p) => <input {...p} dir="rtl" value={form.chief_complaint_ar} onChange={(e) => set('chief_complaint_ar', e.target.value)} disabled={readOnly} />}
+            <FormField label={t('encounters.chiefComplaintAr')} hint={t('encounters.complaintArHint')}>
+              {(p) => <input {...p} dir="rtl" readOnly value={form.chief_complaint_ar} disabled={readOnly} />}
             </FormField>
           </Card>
 
@@ -503,6 +532,7 @@ export function EncounterPage() {
             <div className="encounter-sidebar-actions">
               <Button variant="secondary" disabled={readOnly} onClick={() => setShowRx(true)}>{t('encounters.addPrescription')}</Button>
               <Button variant="secondary" disabled={readOnly} onClick={() => setShowLab(true)}>{t('encounters.orderLab')}</Button>
+              <Button variant="secondary" disabled={!isOwner} onClick={() => setShowReferral(true)}>{t('referrals.referPatient')}</Button>
             </div>
 
             <h3 className="medical-section-divider">{t('encounters.linkedPrescriptions')}</h3>
@@ -537,6 +567,7 @@ export function EncounterPage() {
 
       {showRx && <PrescriptionModal encounter={encounter} onClose={() => setShowRx(false)} onSaved={refreshEncounter} />}
       {showLab && <LabOrderModal encounter={encounter} onClose={() => setShowLab(false)} onSaved={refreshEncounter} />}
+      {showReferral && <CreateReferralModal encounterId={encounter.id} onClose={() => setShowReferral(false)} />}
     </div>
   )
 }

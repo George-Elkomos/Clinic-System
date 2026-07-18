@@ -1,10 +1,17 @@
-"""Turn appointment status transitions into patient notifications."""
+"""Turn appointment status transitions into patient notifications, and push a
+live-queue refresh signal to the owning doctor's WebSocket group."""
+import logging
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from apps.core.enums import AppointmentStatus, NotificationVerb
 
 from .models import Appointment
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(pre_save, sender=Appointment)
@@ -14,6 +21,31 @@ def capture_old_status(sender, instance, **kwargs):
         instance._old_status = old
     else:
         instance._old_status = None
+
+
+@receiver(post_save, sender=Appointment)
+def broadcast_queue_update(sender, instance, **kwargs):
+    """Wake up the doctor's live queue page (DoctorQueuePage) via WebSocket.
+
+    Unconditional on every save — not just status changes — because a
+    priority-only update (mark-emergency) can reorder "next" without changing
+    status, and correctness here matters more than shaving a few pushes.
+    The socket carries no payload; the client just re-fetches GET my-queue/,
+    so a redundant push is harmless, unlike a missed one.
+
+    Never let a real-time hiccup break the appointment save itself.
+    """
+    from .consumers import group_for_doctor
+
+    try:
+        layer = get_channel_layer()
+        if layer is None:
+            return
+        async_to_sync(layer.group_send)(
+            group_for_doctor(instance.doctor_id), {"type": "queue.update"}
+        )
+    except Exception:  # noqa: BLE001 - real-time push is best-effort
+        logger.exception("Failed to broadcast queue update for doctor %s", instance.doctor_id)
 
 
 @receiver(post_save, sender=Appointment)

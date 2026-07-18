@@ -1,17 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
+import { InvoiceGeneratedModal } from '../../components/billing/InvoiceGeneratedModal'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { useDoctorQueueSocket } from '../../hooks/useDoctorQueueSocket'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatTime } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
-import type { QueueAppointment } from '../../services/types'
+import type { AppointmentBilling, QueueAppointment } from '../../services/types'
 
 function ageFromDob(dob: string | null): string {
   if (!dob) return ''
@@ -200,10 +203,14 @@ export function DoctorQueuePage() {
   const confirm = useConfirm()
   const qc = useQueryClient()
 
+  // Real-time: a WebSocket push (see apps/appointments/consumers.py) invalidates
+  // ['doctor-queue'] / ['doctor-queue-in-progress'] whenever this doctor's queue
+  // changes, so no polling interval is needed here.
+  useDoctorQueueSocket()
+
   const { data, isLoading } = useQuery({
     queryKey: ['doctor-queue'],
     queryFn: () => appointmentsApi.myQueue(),
-    refetchInterval: 15_000,
   })
 
   // Safety-net: if the queue endpoint returns no current patient, check directly for any
@@ -212,14 +219,18 @@ export function DoctorQueuePage() {
     queryKey: ['doctor-queue-in-progress'],
     queryFn: () => appointmentsApi.list({ status: 'IN_PROGRESS' }),
     enabled: data !== undefined && data.current === null,
-    refetchInterval: 15_000,
   })
+
+  const [billingResult, setBillingResult] = useState<AppointmentBilling | null>(null)
 
   const complete = useMutation({
     mutationFn: (id: number) => appointmentsApi.complete(id),
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['doctor-queue'] })
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      // Billing pop-up (Phase 12): invoice generated / free follow-up used.
+      if (data.billing) setBillingResult(data.billing)
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
@@ -267,7 +278,7 @@ export function DoctorQueuePage() {
       </div>
 
       {fallbackRows.map((a) => (
-        <div key={a.id} style={{ borderInlineStart: '3px solid var(--color-primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-4)' }}>
+        <div key={a.id} style={{ borderInlineStart: '3px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-4)' }}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
               <div>
@@ -300,6 +311,10 @@ export function DoctorQueuePage() {
       <p className="queue-footer">
         {t('queue.autoRefresh')}
       </p>
+
+      {billingResult && (
+        <InvoiceGeneratedModal billing={billingResult} onClose={() => setBillingResult(null)} />
+      )}
     </div>
   )
 }

@@ -18,6 +18,19 @@ reportlab==4.5.1        # pure-Python — ALL PDFs (prescriptions, reports)
 # --- Audit (optional history on MedicalRecord only) ---
 django-simple-history==3.11.0
 
+# --- Background task queue (AI Scribe transcription, email/SMS/WhatsApp) ---
+# ORM-backed broker (uses the existing DB) — no Redis/RabbitMQ to install.
+# Worker process: `python manage.py qcluster` (dev.ps1 starts it automatically).
+django-q2==1.10.0
+
+# --- Real-time updates (doctor's live queue page) ---
+# daphne makes `manage.py runserver` ASGI-capable (HTTP + WebSocket) with no
+# change to how the backend is launched. In-memory channel layer (see
+# CHANNEL_LAYERS in settings/base.py) — swap to channels_redis if this ever
+# runs as more than one process.
+channels==4.3.2
+daphne==4.2.2
+
 # --- Optional SMS / WhatsApp (feature-flagged off by default) ---
 twilio==9.10.9          # SMS + WhatsApp via Twilio; feature-gated by SMS_ENABLED / WHATSAPP_ENABLED
 

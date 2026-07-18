@@ -88,6 +88,70 @@ def test_create_and_confirm_followup(api, patient, doctor_profile, future_slot):
     assert confirmed.data["appointment_type"] == AppointmentType.FOLLOW_UP
 
 
+def test_stale_followup_reslotted_on_list(api, patient, doctor_profile, future_slot):
+    """A SUGGESTED follow-up whose slot went stale is re-pointed to the next
+    open slot when the patient loads their follow-up list — no dead-ends."""
+    from datetime import timedelta
+
+    from apps.core.enums import SlotStatus
+    from apps.doctors.models import TimeSlot
+
+    appt = _completed_appt(patient, doctor_profile, future_slot)
+    followup = services.create_followup(
+        origin_appointment=appt, recommended_date=timezone.localdate()
+    )
+    original_slot = followup.suggested_slot
+    assert original_slot is not None
+
+    # Make the pinned slot unbookable (someone else took it).
+    original_slot.status = SlotStatus.BOOKED
+    original_slot.save(update_fields=["status"])
+    # Guarantee another open future slot exists to move to.
+    assert TimeSlot.objects.filter(
+        doctor=doctor_profile, status=SlotStatus.AVAILABLE,
+        start_datetime__gte=timezone.now() + timedelta(minutes=30),
+    ).exists()
+
+    api.force_authenticate(patient)
+    resp = api.get(reverse("followup-list"))
+    assert resp.status_code == 200
+    row = next(r for r in resp.data["results"] if r["id"] == followup.id)
+    assert row["suggested_slot"] is not None
+    assert row["suggested_slot"] != original_slot.id  # re-slotted
+
+    followup.refresh_from_db()
+    assert followup.suggested_slot.status == SlotStatus.AVAILABLE
+    assert followup.suggested_slot.start_datetime >= timezone.now()
+
+
+def test_confirm_rejects_past_slot(api, patient, doctor_profile, future_slot):
+    """Confirming a follow-up whose slot is in the past fails with a clear,
+    specific message (not the generic form-validation copy)."""
+    from datetime import timedelta
+
+    from apps.core.enums import SlotStatus
+    from apps.doctors.models import TimeSlot
+
+    appt = _completed_appt(patient, doctor_profile, future_slot)
+    followup = services.create_followup(
+        origin_appointment=appt, recommended_date=timezone.localdate()
+    )
+    # Force a past slot onto the follow-up.
+    past = timezone.now() - timedelta(days=30)
+    past_slot = TimeSlot.objects.create(
+        doctor=doctor_profile, date=past.date(),
+        start_datetime=past, end_datetime=past + timedelta(minutes=30),
+        status=SlotStatus.AVAILABLE,
+    )
+    followup.suggested_slot = past_slot
+    followup.save(update_fields=["suggested_slot"])
+
+    api.force_authenticate(patient)
+    resp = api.post(reverse("followup-confirm", args=[followup.id]), {}, format="json")
+    assert resp.status_code == 400
+    assert "passed" in str(resp.data["fields"]).lower()
+
+
 # --- Reports ----------------------------------------------------------------
 def test_reports_manager_only(api, patient, make_user):
     manager = make_user("mgr5@test.dev", RoleChoices.MANAGER)

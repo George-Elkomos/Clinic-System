@@ -8,7 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.enums import AppointmentStatus, AppointmentType, RoleChoices
+from apps.core.enums import AppointmentStatus, AppointmentType, FollowUpStatus, RoleChoices
 from apps.doctors.models import DoctorProfile
 from apps.medical_records.serializers import PatientSummarySerializer
 from apps.users.models import PatientProfile
@@ -142,7 +142,18 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment = self.get_object()
         self._staff_or_owning_doctor(appointment)
         services.complete_appointment(appointment)
-        return Response(AppointmentSerializer(appointment).data)
+        data = AppointmentSerializer(appointment).data
+        # Billing outcome (Phase 12): lets the desk show "Invoice #INV-XXXX
+        # generated" or "free follow-up visit used" right after completion.
+        invoice = getattr(appointment, "billing_invoice", None)
+        validity = getattr(appointment, "billing_fee_validity", None)
+        data["billing"] = {
+            "invoice_id": invoice.id if invoice else None,
+            "invoice_number": invoice.number if invoice else None,
+            "invoice_total": str(invoice.total) if invoice else None,
+            "free_followup_used": invoice is None and validity is not None,
+        }
+        return Response(data)
 
     @action(detail=False, methods=["post"], url_path="walk-in")
     def walk_in(self, request):
@@ -291,6 +302,15 @@ class FollowUpViewSet(viewsets.ModelViewSet):
         if user.role == RoleChoices.DOCTOR:
             return qs.filter(doctor__user=user)
         return qs
+
+    def list(self, request, *args, **kwargs):
+        # Self-heal: re-point any stale SUGGESTED slots to the next open time so
+        # the viewer always sees a bookable suggestion rather than a dead-end.
+        for followup in self.filter_queryset(self.get_queryset()).filter(
+            status=FollowUpStatus.SUGGESTED
+        ):
+            services.reslot_stale_followup(followup)
+        return super().list(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         if request.user.role not in (RoleChoices.DOCTOR, *STAFF_ROLES):

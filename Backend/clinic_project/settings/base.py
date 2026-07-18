@@ -27,6 +27,10 @@ env = environ.Env(
     REMINDER_1H_WINDOW_MINUTES=(int, 15),
     WAITLIST_HOLD_HOURS=(int, 24),
     CLINIC_NAME=(str, "Sunrise Family Clinic"),
+    BILLING_FOLLOWUP_DAYS=(int, 14),
+    BILLING_INVOICE_DUE_DAYS=(int, 7),
+    BILLING_DEFAULT_CONSULTATION_PRICE=(str, "50.00"),
+    BILLING_CURRENCY=(str, "USD"),
 )
 
 # Read .env if present (sibling of manage.py).
@@ -38,6 +42,10 @@ ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
 # --- Applications -----------------------------------------------------------
 DJANGO_APPS = [
+    # "daphne" must load before "staticfiles" — it patches `runserver` to serve
+    # ASGI (HTTP + WebSocket) instead of plain WSGI, with zero change to how
+    # dev.ps1 launches the backend (still `manage.py runserver`).
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -53,6 +61,8 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "django_filters",
     "simple_history",
+    "django_q",
+    "channels",
 ]
 
 LOCAL_APPS = [
@@ -69,6 +79,8 @@ LOCAL_APPS = [
     "apps.ai_scribe",     # AI medical scribe (voice -> transcript -> structured draft)
     "apps.encounters",    # Phase 8 — structured clinical encounter
     "apps.medications",   # Phase 9 — medication master + drug-allergy alerts
+    "apps.billing",       # Phase 12 — invoices, payments, fee validity
+    "apps.referrals",     # Phase 13 — referrals + complaints master
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -216,6 +228,12 @@ REMINDER_1H_WINDOW_MINUTES = env("REMINDER_1H_WINDOW_MINUTES")
 WAITLIST_HOLD_HOURS = env("WAITLIST_HOLD_HOURS")
 CLINIC_NAME = env("CLINIC_NAME")
 
+# --- Billing (Phase 12) -------------------------------------------------------
+BILLING_FOLLOWUP_DAYS = env("BILLING_FOLLOWUP_DAYS")            # free follow-up window
+BILLING_INVOICE_DUE_DAYS = env("BILLING_INVOICE_DUE_DAYS")      # invoice_date -> due_date
+BILLING_DEFAULT_CONSULTATION_PRICE = env("BILLING_DEFAULT_CONSULTATION_PRICE")
+BILLING_CURRENCY = env("BILLING_CURRENCY")
+
 # --- AI Scribe (apps/ai_scribe) ---------------------------------------------
 # Records a doctor-patient session -> Whisper transcript -> Gemini structured
 # draft the doctor reviews and confirms. All heavy deps are imported lazily, so
@@ -235,3 +253,37 @@ AI_SCRIBE_MAX_AUDIO_MB = env.int("AI_SCRIBE_MAX_AUDIO_MB", default=80)
 # Structured extraction (Google Gemini — free tier key from aistudio.google.com).
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_MODEL = env("GEMINI_MODEL", default="gemini-2.0-flash")
+
+# --- Background task queue (Django-Q2) ---------------------------------------
+# Replaces ad-hoc threading.Thread / inline dispatch for slow off-request work
+# (AI Scribe transcription, outbound email/SMS/WhatsApp) with a real worker
+# queue. Uses the existing Django ORM as the broker — no Redis/RabbitMQ to
+# install or run, matching this project's "minimal infrastructure" stance.
+# Run the worker locally with:  python manage.py qcluster  (dev.ps1 starts it).
+Q_CLUSTER = {
+    "name": "clinic",
+    "orm": "default",
+    "workers": env.int("Q_CLUSTER_WORKERS", default=2),
+    "recycle": 500,
+    "timeout": 300,          # kill a task if it runs past 5 minutes
+    "retry": 360,            # must exceed timeout or django-q refuses to start
+    "max_attempts": 3,
+    "retry_backoff": True,
+    "save_limit": 500,       # keep the last N successful task results
+    "catch_up": False,       # don't replay tasks missed while no worker ran
+    "sync": env.bool("Q_CLUSTER_SYNC", default=False),  # True executes inline (tests)
+}
+
+# --- Real-time updates (Django Channels) -------------------------------------
+# Pushes queue-change events to the doctor's live queue page instead of the
+# frontend polling every 15s. In-memory channel layer — correct and sufficient
+# as long as the backend runs as a SINGLE process (true today: one `runserver`/
+# daphne process via dev.ps1). It does NOT work across multiple worker
+# processes/machines (each has its own isolated memory) — if this ever scales
+# past one process, swap to `channels_redis.core.RedisChannelLayer` (same
+# "add Redis when you actually need it" tradeoff as Celery vs Django-Q above).
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}

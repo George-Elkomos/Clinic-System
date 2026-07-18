@@ -106,7 +106,12 @@ def cancel_appointment(appointment, *, cancelled_by, reason="", enforce_window=F
 
 @transaction.atomic
 def complete_appointment(appointment):
-    """Mark completed and record the doctor↔patient treatment link."""
+    """Mark completed, record the doctor↔patient link, and trigger billing.
+
+    Billing (Phase 12) either consumes an active free-follow-up window or
+    issues a consultation invoice — see billing.services for the rules.
+    """
+    from apps.billing.services import handle_appointment_completed
     from apps.core.enums import DoctorPatientSource
     from apps.doctors.models import DoctorPatient
 
@@ -121,6 +126,12 @@ def complete_appointment(appointment):
     )
     link.last_treated_at = appointment.completed_at
     link.save(update_fields=["last_treated_at", "updated_at"])
+
+    invoice, fee_validity = handle_appointment_completed(appointment)
+    # Exposed (not persisted) so the API layer can tell the front desk what
+    # happened: "Invoice #INV-XXXX generated" vs "free follow-up used".
+    appointment.billing_invoice = invoice
+    appointment.billing_fee_validity = fee_validity
     return appointment
 
 
@@ -208,6 +219,39 @@ def suggest_followup_slot(doctor, recommended_date):
 
 
 @transaction.atomic
+def reslot_stale_followup(followup):
+    """Keep a SUGGESTED follow-up bookable.
+
+    A follow-up pins one specific slot at suggestion time. If that slot later
+    passes or gets taken, the suggestion becomes a dead-end the patient can't
+    confirm. This re-points it at the next open slot for the same doctor near
+    the recommended date. Returns True if the suggested slot changed.
+    """
+    from apps.core.enums import FollowUpStatus
+
+    if followup.status != FollowUpStatus.SUGGESTED:
+        return False
+
+    slot = followup.suggested_slot
+    still_bookable = (
+        slot is not None
+        and slot.status == SlotStatus.AVAILABLE
+        and slot.start_datetime >= timezone.now()
+    )
+    if still_bookable:
+        return False
+
+    fresh = suggest_followup_slot(followup.doctor, followup.recommended_date)
+    fresh_id = fresh.pk if fresh else None
+    if fresh_id == followup.suggested_slot_id:
+        return False  # nothing better available; leave as-is (patient books manually)
+
+    followup.suggested_slot = fresh
+    followup.save(update_fields=["suggested_slot", "updated_at"])
+    return True
+
+
+@transaction.atomic
 def create_followup(*, origin_appointment, recommended_date, notes="", created_by=None):
     """Doctor recommends a follow-up; the system proposes the next open slot."""
     from apps.core.enums import FollowUpStatus, NotificationVerb
@@ -247,6 +291,10 @@ def confirm_followup(followup, *, created_by=None):
     if not followup.suggested_slot_id:
         raise ValidationError(
             {"detail": "No suggested time is available. Please book a visit manually."}
+        )
+    if followup.suggested_slot.start_datetime < timezone.now():
+        raise ValidationError(
+            {"detail": "This suggested time has passed. Please book a visit manually."}
         )
     appointment = book_slot(
         patient=followup.patient,

@@ -768,3 +768,128 @@ export interface UpdateEncounterPayload {
   treatment_plan_ar?: string
   vitals?: number | null
 }
+
+// --- Billing (Phase 12) ---
+
+export type InvoiceStatus =
+  | 'DRAFT' | 'ISSUED' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED' | 'VOID'
+
+export type PaymentMethod = 'CASH' | 'CARD' | 'BANK_TRANSFER'
+
+export interface ServiceItem {
+  id: number
+  name: string
+  name_ar: string
+  item_type: 'CONSULTATION' | 'LAB_TEST' | 'PROCEDURE' | 'OTHER'
+  default_price: string
+  is_active: boolean
+}
+
+export interface InvoiceItem {
+  id: number
+  description: string
+  service_item: number | null
+  quantity: number
+  unit_price: string
+  line_total: string
+  source_type: 'APPOINTMENT' | 'LAB_ORDER'
+  source_id: number | null
+}
+
+export interface Payment {
+  id: number
+  invoice: number
+  paid_at: string
+  amount: string
+  payment_method: PaymentMethod
+  reference: string
+  received_by: number | null
+  received_by_name: string | null
+}
+
+export interface Invoice {
+  id: number
+  number: string
+  patient: number
+  patient_name: string
+  doctor: number | null
+  doctor_name: string | null
+  invoice_date: string
+  due_date: string | null
+  status: InvoiceStatus
+  subtotal: string
+  discount: string
+  total: string
+  paid_amount: string
+  balance: string
+  currency: string
+  notes: string
+  items: InvoiceItem[]
+  payments: Payment[]
+}
+
+// Billing block appended to the complete-appointment response.
+export interface AppointmentBilling {
+  invoice_id: number | null
+  invoice_number: string | null
+  invoice_total: string | null
+  free_followup_used: boolean
+}
+
+export interface DoctorRevenue {
+  doctor_id: number
+  doctor_name: string
+  total_billed: string
+  total_collected: string
+}
+
+export interface BillingReport {
+  period: string
+  since: string
+  currency: string
+  total_billed: string
+  total_collected: string
+  total_outstanding: string
+  revenue_by_doctor: DoctorRevenue[]
+}
+
+// --- Referrals (Phase 13) ---
+
+export type ReferralType = 'INTERNAL' | 'EXTERNAL'
+export type ReferralStatus = 'PENDING' | 'ACCEPTED' | 'COMPLETED' | 'CANCELLED'
+
+export interface Referral {
+  id: number
+  patient: number
+  patient_name: string
+  referring_doctor: number | null
+  referring_doctor_name: string
+  encounter: number
+  referral_type: ReferralType
+  specialty: number | null
+  specialty_detail: Specialty | null
+  target_doctor: number | null
+  target_doctor_name: string
+  external_facility_name: string
+  accepted_by: number | null
+  accepted_by_name: string
+  reason: string
+  reason_ar: string
+  notes: string
+  notes_ar: string
+  referral_date: string
+  status: ReferralStatus
+  created_at: string
+}
+
+export interface CreateReferralPayload {
+  encounter: number
+  referral_type: ReferralType
+  specialty?: number | null
+  target_doctor?: number | null
+  external_facility_name?: string
+  reason: string
+  reason_ar?: string
+  notes?: string
+  notes_ar?: string
+}

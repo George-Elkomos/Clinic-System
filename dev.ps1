@@ -1,10 +1,11 @@
 <#
 .SYNOPSIS
-  Start/stop the Clinic Management System backend (Django) + frontend (Vite) together.
+  Start/stop the Clinic Management System backend (Django) + frontend (Vite) +
+  background worker (Django-Q qcluster) together.
 
 .USAGE
-  .\dev.ps1 start       # start both servers
-  .\dev.ps1 stop        # stop both servers
+  .\dev.ps1 start       # start all three
+  .\dev.ps1 stop        # stop all three
   .\dev.ps1 restart     # stop then start
   .\dev.ps1 status      # show whether each is running
 
@@ -66,6 +67,7 @@ function Do-Stop {
   if ($null -ne $pids) {
     Stop-Tree ([int]$pids.backend) 'backend'
     Stop-Tree ([int]$pids.frontend) 'frontend'
+    Stop-Tree ([int]$pids.worker) 'worker'
   }
   # Always free the well-known dev ports so nothing is left orphaned.
   Free-Port 8000 'backend'
@@ -79,8 +81,10 @@ function Do-Status {
   if ($null -eq $pids) { Write-Host 'Not running.' -ForegroundColor DarkGray; return }
   $b = if (Test-Alive ([int]$pids.backend)) { 'running' } else { 'stopped' }
   $f = if (Test-Alive ([int]$pids.frontend)) { 'running' } else { 'stopped' }
+  $w = if (Test-Alive ([int]$pids.worker)) { 'running' } else { 'stopped' }
   Write-Host ("backend  (PID {0}): {1}" -f $pids.backend, $b)
   Write-Host ("frontend (PID {0}): {1}" -f $pids.frontend, $f)
+  Write-Host ("worker   (PID {0}): {1}" -f $pids.worker, $w)
 }
 
 function Do-Start {
@@ -93,7 +97,7 @@ function Do-Start {
   }
 
   $pids = Read-Pids
-  if ($null -ne $pids -and ((Test-Alive ([int]$pids.backend)) -or (Test-Alive ([int]$pids.frontend)))) {
+  if ($null -ne $pids -and ((Test-Alive ([int]$pids.backend)) -or (Test-Alive ([int]$pids.frontend)) -or (Test-Alive ([int]$pids.worker)))) {
     Write-Host 'Already running. Use "dev.ps1 restart" or "dev.ps1 stop" first.' -ForegroundColor Yellow
     Do-Status
     return
@@ -115,9 +119,17 @@ function Do-Start {
     -RedirectStandardOutput (Join-Path $RunDir 'frontend.log') `
     -RedirectStandardError  (Join-Path $RunDir 'frontend.err')
 
+  Write-Host 'Starting background worker (Django-Q qcluster)...' -ForegroundColor Cyan
+  $workerProc = Start-Process -FilePath $PyExe `
+    -ArgumentList 'manage.py', 'qcluster' `
+    -WorkingDirectory $Backend -PassThru `
+    -RedirectStandardOutput (Join-Path $RunDir 'worker.log') `
+    -RedirectStandardError  (Join-Path $RunDir 'worker.err')
+
   @{
     backend  = $backendProc.Id
     frontend = $frontendProc.Id
+    worker   = $workerProc.Id
     started  = (Get-Date).ToString('o')
   } | ConvertTo-Json | Set-Content -Path $PidFile -Encoding utf8
 
@@ -126,7 +138,7 @@ function Do-Start {
   Write-Host '  App (frontend):  http://localhost:5173'
   Write-Host '  API (backend):   http://127.0.0.1:8000/api/'
   Write-Host '  Public kiosk:    http://localhost:5173/kiosk/1'
-  Write-Host '  Logs:            .run\backend.log  .run\frontend.log'
+  Write-Host '  Logs:            .run\backend.log  .run\frontend.log  .run\worker.log'
   Write-Host '  Stop with:       .\stop.cmd   (or  .\dev.ps1 stop)'
 }
 

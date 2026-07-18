@@ -115,7 +115,10 @@ def test_emergency_bumps_kiosk_queue(api, patient, patient2, doctor_profile, sec
     assert resp.status_code == 200
     first = resp.data["queue"][0]
     assert first["is_emergency"] is True
-    assert first["display_name"].startswith(patient2.first_name)
+    # Kiosk is public: it shows an opaque ticket token, never the patient's name.
+    expected_token = "#" + f"{emerg.id:04X}"[-4:]
+    assert first["display_name"] == expected_token
+    assert patient2.first_name not in first["display_name"]
     assert emerg.priority == 10
 
 
