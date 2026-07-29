@@ -9,7 +9,16 @@ _state = threading.local()
 
 
 def get_current_user():
-    return getattr(_state, "user", None)
+    # Resolved lazily against the live request (not a value snapshotted at
+    # middleware time) because DRF's JWT authentication only populates
+    # request.user once the view's perform_authentication() runs, which is
+    # after this middleware's pre-view phase but before any signal fired by
+    # the view's own db writes (e.g. audit's post_save receiver).
+    request = getattr(_state, "request", None)
+    if request is None:
+        return None
+    user = getattr(request, "user", None)
+    return user if (user and user.is_authenticated) else None
 
 
 def get_current_request_meta():
@@ -31,13 +40,12 @@ class CurrentUserMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        user = getattr(request, "user", None)
-        _state.user = user if (user and user.is_authenticated) else None
+        _state.request = request
         _state.ip_address = _client_ip(request)
         _state.user_agent = request.META.get("HTTP_USER_AGENT", "")[:512]
         try:
             return self.get_response(request)
         finally:
-            _state.user = None
+            _state.request = None
             _state.ip_address = None
             _state.user_agent = ""

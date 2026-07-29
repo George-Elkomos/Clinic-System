@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { MedicationItemRow } from '../../components/medical/MedicationItemRow'
+import { ProcedureDetailModal } from '../../components/medical/ProcedureDetailModal'
 import { useAuth } from '../../hooks/useAuth'
 import { useInteractionCheck } from '../../hooks/useInteractionCheck'
 
@@ -14,6 +15,7 @@ import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { StatusBadge } from '../../components/primitives/StatusBadge'
 import { useToast } from '../../components/primitives/Toast'
 import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
 import { VitalSignsHistory } from '../../components/vitals/VitalSignsHistory'
@@ -27,6 +29,7 @@ import { authApi } from '../../services/auth.api'
 import { medicalApi } from '../../services/medical.api'
 import { vitalsApi } from '../../services/vitals.api'
 import { encountersApi } from '../../services/encounters.api'
+import { proceduresApi } from '../../services/procedures.api'
 import type { Diagnosis, Prescription, PrescriptionItem } from '../../services/types'
 
 // ---- Vital Signs -----------------------------------------------------------
@@ -361,6 +364,55 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
   )
 }
 
+// ---- Clinical procedures ----------------------------------------------------
+function ProceduresSection({ patientId }: { patientId: number }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const qc = useQueryClient()
+  const [openProcedureId, setOpenProcedureId] = useState<number | null>(null)
+
+  const { data: procedures = [] } = useQuery({
+    queryKey: ['procedures', patientId],
+    queryFn: () => proceduresApi.list({ patient: patientId }).then((r) => r.results),
+  })
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ['procedures', patientId] })
+
+  return (
+    <Card title={t('procedures.title')}>
+      {procedures.length === 0 ? (
+        <p>{t('procedures.none')}</p>
+      ) : (
+        <ul className="procedure-list">
+          {procedures.map((proc) => (
+            <li key={proc.id}>
+              <button type="button" className="procedure-row" onClick={() => setOpenProcedureId(proc.id)}>
+                <div className="procedure-row__main">
+                  <span className="procedure-row__name">
+                    {language === 'ar' && proc.procedure_name_ar ? proc.procedure_name_ar : proc.procedure_name}
+                  </span>
+                  <span className="procedure-row__meta">
+                    {proc.doctor_name} · {formatDate(proc.created_at, language)}
+                  </span>
+                </div>
+                <StatusBadge status={proc.status} ns="procedures.status" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {openProcedureId != null && (
+        <ProcedureDetailModal
+          procedureId={openProcedureId}
+          onClose={() => setOpenProcedureId(null)}
+          onChanged={refresh}
+        />
+      )}
+    </Card>
+  )
+}
+
 // ---- Scans / Labs ----------------------------------------------------------
 function ScansLabsSection({ patientId }: { patientId: number }) {
   const { t } = useTranslation()
@@ -540,6 +592,7 @@ export function PatientRecordPage() {
           <ChronicDiagnosesSection patientId={patientId} />
           <NotesSection patientId={patientId} categories={categories} />
           <PrescriptionsSection patientId={patientId} />
+          <ProceduresSection patientId={patientId} />
           <ScansLabsSection patientId={patientId} />
           <Card title={t('timeline.title')}>
             <PatientTimeline patientId={patientId} />

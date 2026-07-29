@@ -20,6 +20,7 @@ AUDITED_MODELS = [
     "medical_records.ClinicalNote",
     "medical_records.Prescription",
     "reviews.Review",
+    "procedures.ClinicalProcedure",
 ]
 
 IGNORED_FIELDS = {"created_at", "updated_at", "last_login", "password"}

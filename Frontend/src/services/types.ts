@@ -753,6 +753,7 @@ export interface Encounter {
   supersedes: number | null
   prescriptions: Prescription[]
   lab_orders: LabOrderSummary[]
+  procedures: ClinicalProcedureSummary[]
   created_at: string
 }
 
@@ -892,4 +893,77 @@ export interface CreateReferralPayload {
   reason_ar?: string
   notes?: string
   notes_ar?: string
+}
+
+// --- Clinical Procedures (Phase 14) ---
+
+export type ProcedureStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+export type ProcedureCategory = 'MINOR_SURGERY' | 'INJECTION' | 'DRESSING' | 'BIOPSY' | 'OTHER'
+
+export interface ProcedureChecklistItem {
+  step: string
+  required: boolean
+  completed?: boolean
+}
+
+export interface ProcedureTemplate {
+  id: number
+  name: string
+  name_ar: string
+  category: ProcedureCategory
+  description: string
+  estimated_duration_minutes: number
+  checklist_template: ProcedureChecklistItem[]
+  is_active: boolean
+}
+
+export interface ClinicalProcedure {
+  id: number
+  patient: number
+  patient_name: string
+  doctor: number
+  doctor_name: string
+  appointment: number | null
+  encounter: number | null
+  template: number | null
+  template_detail: ProcedureTemplate | null
+  procedure_name: string
+  procedure_name_ar: string
+  status: ProcedureStatus
+  checklist_state: ProcedureChecklistItem[]
+  pre_procedure_notes: string
+  post_procedure_notes: string
+  complications: string
+  start_time: string | null
+  end_time: string | null
+  cancellation_reason: string
+  cancelled_at: string | null
+  created_at: string
+}
+
+export interface ClinicalProcedureSummary {
+  id: number
+  patient: number
+  patient_name: string
+  doctor: number
+  doctor_name: string
+  appointment: number | null
+  encounter: number | null
+  template: number | null
+  procedure_name: string
+  procedure_name_ar: string
+  status: ProcedureStatus
+  start_time: string | null
+  end_time: string | null
+  created_at: string
+}
+
+export interface CreateProcedurePayload {
+  patient: number
+  appointment?: number | null
+  encounter?: number | null
+  template?: number | null
+  procedure_name?: string
+  procedure_name_ar?: string
+  pre_procedure_notes?: string
 }

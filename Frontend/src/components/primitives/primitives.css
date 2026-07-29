@@ -1276,6 +1276,11 @@
 .encounter-sidebar { position: sticky; top: var(--space-4); }
 .encounter-sidebar-actions { display: flex; flex-direction: column; gap: var(--space-3); }
 .encounter-linked-list { margin: 0; padding-inline-start: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
+.encounter-linked-btn {
+  background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--primary);
+  cursor: pointer; text-align: start; min-height: var(--tap-min);
+}
+.encounter-linked-btn:hover { text-decoration: underline; }
 .encounter-none { color: var(--text-muted); font-size: var(--font-small); }
 .encounter-vitals-linked { color: var(--success); font-weight: 600; }
 .encounter-submit-row { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
@@ -1353,3 +1358,34 @@
 .badge--MODERATE        { border-color: var(--warning); color: var(--warning); }
 .badge--SEVERE          { border-color: var(--danger, #e53e3e); color: var(--danger, #e53e3e); }
 .badge--CONTRAINDICATED { border-color: var(--danger, #e53e3e); color: var(--on-danger, #fff); background: var(--danger, #e53e3e); font-weight: 700; }
+
+/* --- Clinical Procedures (Phase 14) --- */
+.badge--SCHEDULED { border-color: var(--status-pending); color: var(--status-pending); }
+
+.procedure-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.procedure-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: none; width: 100%; text-align: start; cursor: pointer; min-height: var(--tap-min);
+  font: inherit; color: inherit;
+}
+.procedure-row:hover { background: var(--surface-hover); }
+.procedure-row__main { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.procedure-row__name { font-weight: 600; }
+.procedure-row__meta { font-size: var(--font-body); color: var(--text-muted); }
+
+.procedure-detail__head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.procedure-detail__timer { display: flex; gap: var(--space-4); font-size: var(--font-body); color: var(--text-muted); margin-bottom: var(--space-4); }
+.procedure-detail__actions { display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-4); flex-wrap: wrap; }
+
+.procedure-checklist { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.procedure-checklist-item {
+  display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-body); cursor: pointer;
+  min-height: var(--tap-min);
+}
+.procedure-checklist-item input[type='checkbox'] { width: 24px; height: 24px; flex-shrink: 0; }
+.procedure-checklist-item--done .procedure-checklist-item__label { text-decoration: line-through; color: var(--text-muted); }
+.procedure-checklist-item__required { color: var(--danger, #e53e3e); font-size: var(--font-body); }
+
+.procedure-cancel-form { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.procedure-cancel-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }

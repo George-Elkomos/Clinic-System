@@ -151,6 +151,10 @@ class NotificationVerb(models.TextChoices):
     REFERRAL_ACCEPTED = "REFERRAL_ACCEPTED", _("Referral accepted")
     REFERRAL_COMPLETED = "REFERRAL_COMPLETED", _("Referral completed")
     REFERRAL_CANCELLED = "REFERRAL_CANCELLED", _("Referral cancelled")
+    # Phase 14 — Clinical Procedures
+    PROCEDURE_SCHEDULED = "PROCEDURE_SCHEDULED", _("Procedure scheduled")
+    PROCEDURE_COMPLETED = "PROCEDURE_COMPLETED", _("Procedure completed")
+    PROCEDURE_CANCELLED = "PROCEDURE_CANCELLED", _("Procedure cancelled")
 
 
 class LabOrderStatus(models.TextChoices):
@@ -216,6 +220,23 @@ class ReferralType(models.TextChoices):
 class ReferralStatus(models.TextChoices):
     PENDING = "PENDING", _("Pending")
     ACCEPTED = "ACCEPTED", _("Accepted")
+    COMPLETED = "COMPLETED", _("Completed")
+    CANCELLED = "CANCELLED", _("Cancelled")
+
+
+# --- Phase 14 — Clinical Procedures --------------------------------------------
+
+class ProcedureCategory(models.TextChoices):
+    MINOR_SURGERY = "MINOR_SURGERY", _("Minor surgery")
+    INJECTION = "INJECTION", _("Injection")
+    DRESSING = "DRESSING", _("Dressing")
+    BIOPSY = "BIOPSY", _("Biopsy")
+    OTHER = "OTHER", _("Other")
+
+
+class ProcedureStatus(models.TextChoices):
+    SCHEDULED = "SCHEDULED", _("Scheduled")
+    IN_PROGRESS = "IN_PROGRESS", _("In progress")
     COMPLETED = "COMPLETED", _("Completed")
     CANCELLED = "CANCELLED", _("Cancelled")
 

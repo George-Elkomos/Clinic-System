@@ -24,6 +24,8 @@ import { errorMessage } from '../../services/apiClient'
 import { complaintsApi, diagnosesApi, encountersApi } from '../../services/encounters.api'
 import { labOrdersApi } from '../../services/labOrders.api'
 import { medicalApi } from '../../services/medical.api'
+import { proceduresApi } from '../../services/procedures.api'
+import { ProcedureDetailModal } from '../../components/medical/ProcedureDetailModal'
 import { localizedName } from '../../lib/format'
 import type { Complaint, Encounter, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
 
@@ -165,6 +167,82 @@ function LabOrderModal({ encounter, onClose, onSaved }: { encounter: Encounter; 
   )
 }
 
+// ---- Inline "add procedure" modal ------------------------------------------
+const CUSTOM_TEMPLATE_CHOICE = 'custom'
+
+function ProcedureModal({ encounter, onClose, onSaved }: { encounter: Encounter; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const { showToast } = useToast()
+  const [choice, setChoice] = useState<string | number>('')
+  const [customName, setCustomName] = useState('')
+  const [customNameAr, setCustomNameAr] = useState('')
+  const [preNotes, setPreNotes] = useState('')
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['procedure-templates', 'active'],
+    queryFn: () => proceduresApi.listTemplates({ is_active: true }).then((r) => r.results),
+    staleTime: 300_000,
+  })
+
+  const templateOptions = [
+    ...templates.map((tpl) => ({ value: tpl.id, label: localizedName(tpl, language) })),
+    { value: CUSTOM_TEMPLATE_CHOICE, label: t('procedures.customOption') },
+  ]
+
+  const isCustom = choice === CUSTOM_TEMPLATE_CHOICE
+  const canSave = isCustom ? customName.trim().length > 0 : typeof choice === 'number'
+
+  const save = useMutation({
+    mutationFn: () =>
+      proceduresApi.create({
+        patient: encounter.patient,
+        encounter: encounter.id,
+        template: typeof choice === 'number' ? choice : null,
+        procedure_name: isCustom ? customName : undefined,
+        procedure_name_ar: isCustom ? customNameAr : undefined,
+        pre_procedure_notes: preNotes || undefined,
+      }),
+    onSuccess: () => { showToast(t('procedures.saved'), 'success'); onSaved(); onClose() },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  return (
+    <Modal title={t('procedures.modalTitle')} onClose={onClose} wide>
+      <FormField label={t('procedures.template')}>
+        {(p) => (
+          <Select
+            id={p.id}
+            options={templateOptions}
+            value={choice}
+            onChange={(v) => setChoice(Array.isArray(v) ? '' : v)}
+          />
+        )}
+      </FormField>
+
+      {isCustom && (
+        <>
+          <FormField label={t('procedures.customName')}>
+            {(p) => <input {...p} value={customName} onChange={(e) => setCustomName(e.target.value)} />}
+          </FormField>
+          <FormField label={t('procedures.customNameAr')}>
+            {(p) => <input {...p} dir="rtl" value={customNameAr} onChange={(e) => setCustomNameAr(e.target.value)} />}
+          </FormField>
+        </>
+      )}
+
+      <FormField label={t('procedures.preProcedureNotes')} hint={t('procedures.preProcedureNotesHint')}>
+        {(p) => <textarea {...p} rows={2} value={preNotes} onChange={(e) => setPreNotes(e.target.value)} />}
+      </FormField>
+
+      <div className="modal__actions">
+        <Button variant="secondary" onClick={onClose}>{t('encounters.cancel')}</Button>
+        <Button loading={save.isPending} disabled={!canSave} onClick={() => save.mutate()}>{t('encounters.save')}</Button>
+      </div>
+    </Modal>
+  )
+}
+
 // ---- Prescription sidebar item with inline void form ---------------------
 function PrescriptionSidebarItem({
   prescription: p,
@@ -261,7 +339,9 @@ export function EncounterPage() {
   const [diagnosis, setDiagnosis] = useState<ComboOption | null>(null)
   const [showRx, setShowRx] = useState(false)
   const [showLab, setShowLab] = useState(false)
+  const [showProcedure, setShowProcedure] = useState(false)
   const [showReferral, setShowReferral] = useState(false)
+  const [openProcedureId, setOpenProcedureId] = useState<number | null>(null)
   const hydrated = useRef(false)
   const hasEdited = useRef(false)
 
@@ -532,6 +612,7 @@ export function EncounterPage() {
             <div className="encounter-sidebar-actions">
               <Button variant="secondary" disabled={readOnly} onClick={() => setShowRx(true)}>{t('encounters.addPrescription')}</Button>
               <Button variant="secondary" disabled={readOnly} onClick={() => setShowLab(true)}>{t('encounters.orderLab')}</Button>
+              <Button variant="secondary" disabled={readOnly} onClick={() => setShowProcedure(true)}>{t('encounters.addProcedure')}</Button>
               <Button variant="secondary" disabled={!isOwner} onClick={() => setShowReferral(true)}>{t('referrals.referPatient')}</Button>
             </div>
 
@@ -561,13 +642,36 @@ export function EncounterPage() {
                 ))}
               </ul>
             )}
+
+            <h3 className="medical-section-divider">{t('encounters.linkedProcedures')}</h3>
+            {(encounter.procedures ?? []).length === 0 ? (
+              <p className="encounter-none">{t('encounters.noneLinked')}</p>
+            ) : (
+              <ul className="encounter-linked-list">
+                {(encounter.procedures ?? []).map((proc) => (
+                  <li key={proc.id}>
+                    <button type="button" className="encounter-linked-btn" onClick={() => setOpenProcedureId(proc.id)}>
+                      {proc.procedure_name} · {t(`procedures.status.${proc.status}`)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </aside>
       </div>
 
       {showRx && <PrescriptionModal encounter={encounter} onClose={() => setShowRx(false)} onSaved={refreshEncounter} />}
       {showLab && <LabOrderModal encounter={encounter} onClose={() => setShowLab(false)} onSaved={refreshEncounter} />}
+      {showProcedure && <ProcedureModal encounter={encounter} onClose={() => setShowProcedure(false)} onSaved={refreshEncounter} />}
       {showReferral && <CreateReferralModal encounterId={encounter.id} onClose={() => setShowReferral(false)} />}
+      {openProcedureId != null && (
+        <ProcedureDetailModal
+          procedureId={openProcedureId}
+          onClose={() => setOpenProcedureId(null)}
+          onChanged={refreshEncounter}
+        />
+      )}
     </div>
   )
 }

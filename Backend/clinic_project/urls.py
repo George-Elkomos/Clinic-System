@@ -23,6 +23,7 @@ api_patterns = [
     path("", include("apps.medications.urls")),  # Phase 9 — medications + dosage + allergy alerts
     path("", include("apps.billing.urls")),  # Phase 12 — invoices, payments, billing reports
     path("", include("apps.referrals.urls")),  # Phase 13 — referrals + complaints master
+    path("", include("apps.procedures.urls")),  # Phase 14 — clinical procedures
 ]
 
 urlpatterns = [
