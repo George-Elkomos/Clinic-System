@@ -38,30 +38,20 @@ jobs:
           retention-days: 14
 
   deploy:
-    needs: test
     runs-on: ubuntu-latest
     steps:
-      - name: Execute deployment script via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            bash /var/www/clinic_app/deploy/deploy.sh
-
-      - name: Fetch deploy log from server
-        if: always()
+      - name: Deploy via SSH (output captured live, no separate fetch needed)
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
+          set -o pipefail
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cat /var/log/clinic-deploy.log" > deploy.log || echo "(could not fetch deploy log — see the 'Execute deployment script via SSH' step above)" > deploy.log
+            "bash /var/www/clinic_app/deploy/deploy.sh" 2>&1 | tee deploy.log
 
       - name: Upload deploy log
         if: always()

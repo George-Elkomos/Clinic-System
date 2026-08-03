@@ -1,11 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-# Full run (stdout+stderr) is saved here, overwritten each deploy — lets the
-# CI notify job fetch "what happened in the last deploy" and also gives a
-# persistent log directly on the box for manual debugging.
+# Full run (stdout+stderr) is saved here, overwritten each deploy, AND still
+# streamed back over the SSH session that invoked this script — the log is
+# both persisted on the server for manual debugging and captured by CI in
+# the same connection (no separate fetch step to fail independently).
 LOG_FILE=/var/log/clinic-deploy.log
-exec > "$LOG_FILE" 2>&1
+exec > >(tee "$LOG_FILE") 2>&1
 
 echo "=== Deploy started: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
 
