@@ -18,6 +18,47 @@ cd "$APP_DIR"
 PREV_COMMIT=$(git rev-parse HEAD)
 echo "Previous commit (rollback target if anything below fails): $PREV_COMMIT"
 
+# `systemctl restart` only confirms the process launched, not that it kept
+# running — a crash-on-startup bug can report "success" and die a moment
+# later. This checks the service is still alive after a beat, AND that it
+# actually answers a request (Daphne only; qcluster has no HTTP port). On
+# any failure it dumps the real journal (systemd routes app crashes/
+# tracebacks there, not to this script's own output) before returning.
+verify_service() {
+    local service="$1"
+    sleep 2
+    if ! systemctl is-active --quiet "$service"; then
+        echo "--- $service is NOT active after restart. journalctl -u $service (last 150 lines): ---"
+        journalctl -u "$service" -n 150 --no-pager
+        return 1
+    fi
+    echo "--- $service is active. ---"
+    return 0
+}
+
+verify_daphne_http() {
+    sleep 1
+    local code
+    code=$(curl -s -o /dev/null -m 5 -w "%{http_code}" "http://127.0.0.1:8000/api/auth/" 2>/dev/null)
+    if [ -z "$code" ] || [ "$code" = "000" ]; then
+        echo "--- Daphne did not answer a local HTTP request (curl code: '$code'). journalctl -u clinic-daphne (last 150 lines): ---"
+        journalctl -u clinic-daphne -n 150 --no-pager
+        return 1
+    fi
+    echo "--- Daphne answered locally with HTTP $code (any response, even 404, confirms it's alive). ---"
+    return 0
+}
+
+restart_and_verify() {
+    local service="$1"
+    if ! systemctl restart "$service"; then
+        echo "--- systemctl restart $service FAILED. journalctl -u $service (last 150 lines): ---"
+        journalctl -u "$service" -n 150 --no-pager
+        return 1
+    fi
+    verify_service "$service"
+}
+
 rollback() {
     echo "!!! A deploy step failed — rolling back to $PREV_COMMIT !!!"
     cd "$APP_DIR"
@@ -46,8 +87,14 @@ rollback() {
     # step wasn't a restart itself: if `systemctl restart` was the failure
     # (new code crashed on startup), the old process was already killed by
     # that attempt, so it must be explicitly relaunched here.
-    systemctl restart clinic-daphne 2>/dev/null || true
-    systemctl restart clinic-qcluster 2>/dev/null || true
+    if ! systemctl restart clinic-daphne 2>/dev/null; then
+        echo "--- Rollback restart of clinic-daphne also failed. journalctl -u clinic-daphne (last 150 lines): ---"
+        journalctl -u clinic-daphne -n 150 --no-pager 2>/dev/null || true
+    fi
+    if ! systemctl restart clinic-qcluster 2>/dev/null; then
+        echo "--- Rollback restart of clinic-qcluster also failed. journalctl -u clinic-qcluster (last 150 lines): ---"
+        journalctl -u clinic-qcluster -n 150 --no-pager 2>/dev/null || true
+    fi
     if nginx -t 2>/dev/null; then
         systemctl reload nginx 2>/dev/null || true
     fi
@@ -102,8 +149,9 @@ cp "$APP_DIR/deploy/nginx.conf" /etc/nginx/sites-available/clinic_app
 nginx -t || rollback
 
 systemctl daemon-reload
-systemctl restart clinic-daphne || rollback
-systemctl restart clinic-qcluster || rollback
+restart_and_verify clinic-daphne || rollback
+verify_daphne_http || rollback
+restart_and_verify clinic-qcluster || rollback
 systemctl reload nginx || rollback
 
 echo "=== Deploy finished successfully: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
