@@ -1,0 +1,16 @@
+[Unit]
+Description=Django-Q2 worker (Clinic Project)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=www-data
+WorkingDirectory=/var/www/clinic_app/Backend
+Environment=DJANGO_SETTINGS_MODULE=clinic_project.settings.prod
+ExecStart=/var/www/clinic_app/Backend/venv/bin/python manage.py qcluster
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
