@@ -1,6 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
+# Full run (stdout+stderr) is saved here, overwritten each deploy — lets the
+# CI notify job fetch "what happened in the last deploy" and also gives a
+# persistent log directly on the box for manual debugging.
+LOG_FILE=/var/log/clinic-deploy.log
+exec > "$LOG_FILE" 2>&1
+
+echo "=== Deploy started: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
+
 APP_DIR=/var/www/clinic_app
 cd "$APP_DIR"
 git pull origin main
@@ -28,3 +36,5 @@ systemctl daemon-reload
 systemctl restart clinic-daphne
 systemctl restart clinic-qcluster
 systemctl reload nginx
+
+echo "=== Deploy finished successfully: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
