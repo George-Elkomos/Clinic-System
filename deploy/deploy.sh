@@ -1,5 +1,8 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
+# Note: no `set -e` — failures are handled explicitly via `|| rollback` below
+# so a bad deploy can restore the previous working state instead of just
+# stopping halfway.
 
 # Full run (stdout+stderr) is saved here, overwritten each deploy, AND still
 # streamed back over the SSH session that invoked this script — the log is
@@ -12,30 +15,95 @@ echo "=== Deploy started: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
 
 APP_DIR=/var/www/clinic_app
 cd "$APP_DIR"
-git pull origin main
+PREV_COMMIT=$(git rev-parse HEAD)
+echo "Previous commit (rollback target if anything below fails): $PREV_COMMIT"
+
+rollback() {
+    echo "!!! A deploy step failed — rolling back to $PREV_COMMIT !!!"
+    cd "$APP_DIR"
+    git reset --hard "$PREV_COMMIT"
+
+    # Restore live config files to match the reverted commit, in case they
+    # were already copied over before the failure was detected.
+    cp "$APP_DIR/deploy/clinic-daphne.service" /etc/systemd/system/clinic-daphne.service 2>/dev/null || true
+    cp "$APP_DIR/deploy/clinic-qcluster.service" /etc/systemd/system/clinic-qcluster.service 2>/dev/null || true
+    cp "$APP_DIR/deploy/nginx.conf" /etc/nginx/sites-available/clinic_app 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
+
+    # Reinstall against the reverted code in case the failure happened
+    # mid pip-install and left a mismatched venv.
+    cd "$APP_DIR/Backend"
+    source venv/bin/activate
+    pip install -r requirements.txt 2>/dev/null || true
+
+    # Restore Frontend/dist if a botched build left it partially written.
+    if [ -d "$APP_DIR/Frontend/dist.bak" ]; then
+        rm -rf "$APP_DIR/Frontend/dist"
+        mv "$APP_DIR/Frontend/dist.bak" "$APP_DIR/Frontend/dist"
+    fi
+
+    # Restart services on the now-reverted code — needed even if the failed
+    # step wasn't a restart itself: if `systemctl restart` was the failure
+    # (new code crashed on startup), the old process was already killed by
+    # that attempt, so it must be explicitly relaunched here.
+    systemctl restart clinic-daphne 2>/dev/null || true
+    systemctl restart clinic-qcluster 2>/dev/null || true
+    if nginx -t 2>/dev/null; then
+        systemctl reload nginx 2>/dev/null || true
+    fi
+
+    echo "=== Rolled back to $PREV_COMMIT and restarted services on the previous working version. ==="
+    echo "=== Deploy FAILED and was rolled back: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
+    exit 1
+}
+
+git pull origin main || rollback
 
 # --- Backend ---
 cd "$APP_DIR/Backend"
-source venv/bin/activate
-pip install -r requirements.txt
+source venv/bin/activate || rollback
+pip install -r requirements.txt || rollback
 export DJANGO_SETTINGS_MODULE=clinic_project.settings.prod
-python manage.py migrate
-python manage.py collectstatic --noinput
+
+# Back up the SQLite files (including WAL/SHM, since WAL mode is in use) so
+# a failed/partial migration can be undone by restoring them wholesale,
+# rather than leaving the schema half-migrated.
+for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
+    [ -f "$f" ] && cp "$f" "$f.pre-migrate-bak"
+done
+
+if ! python manage.py migrate; then
+    for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
+        [ -f "$f.pre-migrate-bak" ] && mv "$f.pre-migrate-bak" "$f"
+    done
+    rollback
+fi
+for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
+    rm -f "$f.pre-migrate-bak"
+done
+
+python manage.py collectstatic --noinput || rollback
 
 # --- Frontend ---
 cd "$APP_DIR/Frontend"
-npm ci
-npm run build
+npm ci || rollback
 
-# --- Sync service/nginx config from repo (in case they changed) ---
+rm -rf dist.bak
+[ -d dist ] && cp -r dist dist.bak
+npm run build || rollback
+rm -rf dist.bak
+
+# --- Only reached once install/migrate/build all succeeded: sync config
+#     and restart the live services onto the new code. ---
 cp "$APP_DIR/deploy/clinic-daphne.service" /etc/systemd/system/clinic-daphne.service
 cp "$APP_DIR/deploy/clinic-qcluster.service" /etc/systemd/system/clinic-qcluster.service
 cp "$APP_DIR/deploy/nginx.conf" /etc/nginx/sites-available/clinic_app
-nginx -t
+
+nginx -t || rollback
 
 systemctl daemon-reload
-systemctl restart clinic-daphne
-systemctl restart clinic-qcluster
-systemctl reload nginx
+systemctl restart clinic-daphne || rollback
+systemctl restart clinic-qcluster || rollback
+systemctl reload nginx || rollback
 
 echo "=== Deploy finished successfully: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
