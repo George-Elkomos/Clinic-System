@@ -11,6 +11,11 @@ jobs:
     defaults:
       run:
         working-directory: Backend
+    env:
+      # Test-only value — settings/base.py requires SECRET_KEY with no
+      # default; CI has no .env file (it's gitignored). Never used in
+      # production, so it's fine to keep in plain text here.
+      SECRET_KEY: ci-test-secret-key-not-for-production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
