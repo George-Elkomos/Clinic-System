@@ -19,6 +19,9 @@ Frontend/.vite/
 # --- Dev runner ---
 .run/
 
+# --- Personal server-ops archive (not part of this project's codebase) ---
+Server-Documentation/
+
 # --- Editor / OS ---
 .vscode/
 .idea/
