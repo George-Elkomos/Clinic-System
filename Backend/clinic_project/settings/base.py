@@ -184,6 +184,12 @@ JWT_COOKIE_PATH = "/api/auth/"
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
 
+# --- CSRF -------------------------------------------------------------------
+# Needed once served over HTTPS behind a reverse proxy (Django checks the
+# Referer header's origin against this list for unsafe requests). Empty by
+# default — matches Django's own default, harmless for plain-HTTP dev/IP use.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
 # --- I18N -------------------------------------------------------------------
 LANGUAGE_CODE = "en"
 LANGUAGES = [("en", "English"), ("ar", "Arabic")]

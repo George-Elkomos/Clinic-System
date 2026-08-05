@@ -1,0 +1,126 @@
+name: CI/CD Pipeline to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    env:
+      # Test-only value — settings/base.py requires SECRET_KEY with no
+      # default; CI has no .env file (it's gitignored). Never used in
+      # production, so it's fine to keep in plain text here.
+      SECRET_KEY: ci-test-secret-key-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: Backend/requirements.txt
+      - name: Install dependencies and run tests
+        run: |
+          set -o pipefail
+          {
+            echo "--- pip install -r requirements.txt ---"
+            pip install -r requirements.txt
+            echo "--- python -m pytest ---"
+            python -m pytest
+          } 2>&1 | tee pytest.log
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-log
+          path: Backend/pytest.log
+          retention-days: 14
+
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH (output captured live, no separate fetch needed)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -o pipefail
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "bash /var/www/clinic_app/deploy/deploy.sh" 2>&1 | tee deploy.log
+
+      - name: Upload deploy log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-log
+          path: deploy.log
+          retention-days: 14
+
+  notify:
+    needs: [test, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare log placeholders
+        run: mkdir -p logs && touch logs/pytest.log logs/deploy.log
+
+      - name: Download test log
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: pytest-log
+          path: logs
+
+      - name: Download deploy log
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: deploy-log
+          path: logs
+
+      - name: Combine logs
+        run: |
+          {
+            echo "===== PYTEST LOG ====="
+            cat logs/pytest.log
+            echo
+            echo "===== DEPLOY LOG (server: /var/log/clinic-deploy.log) ====="
+            cat logs/deploy.log
+          } > logs/pipeline.log
+
+      - name: Determine status
+        id: status
+        run: |
+          if [ "${{ needs.test.result }}" = "success" ] && [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "label=SUCCEEDED" >> "$GITHUB_OUTPUT"
+          else
+            echo "label=FAILED" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Send status email with logs
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Clinic deploy ${{ steps.status.outputs.label }} — ${{ github.sha }}"
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: GitHub Actions
+          body: |
+            Test job: ${{ needs.test.result }}
+            Deploy job: ${{ needs.deploy.result }}
+            Commit: ${{ github.sha }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Full logs are attached (pipeline.log — pytest output + the server's deploy.sh output).
+          attachments: logs/pipeline.log

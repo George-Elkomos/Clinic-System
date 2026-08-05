@@ -2,9 +2,9 @@
 Backend/.venv/
 __pycache__/
 *.py[cod]
-# Backend/db.sqlite3
-# Backend/db.sqlite3-wal
-# Backend/db.sqlite3-shm
+Backend/db.sqlite3
+Backend/db.sqlite3-wal
+Backend/db.sqlite3-shm
 Backend/.env
 Backend/media/
 Backend/staticfiles/
@@ -18,6 +18,9 @@ Frontend/.vite/
 
 # --- Dev runner ---
 .run/
+
+# --- Personal server-ops archive (not part of this project's codebase) ---
+Server-Documentation/
 
 # --- Editor / OS ---
 .vscode/
