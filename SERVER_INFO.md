@@ -106,12 +106,26 @@ to `main`:
   `MAIL_USERNAME`, `MAIL_PASSWORD`, `NOTIFY_EMAIL`.
 
 ### Automatic rollback
-`deploy.sh` records the commit before pulling. If **any** step fails
-(`git pull`, `pip install`, `migrate`, `collectstatic`, `npm ci`/`build`,
-`nginx -t`, a service restart, or the post-restart health check below), it:
+`deploy.sh` records the commit before pulling. Step order is deliberate:
+`git pull` → `pip install` → `collectstatic` → **`npm ci`/`npm run build`**
+→ **`migrate`** → sync config → restart + health-check. Frontend build runs
+*before* the database migration on purpose — it's the step most likely to
+fail (e.g. a `package-lock.json` drift), and it doesn't touch the database,
+so a frontend failure rolls back with zero database risk. `migrate` is the
+last thing that can still fail before the schema actually changes.
+
+If **any** step fails, `rollback()`:
 1. `git reset --hard` back to the previous commit.
-2. Restores `db.sqlite3` (+ `-wal`/`-shm`) from a pre-migration backup if the
-   failure was in `migrate` — prevents a half-applied migration.
+2. Restores `db.sqlite3` (+ `-wal`/`-shm`) from a pre-migrate backup —
+   **whenever that backup is present**, not only when `migrate` itself was
+   the failing step. The backup is deliberately kept on disk through the
+   restart + health-check that follows `migrate`, so "migration succeeded
+   but the new code then crashed on restart" *also* correctly reverts the
+   schema, not just the code. (This exact gap caused a real incident once —
+   a later, unrelated `npm ci` failure rolled the code back while the
+   database stayed on the new schema, because the backup used to be deleted
+   immediately after `migrate` succeeded. Reordering + delaying the backup
+   cleanup fixed it.)
 3. Restores `Frontend/dist` from a pre-build backup if `npm run build` failed
    partway.
 4. Re-syncs the systemd/Nginx config files to the reverted commit's versions.
@@ -120,9 +134,9 @@ to `main`:
    `systemctl restart` already killed the old process, so it must be
    explicitly relaunched).
 
-Live services are never touched until `pip install`/`migrate`/
-`collectstatic`/frontend build have all already succeeded — most failure
-modes never reach the running app at all.
+Live services are never touched until `pip install`/frontend build/`migrate`
+have all already succeeded — most failure modes never reach the running app
+at all.
 
 **A failed `systemctl restart` isn't the only failure mode checked** —
 restart "succeeding" doesn't guarantee the process stayed up (systemd only
@@ -130,6 +144,14 @@ confirms it launched). After restarting, the script also checks
 `systemctl is-active` and makes a real local HTTP request to Daphne; either
 failing triggers the same rollback, with `journalctl -u clinic-daphne`
 dumped into the log so the actual crash traceback is visible.
+
+**Residual, much narrower risk**: if `migrate` succeeds and the restart/
+health-check *also* succeeds (so the deploy is reported successful), but the
+new code has some other startup-order-independent bug, that's just a normal
+bug in the new code — not a rollback gap. The rollback only needs to (and
+now does) protect against the schema and the running code ever being out of
+sync with each other; it was never meant to catch every possible application
+bug.
 
 **Gotcha**: `deploy.sh` reads itself from disk at the start of its own
 execution — so an edit to `deploy.sh` itself only takes effect starting the
