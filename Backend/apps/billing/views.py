@@ -3,7 +3,8 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.core.enums import RoleChoices
+from apps.audit.services import record_event
+from apps.core.enums import AuditAction, RoleChoices
 from apps.users.permissions import IsManager, IsSecretaryOrManager
 
 from . import services
@@ -121,3 +122,15 @@ class BillingReportView(APIView):
         if period not in VALID_PERIODS:
             period = "month"
         return Response(services.billing_report(period))
+
+
+class BillingSummaryView(BillingReportView):
+    """GET /api/reports/billing-summary/?period=day|month|year — Phase 16
+    alias of BillingReportView under the new analytics naming. Identical
+    aggregation (services.billing_report); the only difference is the
+    Phase 16 manager-view audit trail, added only here so the pre-existing
+    /reports/billing/ endpoint (BillingReportsPage.tsx) stays unchanged."""
+
+    def get(self, request):
+        record_event(actor=request.user, action=AuditAction.ACCESS, request=request)
+        return super().get(request)

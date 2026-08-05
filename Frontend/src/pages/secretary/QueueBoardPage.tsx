@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
@@ -9,6 +10,7 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { StatusBadge } from '../../components/primitives/StatusBadge'
+import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { useToast } from '../../components/primitives/Toast'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatTime } from '../../lib/format'
@@ -27,6 +29,7 @@ export function QueueBoardPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [doctorId, setDoctorId] = useState<number | ''>('')
   const [patientSearch, setPatientSearch] = useState('')
@@ -71,9 +74,27 @@ export function QueueBoardPage() {
     return null
   }
 
+  const handleTransition = async (a: Appointment, action: 'checkIn' | 'start' | 'complete' | 'markEmergency') => {
+    if (action === 'complete' && a.encounter_id == null) {
+      const ok = await confirm({
+        title: t('queue.completeNoEncounterTitle'),
+        message: t('queue.completeNoEncounterMessage'),
+        confirmLabel: t('appointments.complete'),
+      })
+      if (!ok) return
+    }
+    transition.mutate({ id: a.id, action })
+  }
+
   const rows = (queue?.results ?? [])
     .filter((a) => ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'].includes(a.status))
     .sort((a, b) => b.priority - a.priority || a.scheduled_start.localeCompare(b.scheduled_start))
+
+  // Pending bookings never show in the queue below (there's nothing to check
+  // in yet) -- surface a hint so the desk doesn't quietly disappear from view
+  // and get mistaken for "not booked", which used to push people toward
+  // "Add walk-in" as a workaround instead of confirming the real booking.
+  const pendingCount = (queue?.results ?? []).filter((a) => a.status === 'PENDING').length
 
   return (
     <div>
@@ -125,6 +146,19 @@ export function QueueBoardPage() {
             </div>
           </Card>
 
+          {pendingCount > 0 && (
+            <div className="callout callout--info" style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              flexWrap: 'wrap', gap: 'var(--space-3)',
+              background: 'var(--accent-soft, #eef4ff)', border: '1px solid var(--primary)',
+              borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)',
+              marginBottom: 'var(--space-4)',
+            }}>
+              <span>{t('queue.pendingHint', { count: pendingCount })}</span>
+              <Link to="/secretary/desk"><Button variant="secondary">{t('nav.appointmentDesk')}</Button></Link>
+            </div>
+          )}
+
           <Card title={t('queue.title')}>
             {isLoading ? <CenteredSpinner /> : rows.length === 0 ? <p>{t('queue.noQueue')}</p> : (
               rows.map((a) => {
@@ -142,7 +176,7 @@ export function QueueBoardPage() {
                       {a.appointment_type !== 'EMERGENCY' && (
                         <Button variant="secondary" onClick={() => transition.mutate({ id: a.id, action: 'markEmergency' })}>{t('queue.markEmergency')}</Button>
                       )}
-                      {action && <Button onClick={() => transition.mutate({ id: a.id, action: action.action })}>{action.label}</Button>}
+                      {action && <Button onClick={() => handleTransition(a, action.action)}>{action.label}</Button>}
                     </div>
                   </div>
                 )

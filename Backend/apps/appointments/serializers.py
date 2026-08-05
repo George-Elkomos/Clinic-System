@@ -10,6 +10,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     type_display = serializers.CharField(source="get_appointment_type_display", read_only=True)
+    # Lets the frontend link back to a DRAFT or already-SUBMITTED encounter
+    # (view-only + Amend once submitted) without the doctor needing to know
+    # the appointment id -- null when no encounter was ever opened for this
+    # visit (e.g. completed straight from the queue with no clinical note).
+    encounter_id = serializers.SerializerMethodField()
+
+    def get_encounter_id(self, obj):
+        return obj.encounter.id if hasattr(obj, "encounter") else None
 
     class Meta:
         model = Appointment
@@ -18,7 +26,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "scheduled_start", "scheduled_end", "status", "status_display",
             "appointment_type", "type_display", "priority", "reason",
             "cancellation_reason", "checked_in_at", "started_at", "completed_at",
-            "created_at",
+            "created_at", "encounter_id",
         ]
         read_only_fields = fields
 
@@ -34,12 +42,27 @@ class AppointmentQueueSerializer(AppointmentSerializer):
     patient_allergies = serializers.CharField(source="patient.allergies_summary", read_only=True)
     patient_chronic_conditions = serializers.CharField(source="patient.chronic_conditions", read_only=True)
     patient_current_medications = serializers.CharField(source="patient.current_medications", read_only=True)
+    # Lets the "previous patient" card offer a "View Invoice" link (Phase 12)
+    # without depending on the one-shot post-completion pop-up.
+    invoice_id = serializers.SerializerMethodField()
+
+    def get_invoice_id(self, obj):
+        from apps.billing.models import InvoiceItem
+        from apps.core.enums import BillingSourceType
+
+        return (
+            InvoiceItem.objects.filter(
+                source_type=BillingSourceType.APPOINTMENT, source_id=obj.id
+            )
+            .values_list("invoice_id", flat=True)
+            .first()
+        )
 
     class Meta(AppointmentSerializer.Meta):
         fields = AppointmentSerializer.Meta.fields + [
             "patient_profile_id", "patient_phone", "patient_dob", "patient_gender",
             "patient_blood_type", "patient_allergies", "patient_chronic_conditions",
-            "patient_current_medications",
+            "patient_current_medications", "invoice_id",
         ]
         read_only_fields = fields
 

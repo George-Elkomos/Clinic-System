@@ -25,7 +25,9 @@ import { complaintsApi, diagnosesApi, encountersApi } from '../../services/encou
 import { labOrdersApi } from '../../services/labOrders.api'
 import { medicalApi } from '../../services/medical.api'
 import { proceduresApi } from '../../services/procedures.api'
+import { radiologyApi } from '../../services/radiology.api'
 import { ProcedureDetailModal } from '../../components/medical/ProcedureDetailModal'
+import { RadiologyOrderDetailModal } from '../../components/medical/RadiologyOrderDetailModal'
 import { localizedName } from '../../lib/format'
 import type { Complaint, Encounter, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
 
@@ -243,6 +245,93 @@ function ProcedureModal({ encounter, onClose, onSaved }: { encounter: Encounter;
   )
 }
 
+// ---- Inline "order radiology study" modal ----------------------------------
+function RadiologyOrderModal({ encounter, onClose, onSaved }: { encounter: Encounter; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const { showToast } = useToast()
+  const [choice, setChoice] = useState<string | number>('')
+  const [customName, setCustomName] = useState('')
+  const [customNameAr, setCustomNameAr] = useState('')
+  const [clinicalReason, setClinicalReason] = useState('')
+  const [priority, setPriority] = useState<'ROUTINE' | 'URGENT'>('ROUTINE')
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['radiology-templates', 'active'],
+    queryFn: () => radiologyApi.listTemplates({ is_active: true }).then((r) => r.results),
+    staleTime: 300_000,
+  })
+
+  const templateOptions = [
+    ...templates.map((tpl) => ({ value: tpl.id, label: localizedName(tpl, language) })),
+    { value: CUSTOM_TEMPLATE_CHOICE, label: t('radiology.customOption') },
+  ]
+
+  const isCustom = choice === CUSTOM_TEMPLATE_CHOICE
+  const canSave = isCustom ? customName.trim().length > 0 : typeof choice === 'number'
+
+  const save = useMutation({
+    mutationFn: () =>
+      radiologyApi.create({
+        patient: encounter.patient,
+        encounter: encounter.id,
+        template: typeof choice === 'number' ? choice : null,
+        study_name: isCustom ? customName : undefined,
+        study_name_ar: isCustom ? customNameAr : undefined,
+        clinical_reason: clinicalReason || undefined,
+        priority,
+      }),
+    onSuccess: () => { showToast(t('radiology.saved'), 'success'); onSaved(); onClose() },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  return (
+    <Modal title={t('radiology.modalTitle')} onClose={onClose} wide>
+      <FormField label={t('radiology.template')}>
+        {(p) => (
+          <Select
+            id={p.id}
+            options={templateOptions}
+            value={choice}
+            onChange={(v) => setChoice(Array.isArray(v) ? '' : v)}
+          />
+        )}
+      </FormField>
+
+      {isCustom && (
+        <>
+          <FormField label={t('radiology.customName')}>
+            {(p) => <input {...p} value={customName} onChange={(e) => setCustomName(e.target.value)} />}
+          </FormField>
+          <FormField label={t('radiology.customNameAr')}>
+            {(p) => <input {...p} dir="rtl" value={customNameAr} onChange={(e) => setCustomNameAr(e.target.value)} />}
+          </FormField>
+        </>
+      )}
+
+      <FormField label={t('radiology.priority')}>
+        {(p) => (
+          <Select
+            id={p.id}
+            options={['ROUTINE', 'URGENT'].map((v) => ({ value: v, label: t(`status.${v}`) }))}
+            value={priority}
+            onChange={(v) => setPriority(Array.isArray(v) ? 'ROUTINE' : (String(v) as 'ROUTINE' | 'URGENT'))}
+          />
+        )}
+      </FormField>
+
+      <FormField label={t('radiology.clinicalReason')} hint={t('radiology.clinicalReasonHint')}>
+        {(p) => <textarea {...p} rows={2} value={clinicalReason} onChange={(e) => setClinicalReason(e.target.value)} />}
+      </FormField>
+
+      <div className="modal__actions">
+        <Button variant="secondary" onClick={onClose}>{t('encounters.cancel')}</Button>
+        <Button loading={save.isPending} disabled={!canSave} onClick={() => save.mutate()}>{t('encounters.save')}</Button>
+      </div>
+    </Modal>
+  )
+}
+
 // ---- Prescription sidebar item with inline void form ---------------------
 function PrescriptionSidebarItem({
   prescription: p,
@@ -341,7 +430,11 @@ export function EncounterPage() {
   const [showLab, setShowLab] = useState(false)
   const [showProcedure, setShowProcedure] = useState(false)
   const [showReferral, setShowReferral] = useState(false)
+  const [showRadiologyOrder, setShowRadiologyOrder] = useState(false)
   const [openProcedureId, setOpenProcedureId] = useState<number | null>(null)
+  const [openRadiologyOrderId, setOpenRadiologyOrderId] = useState<number | null>(null)
+  const [replacingVitals, setReplacingVitals] = useState(false)
+  const [editingVitals, setEditingVitals] = useState(false)
   const hydrated = useRef(false)
   const hasEdited = useRef(false)
 
@@ -453,6 +546,8 @@ export function EncounterPage() {
     onSuccess: (twin) => {
       showToast(t('encounters.amended'), 'success')
       hydrated.current = false
+      setReplacingVitals(false)
+      setEditingVitals(false)
       setEncounterId(twin.id)
       qc.setQueryData(['encounter', twin.id], twin)
     },
@@ -495,6 +590,15 @@ export function EncounterPage() {
 
   const readOnly = !isDraft || !isOwner
 
+  // Doctors/secretaries can only edit a vitals reading within 24h of when it
+  // was recorded (managers: no limit) -- mirrors VitalSignsHistory's rule so
+  // the "Edit" affordance here and on /doctor/patients stay consistent.
+  const VITALS_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000
+  const canEditVitals =
+    !!encounter.vitals_detail &&
+    (user?.role === 'MANAGER' ||
+      Date.now() - new Date(encounter.vitals_detail.created_at).getTime() <= VITALS_EDIT_WINDOW_MS)
+
   return (
     <div>
       <Breadcrumbs trail={[{ label: t('encounters.title') }]} />
@@ -513,23 +617,26 @@ export function EncounterPage() {
       )}
 
       <div className="encounter-layout">
+        <div className="encounter-main-col">
         <div className="encounter-main">
           <Card title={t('encounters.blockComplaint')}>
-            <FormField label={t('encounters.chiefComplaint')}>
-              {(p) => (
-                <AsyncCombobox
-                  id={p.id}
-                  value={complaint}
-                  onChange={setComplaintAndMark}
-                  fetcher={complaintFetcher}
-                  placeholder={t('encounters.complaintPlaceholder')}
-                  disabled={readOnly}
-                />
-              )}
-            </FormField>
-            <FormField label={t('encounters.chiefComplaintAr')} hint={t('encounters.complaintArHint')}>
-              {(p) => <input {...p} dir="rtl" readOnly value={form.chief_complaint_ar} disabled={readOnly} />}
-            </FormField>
+            <div className="form-grid">
+              <FormField label={t('encounters.chiefComplaint')}>
+                {(p) => (
+                  <AsyncCombobox
+                    id={p.id}
+                    value={complaint}
+                    onChange={setComplaintAndMark}
+                    fetcher={complaintFetcher}
+                    placeholder={t('encounters.complaintPlaceholder')}
+                    disabled={readOnly}
+                  />
+                )}
+              </FormField>
+              <FormField label={t('encounters.chiefComplaintAr')} hint={t('encounters.complaintArHint')}>
+                {(p) => <input {...p} dir="rtl" readOnly value={form.chief_complaint_ar} disabled={readOnly} />}
+              </FormField>
+            </div>
           </Card>
 
           <Card title={t('encounters.blockSymptomsVitals')}>
@@ -548,16 +655,38 @@ export function EncounterPage() {
             </FormField>
 
             <h3 className="medical-section-divider">{t('encounters.captureVitals')}</h3>
-            {encounter.vitals_detail ? (
-              <p className="encounter-vitals-linked">
-                ✓ {t('encounters.vitalsLinked')} — BP {encounter.vitals_detail.bp_systolic}/{encounter.vitals_detail.bp_diastolic}, HR {encounter.vitals_detail.heart_rate}
-              </p>
+            {encounter.vitals_detail && !replacingVitals && !editingVitals ? (
+              <>
+                <p className="encounter-vitals-linked">
+                  ✓ {t('encounters.vitalsLinked')} — BP {encounter.vitals_detail.bp_systolic}/{encounter.vitals_detail.bp_diastolic}, HR {encounter.vitals_detail.heart_rate}
+                </p>
+                {!readOnly && (
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    {canEditVitals && (
+                      <Button variant="secondary" onClick={() => setEditingVitals(true)}>
+                        {t('common.edit')}
+                      </Button>
+                    )}
+                    <Button variant="secondary" onClick={() => setReplacingVitals(true)}>
+                      {t('encounters.recordNewVitals')}
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : !readOnly ? (
               <VitalSignsForm
                 patientId={encounter.patient}
                 appointmentId={encounter.appointment}
+                initial={editingVitals ? (encounter.vitals_detail ?? undefined) : undefined}
+                onCancel={
+                  encounter.vitals_detail
+                    ? () => { setReplacingVitals(false); setEditingVitals(false) }
+                    : undefined
+                }
                 onSuccess={(created) => {
-                  if (created) save.mutate({ vitals: created.id })
+                  if (created && !editingVitals) save.mutate({ vitals: created.id })
+                  setReplacingVitals(false)
+                  setEditingVitals(false)
                   refreshEncounter()
                 }}
               />
@@ -567,12 +696,14 @@ export function EncounterPage() {
           </Card>
 
           <Card title={t('encounters.blockExamination')}>
-            <FormField label={t('encounters.examinationFindings')}>
-              {(p) => <textarea {...p} rows={3} value={form.examination_findings} onChange={(e) => set('examination_findings', e.target.value)} disabled={readOnly} />}
-            </FormField>
-            <FormField label={t('encounters.examinationFindingsAr')}>
-              {(p) => <textarea {...p} dir="rtl" rows={3} value={form.examination_findings_ar} onChange={(e) => set('examination_findings_ar', e.target.value)} disabled={readOnly} />}
-            </FormField>
+            <div className="form-grid">
+              <FormField label={t('encounters.examinationFindings')}>
+                {(p) => <textarea {...p} rows={3} value={form.examination_findings} onChange={(e) => set('examination_findings', e.target.value)} disabled={readOnly} />}
+              </FormField>
+              <FormField label={t('encounters.examinationFindingsAr')}>
+                {(p) => <textarea {...p} dir="rtl" rows={3} value={form.examination_findings_ar} onChange={(e) => set('examination_findings_ar', e.target.value)} disabled={readOnly} />}
+              </FormField>
+            </div>
           </Card>
 
           <Card title={t('encounters.blockDiagnosis')}>
@@ -591,20 +722,23 @@ export function EncounterPage() {
             <FormField label={t('encounters.diagnosisNotes')}>
               {(p) => <textarea {...p} rows={2} value={form.diagnosis_notes} onChange={(e) => set('diagnosis_notes', e.target.value)} disabled={readOnly} />}
             </FormField>
-            <FormField label={t('encounters.treatmentPlan')}>
-              {(p) => <textarea {...p} rows={3} value={form.treatment_plan} onChange={(e) => set('treatment_plan', e.target.value)} disabled={readOnly} />}
-            </FormField>
-            <FormField label={t('encounters.treatmentPlanAr')}>
-              {(p) => <textarea {...p} dir="rtl" rows={3} value={form.treatment_plan_ar} onChange={(e) => set('treatment_plan_ar', e.target.value)} disabled={readOnly} />}
-            </FormField>
-          </Card>
-
-          {!readOnly && (
-            <div className="encounter-submit-row">
-              <span className="encounter-autosave-hint">{t('encounters.savedDraftHint')}</span>
-              <Button loading={submit.isPending} onClick={handleSubmit}>{t('encounters.submit')}</Button>
+            <div className="form-grid">
+              <FormField label={t('encounters.treatmentPlan')}>
+                {(p) => <textarea {...p} rows={3} value={form.treatment_plan} onChange={(e) => set('treatment_plan', e.target.value)} disabled={readOnly} />}
+              </FormField>
+              <FormField label={t('encounters.treatmentPlanAr')}>
+                {(p) => <textarea {...p} dir="rtl" rows={3} value={form.treatment_plan_ar} onChange={(e) => set('treatment_plan_ar', e.target.value)} disabled={readOnly} />}
+              </FormField>
             </div>
-          )}
+          </Card>
+        </div>
+
+        {!readOnly && (
+          <div className="encounter-submit-row">
+            <span className="encounter-autosave-hint">{t('encounters.savedDraftHint')}</span>
+            <Button loading={submit.isPending} onClick={handleSubmit}>{t('encounters.submit')}</Button>
+          </div>
+        )}
         </div>
 
         <aside className="encounter-sidebar">
@@ -613,6 +747,7 @@ export function EncounterPage() {
               <Button variant="secondary" disabled={readOnly} onClick={() => setShowRx(true)}>{t('encounters.addPrescription')}</Button>
               <Button variant="secondary" disabled={readOnly} onClick={() => setShowLab(true)}>{t('encounters.orderLab')}</Button>
               <Button variant="secondary" disabled={readOnly} onClick={() => setShowProcedure(true)}>{t('encounters.addProcedure')}</Button>
+              <Button variant="secondary" disabled={readOnly} onClick={() => setShowRadiologyOrder(true)}>{t('encounters.addRadiologyOrder')}</Button>
               <Button variant="secondary" disabled={!isOwner} onClick={() => setShowReferral(true)}>{t('referrals.referPatient')}</Button>
             </div>
 
@@ -638,7 +773,10 @@ export function EncounterPage() {
             ) : (
               <ul className="encounter-linked-list">
                 {(encounter.lab_orders ?? []).map((o) => (
-                  <li key={o.id}>{o.order_number} · {t(`status.${o.status}`)}</li>
+                  <li key={o.id} className="encounter-linked-row encounter-linked-row--static">
+                    <span className="encounter-linked-row__name">{o.order_number}</span>
+                    <StatusBadge status={o.status} ns="status" />
+                  </li>
                 ))}
               </ul>
             )}
@@ -650,8 +788,25 @@ export function EncounterPage() {
               <ul className="encounter-linked-list">
                 {(encounter.procedures ?? []).map((proc) => (
                   <li key={proc.id}>
-                    <button type="button" className="encounter-linked-btn" onClick={() => setOpenProcedureId(proc.id)}>
-                      {proc.procedure_name} · {t(`procedures.status.${proc.status}`)}
+                    <button type="button" className="encounter-linked-row" onClick={() => setOpenProcedureId(proc.id)}>
+                      <span className="encounter-linked-row__name">{proc.procedure_name}</span>
+                      <StatusBadge status={proc.status} ns="procedures.status" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <h3 className="medical-section-divider">{t('encounters.linkedRadiologyOrders')}</h3>
+            {(encounter.radiology_orders ?? []).length === 0 ? (
+              <p className="encounter-none">{t('encounters.noneLinked')}</p>
+            ) : (
+              <ul className="encounter-linked-list">
+                {(encounter.radiology_orders ?? []).map((order) => (
+                  <li key={order.id}>
+                    <button type="button" className="encounter-linked-row" onClick={() => setOpenRadiologyOrderId(order.id)}>
+                      <span className="encounter-linked-row__name">{order.study_name}</span>
+                      <StatusBadge status={order.status} ns="radiology.status" />
                     </button>
                   </li>
                 ))}
@@ -664,11 +819,19 @@ export function EncounterPage() {
       {showRx && <PrescriptionModal encounter={encounter} onClose={() => setShowRx(false)} onSaved={refreshEncounter} />}
       {showLab && <LabOrderModal encounter={encounter} onClose={() => setShowLab(false)} onSaved={refreshEncounter} />}
       {showProcedure && <ProcedureModal encounter={encounter} onClose={() => setShowProcedure(false)} onSaved={refreshEncounter} />}
+      {showRadiologyOrder && <RadiologyOrderModal encounter={encounter} onClose={() => setShowRadiologyOrder(false)} onSaved={refreshEncounter} />}
       {showReferral && <CreateReferralModal encounterId={encounter.id} onClose={() => setShowReferral(false)} />}
       {openProcedureId != null && (
         <ProcedureDetailModal
           procedureId={openProcedureId}
           onClose={() => setOpenProcedureId(null)}
+          onChanged={refreshEncounter}
+        />
+      )}
+      {openRadiologyOrderId != null && (
+        <RadiologyOrderDetailModal
+          orderId={openRadiologyOrderId}
+          onClose={() => setOpenRadiologyOrderId(null)}
           onChanged={refreshEncounter}
         />
       )}

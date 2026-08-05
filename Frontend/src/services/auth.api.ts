@@ -39,4 +39,10 @@ export const authApi = {
 
   updateNotificationPreference: (data: Partial<NotificationPreference>) =>
     api.patch<NotificationPreference>('/auth/me/notification-preference/', data).then((r) => r.data),
+
+  requestPasswordReset: (email: string) =>
+    api.post<{ detail: string }>('/auth/password-reset/', { email }).then((r) => r.data),
+
+  confirmPasswordReset: (data: { uid: string; token: string; new_password: string }) =>
+    api.post<{ detail: string }>('/auth/password-reset/confirm/', data).then((r) => r.data),
 }

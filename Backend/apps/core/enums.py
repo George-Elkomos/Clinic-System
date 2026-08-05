@@ -155,6 +155,12 @@ class NotificationVerb(models.TextChoices):
     PROCEDURE_SCHEDULED = "PROCEDURE_SCHEDULED", _("Procedure scheduled")
     PROCEDURE_COMPLETED = "PROCEDURE_COMPLETED", _("Procedure completed")
     PROCEDURE_CANCELLED = "PROCEDURE_CANCELLED", _("Procedure cancelled")
+    # Phase 15 — Radiology Orders
+    RADIOLOGY_ORDER_CREATED = "RADIOLOGY_ORDER_CREATED", _("Radiology order created")
+    RADIOLOGY_ORDER_COMPLETED = "RADIOLOGY_ORDER_COMPLETED", _("Radiology scan completed")
+    RADIOLOGY_ORDER_REPORTED = "RADIOLOGY_ORDER_REPORTED", _("Radiology report available")
+    RADIOLOGY_ORDER_CANCELLED = "RADIOLOGY_ORDER_CANCELLED", _("Radiology order cancelled")
+    PATIENT_SCAN_UPLOADED = "PATIENT_SCAN_UPLOADED", _("Patient uploaded a scan")
 
 
 class LabOrderStatus(models.TextChoices):
@@ -241,6 +247,29 @@ class ProcedureStatus(models.TextChoices):
     CANCELLED = "CANCELLED", _("Cancelled")
 
 
+# --- Phase 15 — Radiology Orders ----------------------------------------------
+
+class RadiologyModality(models.TextChoices):
+    XRAY = "XRAY", _("X-Ray")
+    MRI = "MRI", _("MRI")
+    CT = "CT", _("CT Scan")
+    ULTRASOUND = "ULTRASOUND", _("Ultrasound")
+    PET = "PET", _("PET Scan")
+    OTHER = "OTHER", _("Other")
+
+
+class RadiologyOrderStatus(models.TextChoices):
+    ORDERED = "ORDERED", _("Ordered")
+    COMPLETED = "COMPLETED", _("Completed")
+    REPORTED = "REPORTED", _("Reported")
+    CANCELLED = "CANCELLED", _("Cancelled")
+
+
+class RadiologyOrderPriority(models.TextChoices):
+    ROUTINE = "ROUTINE", _("Routine")
+    URGENT = "URGENT", _("Urgent")
+
+
 class AuditAction(models.TextChoices):
     CREATE = "CREATE", _("Create")
     UPDATE = "UPDATE", _("Update")
@@ -248,3 +277,18 @@ class AuditAction(models.TextChoices):
     LOGIN = "LOGIN", _("Login")
     LOGOUT = "LOGOUT", _("Logout")
     ACCESS = "ACCESS", _("Access")
+
+
+# --- Phase 16 — Advanced Analytics ---------------------------------------------
+
+class PeriodChoices(models.TextChoices):
+    """Calendar-aligned period keys for Phase 16 analytics (apps.core.periods).
+
+    Not used by the older rolling week/month/all lookback in
+    apps.reports.services._period_start, nor by the day/month/year
+    calendar-aligned logic in apps.billing.services._period_start — both of
+    those pre-existing, independent implementations are left untouched.
+    """
+    WEEK = "week", _("Week")
+    MONTH = "month", _("Month")
+    YEAR = "year", _("Year")

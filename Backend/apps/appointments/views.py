@@ -123,6 +123,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     def check_in(self, request, pk=None):
         appointment = self.get_object()
         self._staff_or_owning_doctor(appointment)
+        if appointment.status != AppointmentStatus.CONFIRMED:
+            raise ValidationError({"detail": "Only a confirmed appointment can be checked in."})
         appointment.status = AppointmentStatus.CHECKED_IN
         appointment.checked_in_at = timezone.now()
         appointment.save(update_fields=["status", "checked_in_at", "updated_at"])
@@ -132,6 +134,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     def start(self, request, pk=None):
         appointment = self.get_object()
         self._staff_or_owning_doctor(appointment)
+        # The doctor's "Call Next Patient" can pull straight from CONFIRMED
+        # (front-desk check-in is informational, not a hard gate).
+        startable = (AppointmentStatus.CONFIRMED, AppointmentStatus.CHECKED_IN)
+        if appointment.status not in startable:
+            raise ValidationError({"detail": "Only a confirmed or checked-in appointment can be started."})
         appointment.status = AppointmentStatus.IN_PROGRESS
         appointment.started_at = timezone.now()
         appointment.save(update_fields=["status", "started_at", "updated_at"])
@@ -141,6 +148,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     def complete(self, request, pk=None):
         appointment = self.get_object()
         self._staff_or_owning_doctor(appointment)
+        if appointment.status != AppointmentStatus.IN_PROGRESS:
+            raise ValidationError({"detail": "Only an in-progress appointment can be completed."})
         services.complete_appointment(appointment)
         data = AppointmentSerializer(appointment).data
         # Billing outcome (Phase 12): lets the desk show "Invoice #INV-XXXX

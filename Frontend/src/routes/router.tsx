@@ -4,6 +4,8 @@ import { AppShell } from '../components/layout/AppShell'
 import { ForbiddenPage, NotFoundPage } from '../pages/public/ErrorPages'
 import { KioskQueuePage } from '../pages/public/KioskQueuePage'
 import { LoginPage } from '../pages/public/LoginPage'
+import { ForgotPasswordPage } from '../pages/public/ForgotPasswordPage'
+import { ResetPasswordPage } from '../pages/public/ResetPasswordPage'
 import { PublicDoctorsPage } from '../pages/public/PublicDoctorsPage'
 import { DoctorDetailPage } from '../pages/public/DoctorDetailPage'
 import { RegisterPage } from '../pages/public/RegisterPage'
@@ -46,6 +48,8 @@ import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
 import { MyReferralsPage } from '../pages/patient/MyReferralsPage'
 import { DoctorReferralsPage } from '../pages/doctor/DoctorReferralsPage'
 import { SecretaryReferralsPage } from '../pages/secretary/SecretaryReferralsPage'
+import { MyRadiologyPage } from '../pages/patient/MyRadiologyPage'
+import { RadiologyWorklistPage } from '../pages/secretary/RadiologyWorklistPage'
 import { RoleRoute } from './RoleRoute'
 import { RootRedirect } from './RootRedirect'
 
@@ -55,6 +59,8 @@ export const router = createBrowserRouter([
   // Public — no login required.
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/kiosk/:doctorId', element: <KioskQueuePage /> },
   { path: '/doctors', element: <PublicDoctorsPage /> },
   { path: '/doctors/:id', element: <DoctorDetailPage /> },
@@ -76,6 +82,7 @@ export const router = createBrowserRouter([
       { path: 'timeline', element: <PatientTimelinePage /> },
       { path: 'invoices', element: <MyInvoicesPage /> },
       { path: 'referrals', element: <MyReferralsPage /> },
+      { path: 'radiology', element: <MyRadiologyPage /> },
     ],
   },
 
@@ -113,6 +120,7 @@ export const router = createBrowserRouter([
       { path: 'lab/:id', element: <LabOrderDetailsPage /> },
       { path: 'billing', element: <BillingDeskPage /> },
       { path: 'referrals', element: <SecretaryReferralsPage /> },
+      { path: 'radiology', element: <RadiologyWorklistPage /> },
     ],
   },
 

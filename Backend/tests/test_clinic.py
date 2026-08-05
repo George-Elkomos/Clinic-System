@@ -148,3 +148,128 @@ def test_kiosk_is_public(api, patient, doctor_profile, future_slot):
     resp = api.get(reverse("kiosk-queue", args=[doctor_profile.id]))
     assert resp.status_code == 200
     assert resp.data["doctor"]["id"] == doctor_profile.id
+
+
+# --- Status-transition guards: check-in / start / complete -------------------
+# These three actions must reject out-of-order transitions via the API even
+# though the frontend's happy path never exposes the button in the wrong
+# state -- a stale tab, a replayed request, or a buggy client shouldn't be
+# able to force an appointment through the pipeline out of sequence.
+
+def test_check_in_rejected_from_pending(api, patient, doctor_profile, future_slot, secretary):
+    appt = _book(patient, future_slot)  # still PENDING, never confirmed
+    api.force_authenticate(secretary)
+    resp = api.post(reverse("appointment-check-in", args=[appt.id]))
+    assert resp.status_code == 400
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.PENDING
+
+
+def test_check_in_succeeds_from_confirmed(api, patient, doctor_profile, future_slot, secretary):
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(secretary)
+    resp = api.post(reverse("appointment-check-in", args=[appt.id]))
+    assert resp.status_code == 200
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.CHECKED_IN
+    assert appt.checked_in_at is not None
+
+
+def test_check_in_rejected_when_already_checked_in(api, patient, doctor_profile, future_slot, secretary):
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(secretary)
+    assert api.post(reverse("appointment-check-in", args=[appt.id])).status_code == 200
+    resp = api.post(reverse("appointment-check-in", args=[appt.id]))  # re-check-in
+    assert resp.status_code == 400
+
+
+def test_check_in_rejected_from_completed(api, patient, doctor_profile, future_slot, secretary):
+    appt = _book(patient, future_slot)
+    appt.status = AppointmentStatus.COMPLETED
+    appt.save(update_fields=["status"])
+    api.force_authenticate(secretary)
+    resp = api.post(reverse("appointment-check-in", args=[appt.id]))
+    assert resp.status_code == 400
+
+
+def test_start_succeeds_from_confirmed(api, patient, doctor_profile, future_slot):
+    # The doctor's "Call Next Patient" can pull straight from CONFIRMED,
+    # skipping a front-desk check-in.
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-start", args=[appt.id]))
+    assert resp.status_code == 200
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.IN_PROGRESS
+    assert appt.started_at is not None
+
+
+def test_start_succeeds_from_checked_in(api, patient, doctor_profile, future_slot, secretary):
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(secretary)
+    api.post(reverse("appointment-check-in", args=[appt.id]))
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-start", args=[appt.id]))
+    assert resp.status_code == 200
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.IN_PROGRESS
+
+
+def test_start_rejected_from_pending(api, patient, doctor_profile, future_slot):
+    appt = _book(patient, future_slot)  # never confirmed
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-start", args=[appt.id]))
+    assert resp.status_code == 400
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.PENDING
+
+
+def test_start_rejected_from_completed(api, patient, doctor_profile, future_slot):
+    appt = _book(patient, future_slot)
+    appt.status = AppointmentStatus.COMPLETED
+    appt.save(update_fields=["status"])
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-start", args=[appt.id]))
+    assert resp.status_code == 400
+
+
+def test_start_rejected_from_cancelled(api, patient, doctor_profile, future_slot):
+    appt = _book(patient, future_slot)
+    services.cancel_appointment(appt, cancelled_by=patient, reason="changed mind")
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-start", args=[appt.id]))
+    assert resp.status_code == 400
+
+
+def test_complete_succeeds_from_in_progress(api, patient, doctor_profile, future_slot):
+    appt = _book(patient, future_slot)
+    appt.status = AppointmentStatus.IN_PROGRESS
+    appt.save(update_fields=["status"])
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-complete", args=[appt.id]))
+    assert resp.status_code == 200
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.COMPLETED
+
+
+@pytest.mark.parametrize("bad_status", [
+    AppointmentStatus.PENDING,
+    AppointmentStatus.CONFIRMED,
+    AppointmentStatus.CHECKED_IN,
+    AppointmentStatus.COMPLETED,
+    AppointmentStatus.CANCELLED,
+    AppointmentStatus.NO_SHOW,
+])
+def test_complete_rejected_from_non_in_progress(api, patient, doctor_profile, future_slot, bad_status):
+    appt = _book(patient, future_slot)
+    appt.status = bad_status
+    appt.save(update_fields=["status"])
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-complete", args=[appt.id]))
+    assert resp.status_code == 400
+    appt.refresh_from_db()
+    assert appt.status == bad_status  # unchanged

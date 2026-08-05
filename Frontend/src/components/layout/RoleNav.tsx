@@ -18,6 +18,7 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { to: '/patient/timeline', key: 'nav.timeline' },
     { to: '/patient/invoices', key: 'nav.myInvoices' },
     { to: '/patient/referrals', key: 'nav.myReferrals' },
+    { to: '/patient/radiology', key: 'nav.radiology' },
   ],
   DOCTOR: [
     { to: '/doctor', key: 'nav.dashboard' },
@@ -39,6 +40,7 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { to: '/secretary/lab', key: 'nav.labOrders' },
     { to: '/secretary/billing', key: 'nav.billing' },
     { to: '/secretary/referrals', key: 'nav.referrals' },
+    { to: '/secretary/radiology', key: 'nav.radiologyWorklist' },
   ],
   MANAGER: [
     { to: '/manager', key: 'nav.dashboard' },
@@ -81,6 +83,8 @@ const NAV_ICONS: Record<string, string> = {
   'nav.billingReports':  '💰',
   'nav.myReferrals':     '↪️',
   'nav.referrals':       '↪️',
+  'nav.radiology':          '🩻',
+  'nav.radiologyWorklist':  '🩻',
 }
 
 export function RoleNav({ role }: { role: Role }) {

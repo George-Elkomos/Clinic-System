@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
@@ -48,7 +49,12 @@ function DoctorEditor({ doctor }: { doctor: Doctor }) {
         <input type="checkbox" style={{ width: 'auto', minHeight: 'auto' }} checked={accepting} onChange={(e) => setAccepting(e.target.checked)} />
         {t('doctors.acceptingPatients')}
       </label>
-      <Button loading={save.isPending} onClick={() => save.mutate()}>{t('common.save')}</Button>
+      <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
+        <Button loading={save.isPending} onClick={() => save.mutate()}>{t('common.save')}</Button>
+        <Link to={`/kiosk/${doctor.id}`} target="_blank" rel="noopener noreferrer">
+          <Button variant="secondary" type="button">📺 {t('doctors.openKiosk')}</Button>
+        </Link>
+      </div>
     </Card>
   )
 }

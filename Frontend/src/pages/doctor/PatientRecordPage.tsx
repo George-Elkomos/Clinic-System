@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { MedicationItemRow } from '../../components/medical/MedicationItemRow'
 import { ProcedureDetailModal } from '../../components/medical/ProcedureDetailModal'
+import { RadiologyOrderDetailModal } from '../../components/medical/RadiologyOrderDetailModal'
 import { useAuth } from '../../hooks/useAuth'
 import { useInteractionCheck } from '../../hooks/useInteractionCheck'
 
@@ -30,6 +31,7 @@ import { medicalApi } from '../../services/medical.api'
 import { vitalsApi } from '../../services/vitals.api'
 import { encountersApi } from '../../services/encounters.api'
 import { proceduresApi } from '../../services/procedures.api'
+import { radiologyApi } from '../../services/radiology.api'
 import type { Diagnosis, Prescription, PrescriptionItem } from '../../services/types'
 
 // ---- Vital Signs -----------------------------------------------------------
@@ -413,6 +415,55 @@ function ProceduresSection({ patientId }: { patientId: number }) {
   )
 }
 
+// ---- Radiology Orders -------------------------------------------------------
+function RadiologySection({ patientId }: { patientId: number }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const qc = useQueryClient()
+  const [openOrderId, setOpenOrderId] = useState<number | null>(null)
+
+  const { data: orders = [] } = useQuery({
+    queryKey: ['radiology-orders', patientId],
+    queryFn: () => radiologyApi.list({ patient: patientId }).then((r) => r.results),
+  })
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ['radiology-orders', patientId] })
+
+  return (
+    <Card title={t('radiology.title')}>
+      {orders.length === 0 ? (
+        <p>{t('radiology.none')}</p>
+      ) : (
+        <ul className="procedure-list">
+          {orders.map((order) => (
+            <li key={order.id}>
+              <button type="button" className="procedure-row" onClick={() => setOpenOrderId(order.id)}>
+                <div className="procedure-row__main">
+                  <span className="procedure-row__name">
+                    {language === 'ar' && order.study_name_ar ? order.study_name_ar : order.study_name}
+                  </span>
+                  <span className="procedure-row__meta">
+                    {order.doctor_name} · {formatDate(order.created_at, language)}
+                  </span>
+                </div>
+                <StatusBadge status={order.status} ns="radiology.status" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {openOrderId != null && (
+        <RadiologyOrderDetailModal
+          orderId={openOrderId}
+          onClose={() => setOpenOrderId(null)}
+          onChanged={refresh}
+        />
+      )}
+    </Card>
+  )
+}
+
 // ---- Scans / Labs ----------------------------------------------------------
 function ScansLabsSection({ patientId }: { patientId: number }) {
   const { t } = useTranslation()
@@ -468,7 +519,10 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
     <Card title={`${t('medical.scans')} / ${t('medical.labs')}`}>
       {scans.map((s) => (
         <div key={s.id} className="medical-scan-row">
-          <span><strong>{s.category}</strong> · {s.original_filename} · {formatDate(s.created_at, language)}</span>
+          <div>
+            <span><strong>{s.category}</strong> · {s.original_filename} · {formatDate(s.created_at, language)}</span>
+            {s.description && <div className="medical-list-meta">{s.description}</div>}
+          </div>
           <div className="medical-scan-actions">
             <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
             <Button variant="danger" onClick={() => handleDelete(s.id, s.original_filename)}>🗑 {t('medical.delete')}</Button>
@@ -544,10 +598,35 @@ function ChronicDiagnosesSection({ patientId }: { patientId: number }) {
   )
 }
 
+// ---- Record tabs ------------------------------------------------------------
+// Each patient's record is split into tabs (instead of one long stacked
+// column) so opening a patient doesn't dump 8+ full cards on the page at
+// once. Sections stay mounted and are only hidden via CSS, so in-progress
+// input (a draft note, an AI Scribe recording, unsaved rx items) survives
+// switching tabs.
+const RECORD_TABS = [
+  { key: 'scribe', labelKey: 'ai.tab' },
+  { key: 'vitals', labelKey: 'vitals.title' },
+  { key: 'records', labelKey: 'medical.records' },
+  { key: 'chronic', labelKey: 'medical.chronicDiagnoses' },
+  { key: 'notes', labelKey: 'medical.notes' },
+  { key: 'prescriptions', labelKey: 'medical.prescriptions' },
+  { key: 'procedures', labelKey: 'procedures.title' },
+  { key: 'radiology', labelKey: 'radiology.title' },
+  { key: 'scans', labelKey: 'medical.scans' },
+  { key: 'timeline', labelKey: 'timeline.title' },
+] as const
+type RecordTabKey = typeof RECORD_TABS[number]['key']
+
+function TabPanel({ active, children }: { active: boolean; children: ReactNode }) {
+  return <div style={{ display: active ? 'block' : 'none' }}>{children}</div>
+}
+
 // ---- Page ------------------------------------------------------------------
 export function PatientRecordPage() {
   const { t } = useTranslation()
   const [patientId, setPatientId] = useState<number | ''>('')
+  const [tab, setTab] = useState<RecordTabKey>('scribe')
 
   const { data: patients, isLoading } = useQuery({ queryKey: ['my-patients'], queryFn: medicalApi.myPatients })
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: authApi.me })
@@ -575,7 +654,10 @@ export function PatientRecordPage() {
                 id={p.id}
                 options={(patients ?? []).map((pt) => ({ value: pt.id, label: pt.full_name || pt.email || String(pt.id) }))}
                 value={patientId}
-                onChange={(v) => setPatientId(Array.isArray(v) || v === '' ? '' : Number(v))}
+                onChange={(v) => {
+                  setPatientId(Array.isArray(v) || v === '' ? '' : Number(v))
+                  setTab('scribe')
+                }}
                 placeholder="—"
                 searchable
               />
@@ -586,17 +668,35 @@ export function PatientRecordPage() {
 
       {patientId !== '' && (
         <>
-          <AIScribePanel patientId={patientId} />
-          <VitalsSection patientId={patientId} />
-          <RecordsSection patientId={patientId} />
-          <ChronicDiagnosesSection patientId={patientId} />
-          <NotesSection patientId={patientId} categories={categories} />
-          <PrescriptionsSection patientId={patientId} />
-          <ProceduresSection patientId={patientId} />
-          <ScansLabsSection patientId={patientId} />
-          <Card title={t('timeline.title')}>
-            <PatientTimeline patientId={patientId} />
-          </Card>
+          <div className="tabs" role="tablist" aria-label={t('nav.patients')}>
+            {RECORD_TABS.map((tb) => (
+              <button
+                key={tb.key}
+                type="button"
+                role="tab"
+                className={`tab${tab === tb.key ? ' tab--active' : ''}`}
+                aria-selected={tab === tb.key}
+                onClick={() => setTab(tb.key)}
+              >
+                {tb.key === 'scans' ? `${t('medical.scans')} / ${t('medical.labs')}` : t(tb.labelKey)}
+              </button>
+            ))}
+          </div>
+
+          <TabPanel active={tab === 'scribe'}><AIScribePanel patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'vitals'}><VitalsSection patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'records'}><RecordsSection patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'chronic'}><ChronicDiagnosesSection patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'notes'}><NotesSection patientId={patientId} categories={categories} /></TabPanel>
+          <TabPanel active={tab === 'prescriptions'}><PrescriptionsSection patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'procedures'}><ProceduresSection patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'radiology'}><RadiologySection patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'scans'}><ScansLabsSection patientId={patientId} /></TabPanel>
+          <TabPanel active={tab === 'timeline'}>
+            <Card title={t('timeline.title')}>
+              <PatientTimeline patientId={patientId} />
+            </Card>
+          </TabPanel>
         </>
       )}
     </div>

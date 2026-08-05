@@ -82,6 +82,12 @@ class Scan(SoftDeleteModel, TimeStampedModel):
     description = models.TextField(blank=True)
     appointment = models.ForeignKey("appointments.Appointment", on_delete=models.SET_NULL, null=True, blank=True, related_name="scans")
     taken_at = models.DateField(null=True, blank=True)
+    # Phase 15: links this uploaded file back to the structured order that
+    # requested it (set by RadiologyOrder completion); null for legacy/ad-hoc
+    # uploads not tied to an order.
+    radiology_order = models.ForeignKey(
+        "radiology.RadiologyOrder", on_delete=models.SET_NULL, null=True, blank=True, related_name="scans"
+    )
 
     def __str__(self):
         return f"{self.category} scan for {self.patient}"

@@ -153,9 +153,11 @@ export function DoctorAppointmentsPage() {
                 </div>
                 <div className="appt-card__actions">
                   <StatusBadge status={a.status} />
-                  {a.status === 'IN_PROGRESS' && (
+                  {a.encounter_id != null && (
                     <Link to={`/doctor/encounters/${a.id}`}>
-                      <Button>🩻 {t('encounters.open')}</Button>
+                      <Button variant={a.status === 'IN_PROGRESS' ? 'primary' : 'secondary'}>
+                        🩻 {t(a.status === 'IN_PROGRESS' ? 'encounters.open' : 'encounters.view')}
+                      </Button>
                     </Link>
                   )}
                   {action && (

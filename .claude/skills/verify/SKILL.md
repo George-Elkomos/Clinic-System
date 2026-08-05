@@ -16,15 +16,47 @@ Health check: `curl http://127.0.0.1:8000/api/auth/login/` → 405, `curl http:/
 
 ## Seed / reset test data
 
-Run Django scripts with the venv python and `PYTHONPATH=Backend`:
+Run Django management commands with the venv python and `PYTHONPATH=Backend`
+(idempotent — safe to re-run anytime, only tops up what a prior round consumed):
 
 ```bash
-cd Backend && PYTHONPATH="$PWD" ./.venv/Scripts/python.exe <script.py>
+cd Backend && PYTHONPATH="$PWD" ./.venv/Scripts/python.exe manage.py <command>
 ```
 
+Per-phase one-shot fixtures (each jumps straight to its feature's test point instead
+of walking registration → booking → check-in → queue every time):
+- `seed_billing_e2e` — Phase 12 billing: clean CHECKED_IN walk-in for e2e.patient
+  ready for "Call Next Patient" → "Complete Visit"; one invoice per status bucket
+  (ISSUED/PARTIALLY_PAID/PAID).
+- `seed_referrals_e2e` — Phase 13 referrals + complaints master: seeds the ~80-entry
+  complaint master list; a clean CHECKED_IN walk-in for **e2e.patient2** (deliberately
+  not e2e.patient, so it never collides with the billing fixture's walk-in) ready for
+  "Call Next Patient" → "Refer Patient"; and one referral per lifecycle bucket
+  (PENDING specialty-wide, ACCEPTED, COMPLETED, CANCELLED, PENDING EXTERNAL) between
+  e2e.doctor (referring) and e2e.doctor2 (Cardiology, the receiving side).
+- `seed_procedures_e2e` — Phase 14 clinical procedures: seeds the ProcedureTemplate
+  catalog (Wound Suturing, Minor Skin Biopsy, Injection, Dressing Change, General); a
+  clean CHECKED_IN walk-in for **e2e.patient3** (deliberately not e2e.patient/patient2,
+  so it never collides with the billing/referrals walk-ins) ready for "Call Next
+  Patient" → open encounter → "Add Procedure"; and one ClinicalProcedure per lifecycle
+  bucket (SCHEDULED, IN_PROGRESS with checklist half-done, COMPLETED, CANCELLED),
+  all performed by e2e.doctor.
+- `seed_radiology_e2e` — Phase 15 radiology order templates: seeds the
+  RadiologyTemplate catalog (Chest X-Ray, Abdominal Ultrasound, Head CT, Knee MRI,
+  PET-CT Whole Body, Other); a clean CHECKED_IN walk-in for **e2e.patient4**
+  (deliberately not e2e.patient/patient2/patient3, so it never collides with the
+  billing/referrals/procedures walk-ins); and one RadiologyOrder per lifecycle bucket
+  (ORDERED, COMPLETED with a real attached scan file, REPORTED with findings +
+  impression filled in, CANCELLED), all ordered by e2e.doctor. Backend-only pass —
+  no frontend page exists yet, so drive it via the API (see
+  `Backend/tests/test_radiology.py`), e.g. `POST /api/radiology-orders/{id}/complete/`
+  (multipart, `file` field) and `POST /api/radiology-orders/{id}/report/`.
+
 E2E accounts (password `E2eTest123!`, created by past verification runs, safe to reuse):
-`e2e.patient@test.dev`, `e2e.patient2@test.dev`, `e2e.doctor@test.dev` (DoctorProfile id 4),
-`e2e.secretary@test.dev`, `e2e.manager@test.dev`.
+`e2e.patient@test.dev`, `e2e.patient2@test.dev`, `e2e.patient3@test.dev`,
+`e2e.patient4@test.dev`, `e2e.doctor@test.dev` (DoctorProfile id 4),
+`e2e.doctor2@test.dev` (Cardiology — referral target), `e2e.secretary@test.dev`,
+`e2e.manager@test.dev`.
 
 ## Browser driving
 
@@ -48,6 +80,27 @@ Gotchas:
 - Secretary: `/secretary/billing` tabs + "Record Payment" modal (overpay → field-level error toast).
 - Patient: `/patient/invoices`; isolation: patient2 sees empty; `/secretary/billing` → /403.
 - Manager: `/manager/billing` KPIs + revenue table.
+- Referrals (after `seed_referrals_e2e`): e2e.doctor → `/doctor/queue` → "Call Next
+  Patient" (e2e.patient2) → open the encounter → "Refer Patient" (chief-complaint
+  autocomplete here also exercises the complaints master). `/doctor/referrals` Sent tab
+  shows all 5 seeded statuses. e2e.doctor2 → `/doctor/referrals` Received tab → Accept
+  the PENDING one, Complete the ACCEPTED one. e2e.patient2 → `/patient/referrals`.
+  e2e.secretary → `/secretary/referrals` (read-only, no reason/notes columns).
+- Procedures (after `seed_procedures_e2e`): e2e.doctor → `/doctor/queue` → "Call Next
+  Patient" (e2e.patient3) → open the encounter → "Add Procedure" (try both a template
+  and the "Custom / free-text procedure" option) → open the linked row → "Start
+  Procedure" → tick checklist → "Complete Procedure". Then `/doctor/patients` → select
+  "Yara Fathy" → Procedures section has the 4 pre-seeded buckets: SCHEDULED (test
+  Cancel), IN_PROGRESS (finish the checklist + required post-notes guard + Complete),
+  COMPLETED (confirm fully locked/read-only), CANCELLED (confirm reason shown, no
+  action buttons). No frontend page exists for PATIENT/MANAGER to browse procedures
+  (matches the Phase 14 spec — doctor-only UI); their read/oversight access is
+  API-level only, covered by `Backend/tests/test_procedures.py`. To eyeball the audit
+  trail: `/manager/audit` (not `/manager/audit-log`) — its search box only matches
+  `object_repr`/`object_id`/`actor__email` (see `apps/audit/views.py` search_fields),
+  NOT `model_name`, so search by the procedure's name (e.g. "Biopsy", "Wound
+  Suturing") or the doctor's email, not the literal string "ClinicalProcedure" — or
+  just browse unfiltered, newest-first, right after driving the flow above.
 
 ## Gotcha found by driving past page 1
 

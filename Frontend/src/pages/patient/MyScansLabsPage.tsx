@@ -5,10 +5,12 @@ import { useTranslation } from 'react-i18next'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
+import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
 import { saveBlob } from '../../lib/download'
 import { formatDate } from '../../lib/format'
@@ -20,7 +22,9 @@ const SCAN_CATEGORIES = ['XRAY', 'MRI', 'CT', 'ULTRASOUND', 'DICOM', 'OTHER']
 export function MyScansLabsPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
+  const { user } = useAuth()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [category, setCategory] = useState('XRAY')
   const [file, setFile] = useState<File | null>(null)
@@ -49,6 +53,25 @@ export function MyScansLabsPage() {
     } catch (err) {
       showToast(errorMessage(err), 'error')
     }
+  }
+
+  const deleteScan = useMutation({
+    mutationFn: (id: number) => medicalApi.deleteScan(id),
+    onSuccess: () => {
+      showToast(t('medical.scanDeleted'), 'success')
+      qc.invalidateQueries({ queryKey: ['scans'] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const handleDelete = async (id: number, name: string) => {
+    const ok = await confirm({
+      title: t('medical.deleteScanTitle'),
+      message: t('medical.deleteScanMessage', { name }),
+      confirmLabel: t('medical.deleteScanConfirm'),
+      danger: true,
+    })
+    if (ok) deleteScan.mutate(id)
   }
 
   return (
@@ -83,9 +106,15 @@ export function MyScansLabsPage() {
             <div key={s.id} className="appt-list-row">
               <div className="appt-list-info">
                 <strong>{s.category}</strong> · {s.original_filename}
+                {s.description && <div className="medical-list-meta">{s.description}</div>}
                 <div className="medical-list-meta">{formatDate(s.created_at, language)} · {t('medical.uploadedBy', { name: s.uploaded_by_name })}</div>
               </div>
-              <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
+              <div className="medical-scan-actions">
+                <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
+                {s.uploaded_by === user?.id && (
+                  <Button variant="danger" onClick={() => handleDelete(s.id, s.original_filename)}>🗑 {t('medical.delete')}</Button>
+                )}
+              </div>
             </div>
           ))
         )}

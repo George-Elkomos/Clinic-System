@@ -88,9 +88,9 @@ class ScanSerializer(serializers.ModelSerializer):
         fields = [
             "id", "patient", "uploaded_by", "uploaded_by_name", "category", "file",
             "original_filename", "content_type", "file_size", "description",
-            "appointment", "taken_at", "created_at",
+            "appointment", "radiology_order", "taken_at", "created_at",
         ]
-        read_only_fields = ["id", "uploaded_by", "uploaded_by_name",
+        read_only_fields = ["id", "uploaded_by", "uploaded_by_name", "radiology_order",
                             "original_filename", "content_type", "file_size", "created_at"]
 
     def validate_file(self, value):

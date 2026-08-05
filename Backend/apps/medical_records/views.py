@@ -34,6 +34,7 @@ from .serializers import (
 from .services import lab_orders as lab_order_service
 from .services.pdf import render_prescription_pdf
 from .services.records import create_record_version
+from .services.scans import notify_nearest_doctor_of_scan_upload
 from .services.timeline import build_patient_timeline
 
 
@@ -160,6 +161,13 @@ class ScanViewSet(_UploadViewSet):
     def get_queryset(self):
         qs = Scan.objects.select_related("patient__user", "uploaded_by")
         return scope_to_user(qs, self.request.user).order_by("-created_at")
+
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        # Only a patient's own self-upload needs surfacing to a doctor — a
+        # doctor/secretary uploading already knows about it themselves.
+        if self.request.user.role == RoleChoices.PATIENT:
+            notify_nearest_doctor_of_scan_upload(serializer.instance)
 
 
 class LabResultViewSet(_UploadViewSet):
@@ -391,6 +399,7 @@ class LabOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="sample/label")
     def sample_label(self, request, pk=None):
         from django.http import HttpResponse
+        from django.utils.html import escape
         order = self.get_object()
         try:
             sample = order.sample_collection
@@ -398,12 +407,19 @@ class LabOrderViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": "No sample collection record for this order."})
         patient = order.patient
         dob = patient.date_of_birth.strftime("%Y-%m-%d") if patient.date_of_birth else "N/A"
-        test_names = ", ".join(order.items.values_list("test_name", flat=True))
+        test_names = escape(", ".join(order.items.values_list("test_name", flat=True)))
+        # CW-7: every field below is attacker-influenceable (patient name, test
+        # names) so it must be escaped before landing in raw HTML — this label
+        # is opened as a standalone document and printed, not React-rendered.
+        patient_name = escape(patient.user.get_full_name())
+        sample_id = escape(sample.sample_id)
+        order_number = escape(order.order_number)
+        sample_type_display = escape(sample.get_sample_type_display())
         html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Sample Label — {sample.sample_id}</title>
+<title>Sample Label — {sample_id}</title>
 <style>
   body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; }}
   .label {{ width: 9cm; border: 2px solid #000; padding: 8px; margin: 10px auto; page-break-inside: avoid; }}
@@ -418,14 +434,14 @@ class LabOrderViewSet(viewsets.ModelViewSet):
 </head>
 <body>
 <div class="label">
-  <h2>{patient.user.get_full_name()}</h2>
+  <h2>{patient_name}</h2>
   <p><b>DOB:</b> {dob}</p>
   <p><b>Test(s):</b> {test_names or "—"}</p>
-  <p><b>Type:</b> {sample.get_sample_type_display()}</p>
+  <p><b>Type:</b> {sample_type_display}</p>
   <p><b>Collected:</b> {sample.collected_at.strftime("%Y-%m-%d %H:%M")}</p>
-  <p><b>Order:</b> {order.order_number}</p>
-  <div class="barcode">| | |  {sample.sample_id}  | | |</div>
-  <div class="sample-id">{sample.sample_id}</div>
+  <p><b>Order:</b> {order_number}</p>
+  <div class="barcode">| | |  {sample_id}  | | |</div>
+  <div class="sample-id">{sample_id}</div>
 </div>
 <p style="text-align:center; font-size:9pt; color:#888;">
   <button onclick="window.print()">Print Label</button>

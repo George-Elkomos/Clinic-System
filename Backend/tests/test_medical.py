@@ -1,13 +1,19 @@
 """Phase 2 verification: record versioning, specialty-note rule, treating-doctor
 scoping, scan upload/download, prescription PDF."""
+from datetime import timedelta
+
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 
-from apps.core.enums import RoleChoices
+from apps.appointments.models import Appointment
+from apps.audit.models import AuditLog
+from apps.core.enums import AppointmentStatus, NotificationVerb, RoleChoices
 from apps.doctors.models import DoctorPatient, DoctorProfile, Specialty, SpecialtyCategory
 from apps.medical_records.models import MedicalRecord, Prescription, PrescriptionItem
 from apps.medical_records.services.records import create_record_version
+from apps.notifications.models import Notification
 
 pytestmark = pytest.mark.django_db
 
@@ -107,6 +113,82 @@ def test_scan_rejects_bad_filetype(api, treated):
     bad = SimpleUploadedFile("notes.exe", b"MZ", content_type="application/octet-stream")
     resp = api.post(reverse("scan-list"), {"category": "OTHER", "file": bad}, format="multipart")
     assert resp.status_code == 400
+
+
+def test_scan_upload_and_delete_are_audited(api, treated):
+    api.force_authenticate(treated)
+    upload = SimpleUploadedFile("xray.png", b"\x89PNG\r\n\x1a\n fake", content_type="image/png")
+    created = api.post(reverse("scan-list"), {"category": "XRAY", "file": upload}, format="multipart")
+    assert created.status_code == 201
+    scan_id = created.data["id"]
+
+    create_log = AuditLog.objects.filter(model_name="Scan", object_id=str(scan_id), action="CREATE").first()
+    assert create_log is not None
+    assert create_log.actor_id == treated.id
+
+    # Scan.destroy() soft-deletes (a save, not a real row delete), so this
+    # shows up as an UPDATE entry with the is_deleted/deleted_at transition —
+    # not a DELETE entry — which is the correct, honest representation.
+    deleted = api.delete(reverse("scan-detail", args=[scan_id]))
+    assert deleted.status_code == 204
+
+    delete_log = AuditLog.objects.filter(model_name="Scan", object_id=str(scan_id), action="UPDATE").first()
+    assert delete_log is not None
+    assert delete_log.actor_id == treated.id
+    assert delete_log.changes.get("is_deleted") == {"old": False, "new": True}
+
+
+# --- Patient self-upload notifies the nearest-in-time doctor ------------------
+def _make_appointment(patient, doctor, *, status, start_offset):
+    start = timezone.now() + start_offset
+    return Appointment.objects.create(
+        patient=patient, doctor=doctor, scheduled_start=start, scheduled_end=start + timedelta(minutes=15),
+        status=status, completed_at=timezone.now() + start_offset if status == AppointmentStatus.COMPLETED else None,
+    )
+
+
+def test_patient_scan_upload_notifies_upcoming_doctor_over_past_doctor(api, doctor_profile, treated, make_user):
+    past_doctor_user = make_user("doc-past@test.dev", RoleChoices.DOCTOR)
+    past_doctor = DoctorProfile.objects.create(user=past_doctor_user, license_number="LIC-PAST")
+    _make_appointment(treated.patient_profile, past_doctor, status=AppointmentStatus.COMPLETED, start_offset=-timedelta(days=10))
+    _make_appointment(treated.patient_profile, doctor_profile, status=AppointmentStatus.CONFIRMED, start_offset=timedelta(days=2))
+
+    api.force_authenticate(treated)
+    upload = SimpleUploadedFile("xray.png", b"\x89PNG\r\n\x1a\n fake", content_type="image/png")
+    resp = api.post(reverse("scan-list"), {"category": "XRAY", "file": upload}, format="multipart")
+    assert resp.status_code == 201
+
+    assert Notification.objects.filter(recipient=doctor_profile.user, verb=NotificationVerb.PATIENT_SCAN_UPLOADED).exists()
+    assert not Notification.objects.filter(recipient=past_doctor_user, verb=NotificationVerb.PATIENT_SCAN_UPLOADED).exists()
+
+
+def test_patient_scan_upload_falls_back_to_most_recent_completed_doctor(api, doctor_profile, treated):
+    _make_appointment(treated.patient_profile, doctor_profile, status=AppointmentStatus.COMPLETED, start_offset=-timedelta(days=5))
+
+    api.force_authenticate(treated)
+    upload = SimpleUploadedFile("xray2.png", b"\x89PNG\r\n\x1a\n fake", content_type="image/png")
+    resp = api.post(reverse("scan-list"), {"category": "XRAY", "file": upload}, format="multipart")
+    assert resp.status_code == 201
+    assert Notification.objects.filter(recipient=doctor_profile.user, verb=NotificationVerb.PATIENT_SCAN_UPLOADED).exists()
+
+
+def test_patient_scan_upload_with_no_appointments_notifies_nobody(api, make_user):
+    lone_patient = make_user("lone-patient@test.dev", RoleChoices.PATIENT)
+    api.force_authenticate(lone_patient)
+    upload = SimpleUploadedFile("xray3.png", b"\x89PNG\r\n\x1a\n fake", content_type="image/png")
+    resp = api.post(reverse("scan-list"), {"category": "XRAY", "file": upload}, format="multipart")
+    assert resp.status_code == 201
+    assert not Notification.objects.filter(verb=NotificationVerb.PATIENT_SCAN_UPLOADED).exists()
+
+
+def test_doctor_uploaded_scan_does_not_trigger_patient_upload_notification(api, doctor_profile, treated):
+    api.force_authenticate(doctor_profile.user)
+    upload = SimpleUploadedFile("xray4.png", b"\x89PNG\r\n\x1a\n fake", content_type="image/png")
+    resp = api.post(reverse("scan-list"), {
+        "patient": treated.patient_profile.id, "category": "XRAY", "file": upload,
+    }, format="multipart")
+    assert resp.status_code == 201
+    assert not Notification.objects.filter(verb=NotificationVerb.PATIENT_SCAN_UPLOADED).exists()
 
 
 # --- Prescription + PDF -----------------------------------------------------

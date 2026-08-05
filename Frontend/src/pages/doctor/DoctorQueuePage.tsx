@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { InvoiceGeneratedModal } from '../../components/billing/InvoiceGeneratedModal'
+import { InvoiceViewModal } from '../../components/billing/InvoiceViewModal'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
@@ -55,7 +56,7 @@ function CurrentPanel({
   isPending,
 }: {
   appt: QueueAppointment | null
-  onComplete: (id: number) => void
+  onComplete: (appt: QueueAppointment) => void
   onNoShow: (id: number) => void
   isPending: boolean
 }) {
@@ -117,7 +118,7 @@ function CurrentPanel({
         )}
 
         <div className="queue-actions">
-          <Button loading={isPending} onClick={() => onComplete(appt.id)}>
+          <Button loading={isPending} onClick={() => onComplete(appt)}>
             {t('queue.complete')}
           </Button>
           <Link to={`/doctor/patients?patient=${appt.patient_profile_id}`}>
@@ -169,7 +170,13 @@ function NextPanel({
   )
 }
 
-function PreviousPanel({ appt }: { appt: QueueAppointment | null }) {
+function PreviousPanel({
+  appt,
+  onViewInvoice,
+}: {
+  appt: QueueAppointment | null
+  onViewInvoice: (invoiceId: number) => void
+}) {
   const { t } = useTranslation()
   const { language } = useLanguage()
 
@@ -192,6 +199,19 @@ function PreviousPanel({ appt }: { appt: QueueAppointment | null }) {
       {appt.reason && (
         <div className="queue-panel-meta">{appt.reason}</div>
       )}
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        {/* Keeps the invoice reachable even after the post-completion pop-up is dismissed. */}
+        {appt.invoice_id != null && (
+          <Button variant="secondary" onClick={() => onViewInvoice(appt.invoice_id!)}>
+            {t('billing.viewInvoice')}
+          </Button>
+        )}
+        {appt.encounter_id != null && (
+          <Link to={`/doctor/encounters/${appt.id}`}>
+            <Button variant="secondary">🩻 {t('encounters.view')}</Button>
+          </Link>
+        )}
+      </div>
     </Card>
   )
 }
@@ -222,6 +242,7 @@ export function DoctorQueuePage() {
   })
 
   const [billingResult, setBillingResult] = useState<AppointmentBilling | null>(null)
+  const [viewInvoiceId, setViewInvoiceId] = useState<number | null>(null)
 
   const complete = useMutation({
     mutationFn: (id: number) => appointmentsApi.complete(id),
@@ -263,6 +284,18 @@ export function DoctorQueuePage() {
     if (ok) noShow.mutate(id)
   }
 
+  const handleComplete = async (appt: QueueAppointment) => {
+    if (appt.encounter_id == null) {
+      const ok = await confirm({
+        title: t('queue.completeNoEncounterTitle'),
+        message: t('queue.completeNoEncounterMessage'),
+        confirmLabel: t('queue.complete'),
+      })
+      if (!ok) return
+    }
+    complete.mutate(appt.id)
+  }
+
   if (isLoading) return <CenteredSpinner />
 
   const { previous = null, current = null, next = null, waiting_count = 0 } = data ?? {}
@@ -294,10 +327,10 @@ export function DoctorQueuePage() {
       ))}
 
       <div className="queue-grid">
-        <PreviousPanel appt={previous ?? null} />
+        <PreviousPanel appt={previous ?? null} onViewInvoice={setViewInvoiceId} />
         <CurrentPanel
           appt={current ?? null}
-          onComplete={(id) => complete.mutate(id)}
+          onComplete={handleComplete}
           onNoShow={handleNoShow}
           isPending={complete.isPending || noShow.isPending}
         />
@@ -314,6 +347,9 @@ export function DoctorQueuePage() {
 
       {billingResult && (
         <InvoiceGeneratedModal billing={billingResult} onClose={() => setBillingResult(null)} />
+      )}
+      {viewInvoiceId != null && (
+        <InvoiceViewModal invoiceId={viewInvoiceId} onClose={() => setViewInvoiceId(null)} />
       )}
     </div>
   )

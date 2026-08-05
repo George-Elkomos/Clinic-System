@@ -275,12 +275,13 @@
 .inactive-row td { opacity: 0.55; }
 
 /* ---- Tab bar ---- */
-.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: var(--space-5); }
+.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: var(--space-5); overflow-x: auto; }
 .tab {
   background: none; border: none; cursor: pointer;
   padding: var(--space-3) var(--space-5); font-size: var(--font-action);
   color: var(--text-muted); border-bottom: 3px solid transparent;
   min-height: var(--tap-min); font-weight: 600;
+  white-space: nowrap; flex-shrink: 0;
 }
 .tab--active { color: var(--primary); border-bottom-color: var(--primary); }
 .tab:hover:not(.tab--active) { background: var(--surface); }
@@ -641,6 +642,10 @@
   background: var(--surface-2); border-radius: var(--radius);
   border: 1px solid var(--border);
 }
+.audit-changes__heading {
+  margin: 0; font-size: var(--font-small); font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+}
 
 /* Individual field diff row */
 .audit-diff-item {
@@ -648,7 +653,7 @@
   gap: var(--space-2); font-size: var(--font-small); line-height: 1.5;
 }
 .audit-diff-item__field {
-  font-family: monospace; font-size: 13px;
+  font-size: 13px;
   background: var(--surface-2); color: var(--text);
   padding: 1px var(--space-2); border-radius: var(--radius);
   border: 1px solid var(--border); white-space: nowrap; font-weight: 600;
@@ -656,6 +661,25 @@
 .audit-diff-item__old   { color: var(--danger); text-decoration: line-through; text-decoration-thickness: 1.5px; }
 .audit-diff-item__arrow { color: var(--text-muted); flex-shrink: 0; margin-inline: var(--space-2); }
 .audit-diff-item__new   { color: var(--success); font-weight: 700; }
+
+/* Array/object diffs (e.g. a procedure checklist): full-width block instead of
+   the inline old-arrow-new row, since these render a bullet list underneath. */
+.audit-diff-item--list { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.audit-diff-item__note { color: var(--text-muted); font-style: italic; }
+
+/* Checklist step diff: one bulleted line per step that changed, color-coded
+   by what happened to it (completed/unchecked/added/removed). */
+.audit-diff-checklist { margin: 0; padding-inline-start: var(--space-5); display: flex; flex-direction: column; gap: 2px; }
+.audit-diff-checklist__line--completed { color: var(--success); }
+.audit-diff-checklist__line--unchecked { color: var(--text-muted); }
+.audit-diff-checklist__line--added     { color: var(--success); }
+.audit-diff-checklist__line--removed   { color: var(--danger); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+
+/* Generic array/object diff fallback: before/after side by side. */
+.audit-diff-generic { display: flex; gap: var(--space-5); width: 100%; }
+.audit-diff-generic__col { flex: 1 1 0; min-width: 0; }
+.audit-diff-generic__col ul { margin: var(--space-1) 0 0; padding-inline-start: var(--space-5); }
+.audit-diff-generic__label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
 /* ---- Scans & Labs page (patient) ---- */
 /* Wider gaps between the three section cards */
@@ -914,6 +938,8 @@
   .audit-card__time   { white-space: normal; }
   /* Diff items: stack field name above the diff values */
   .audit-diff-item    { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+  /* Generic before/after diff: stack the two columns instead of side by side */
+  .audit-diff-generic { flex-direction: column; gap: var(--space-2); }
 
   /* Public header: tighten up on mobile */
   .pub-header { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
@@ -1083,6 +1109,7 @@
 .badge--PROCESSING       { border-color: var(--warning); color: var(--warning); }
 .badge--COMPLETED        { border-color: var(--success); color: var(--success); }
 .badge--REVIEWED         { border-color: var(--success); color: var(--success); background: color-mix(in srgb, var(--success) 10%, transparent); }
+.badge--REPORTED         { border-color: var(--success); color: var(--success); background: color-mix(in srgb, var(--success) 10%, transparent); }
 
 /* Priority badges */
 .badge--ROUTINE { border-color: var(--border); color: var(--text-muted); }
@@ -1272,15 +1299,29 @@
 .encounter-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .encounter-locked { color: var(--text-muted); margin-bottom: var(--space-3); }
 .encounter-layout { display: grid; grid-template-columns: 1fr 320px; gap: var(--space-4); align-items: start; }
-.encounter-main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
-.encounter-sidebar { position: sticky; top: var(--space-4); }
+.encounter-main-col { min-width: 0; }
+.encounter-main { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Sticky, but capped and independently scrollable so a long linked-items
+   list can never grow taller than the viewport and spill into content
+   below it (the sidebar used to overlap the main column/submit button
+   once it got tall enough). */
+.encounter-sidebar { position: sticky; top: var(--space-4); max-height: calc(100vh - 96px); overflow-y: auto; }
+
 .encounter-sidebar-actions { display: flex; flex-direction: column; gap: var(--space-3); }
-.encounter-linked-list { margin: 0; padding-inline-start: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
-.encounter-linked-btn {
-  background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--primary);
-  cursor: pointer; text-align: start; min-height: var(--tap-min);
+.encounter-linked-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+/* Card-style row for a linked prescription/lab/procedure — replaces the old
+   plain bulleted link, which let long procedure names wrap onto a second
+   line with no bullet, making it look like a separate, disconnected item. */
+.encounter-linked-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  width: 100%; font: inherit; color: var(--text); text-align: start;
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); cursor: pointer;
 }
-.encounter-linked-btn:hover { text-decoration: underline; }
+.encounter-linked-row:hover { border-color: var(--primary); }
+.encounter-linked-row--static { cursor: default; }
+.encounter-linked-row--static:hover { border-color: var(--border); }
+.encounter-linked-row__name { flex: 1; min-width: 0; font-size: var(--font-small); overflow-wrap: break-word; }
 .encounter-none { color: var(--text-muted); font-size: var(--font-small); }
 .encounter-vitals-linked { color: var(--success); font-weight: 600; }
 .encounter-submit-row { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
@@ -1299,8 +1340,10 @@
 .medical-scan-actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
 
 /* Prescription void UI — encounter sidebar */
-.encounter-rx-item { list-style: none; padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
-.encounter-rx-item:last-child { border-bottom: none; }
+.encounter-rx-item {
+  list-style: none; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+}
 .encounter-rx-item--voided .encounter-rx-item__drugs { text-decoration: line-through; color: var(--text-muted); }
 .encounter-rx-item__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .encounter-rx-item__drugs { font-size: var(--font-small); font-weight: 500; }

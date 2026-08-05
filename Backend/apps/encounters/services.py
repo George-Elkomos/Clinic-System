@@ -27,16 +27,23 @@ _CLINICAL_FIELDS = (
 
 
 def get_or_create_draft(*, appointment, doctor):
-    """Return the encounter already attached to `appointment`, or create a DRAFT."""
-    existing = Encounter.objects.filter(appointment=appointment).first()
-    if existing:
-        return existing
-    return Encounter.objects.create(
-        patient=appointment.patient,
-        doctor=doctor,
+    """Return the encounter already attached to `appointment`, or create a DRAFT.
+
+    Uses Django's get_or_create (not a manual filter-then-create) because two
+    near-simultaneous calls for the same appointment — e.g. React StrictMode's
+    double-invoked mount effect — would otherwise both pass the existence check
+    and race on the appointment's unique constraint; get_or_create retries the
+    lookup on IntegrityError instead of letting the second call 500.
+    """
+    encounter, _ = Encounter.objects.get_or_create(
         appointment=appointment,
-        status=EncounterStatus.DRAFT,
+        defaults={
+            "patient": appointment.patient,
+            "doctor": doctor,
+            "status": EncounterStatus.DRAFT,
+        },
     )
+    return encounter
 
 
 @transaction.atomic
@@ -68,23 +75,36 @@ def submit_encounter(encounter):
 
 @transaction.atomic
 def amend_encounter(encounter):
-    """SUBMITTED -> mark original AMENDED/not-current; return editable DRAFT twin."""
+    """SUBMITTED -> mark original AMENDED/not-current; return editable DRAFT twin.
+
+    The appointment link (OneToOne — only one Encounter can hold it) moves
+    forward to the new twin rather than staying on the superseded original.
+    Otherwise `get_or_create_draft` (and anything routing through
+    `/doctor/encounters/<appointmentId>`, e.g. the "View/Open Clinical
+    Encounter" links) would keep resolving to the stale pre-amendment
+    version forever, no matter how many times it's amended since.
+    """
     if encounter.status != EncounterStatus.SUBMITTED:
         raise ValidationError({"status": "Only a submitted encounter can be amended."})
 
     original = encounter
+    appointment = original.appointment
+
+    # Clear the link on the original first — both rows can't hold the same
+    # OneToOne appointment at once.
+    original.appointment = None
+    original.is_current = False
+    original.status = EncounterStatus.AMENDED
+    original.save(update_fields=["appointment", "is_current", "status", "updated_at"])
+
     twin = Encounter.objects.create(
         version=original.version + 1,
         is_current=True,
         status=EncounterStatus.DRAFT,
         supersedes=original,
+        appointment=appointment,
         **{f: getattr(original, f) for f in _CLINICAL_FIELDS if f != "appointment"},
-        # appointment is OneToOne — keep it on the original to avoid a unique clash.
     )
-
-    original.is_current = False
-    original.status = EncounterStatus.AMENDED
-    original.save(update_fields=["is_current", "status", "updated_at"])
     return twin
 
 

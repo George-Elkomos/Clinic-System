@@ -24,6 +24,7 @@ api_patterns = [
     path("", include("apps.billing.urls")),  # Phase 12 — invoices, payments, billing reports
     path("", include("apps.referrals.urls")),  # Phase 13 — referrals + complaints master
     path("", include("apps.procedures.urls")),  # Phase 14 — clinical procedures
+    path("", include("apps.radiology.urls")),  # Phase 15 — radiology orders
 ]
 
 urlpatterns = [

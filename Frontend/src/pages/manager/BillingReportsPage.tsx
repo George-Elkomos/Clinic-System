@@ -91,7 +91,7 @@ export function BillingReportsPage() {
                     <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('billing.doctor')}</th>
                     <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('billing.totalBilled')}</th>
                     <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('billing.totalCollected')}</th>
-                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}></th>
+                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('billing.revenueShare')}</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -2,10 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { DiagnosisPieChart } from '../../components/analytics/DiagnosisPieChart'
+import { SpecialtyBarChart } from '../../components/analytics/SpecialtyBarChart'
+import { SpecialtyTrendLineChart } from '../../components/analytics/SpecialtyTrendLineChart'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
 import { FormField } from '../../components/primitives/FormField'
+import { KpiRow } from '../../components/primitives/KpiRow'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
@@ -47,7 +51,38 @@ export function ReportsDashboardPage() {
     queryFn: () => reportsApi.diagnosisDistribution(period),
   })
 
+  // specialty-analytics / lab-analytics only understand week|month|year (no
+  // "all") — the page's period Select still offers "all" for the older
+  // dashboard/diagnosis-distribution sections, so translate it to "year"
+  // (the closest available upper bound) rather than let the backend's
+  // silent month-fallback quietly disagree with what the Select shows.
+  const analyticsPeriod = period === 'all' ? 'year' : period
+
+  const { data: specialtyData, isLoading: isSpecialtyLoading } = useQuery({
+    queryKey: ['specialty-analytics', analyticsPeriod],
+    queryFn: () => reportsApi.specialtyAnalytics(analyticsPeriod),
+  })
+
+  const { data: labData, isLoading: isLabLoading } = useQuery({
+    queryKey: ['lab-analytics', analyticsPeriod],
+    queryFn: () => reportsApi.labAnalytics(analyticsPeriod),
+  })
+
   const maxDiagnosis = Math.max(1, ...(diagnosisData?.diagnoses ?? []).map((d) => d.count))
+
+  const specialtyTotals = specialtyData?.specialties ?? []
+  const specialtyTotalAppointments = specialtyTotals.reduce((sum, r) => sum + r.total_appointments, 0)
+  const specialtyTotalCompleted = specialtyTotals.reduce((sum, r) => sum + r.completed, 0)
+  const specialtyCompletionRate = specialtyTotalAppointments
+    ? Math.round((specialtyTotalCompleted / specialtyTotalAppointments) * 1000) / 10
+    : 0
+  const specialtyAvgWait = specialtyTotalAppointments
+    ? Math.round(
+        (specialtyTotals.reduce((sum, r) => sum + r.avg_wait_minutes * r.total_appointments, 0) /
+          specialtyTotalAppointments) *
+          10,
+      ) / 10
+    : 0
 
   const exportReport = async (fmt: 'pdf' | 'csv') => {
     try {
@@ -162,31 +197,130 @@ export function ReportsDashboardPage() {
             </table>
           </Card>
 
+          <Card title={t('reports.specialtyAnalytics')}>
+            {isSpecialtyLoading || !specialtyData ? (
+              <CenteredSpinner />
+            ) : specialtyData.specialties.length === 0 ? (
+              <p>{t('reports.noSpecialtyData')}</p>
+            ) : (
+              <>
+                <KpiRow
+                  items={[
+                    { label: t('reports.total'), value: specialtyTotalAppointments },
+                    { label: t('reports.completionRate'), value: `${specialtyCompletionRate}%` },
+                    { label: t('reports.avgWait'), value: specialtyAvgWait },
+                  ]}
+                />
+                <div className="chart-container">
+                  <SpecialtyBarChart rows={specialtyData.specialties} language={language} />
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: 'var(--text-muted)' }}>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.specialty')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.total')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.completed')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.completionRate')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.avgWait')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {specialtyData.specialties.map((r) => (
+                      <tr key={r.specialty_id} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                        <td style={{ padding: 'var(--space-2)' }} dir="auto">
+                          {language === 'ar' && r.specialty_name_ar ? r.specialty_name_ar : r.specialty_name}
+                        </td>
+                        <td style={{ padding: 'var(--space-2)' }}>{r.total_appointments}</td>
+                        <td style={{ padding: 'var(--space-2)' }}>{r.completed}</td>
+                        <td style={{ padding: 'var(--space-2)' }}>{r.completion_rate}%</td>
+                        <td style={{ padding: 'var(--space-2)' }}>{r.avg_wait_minutes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </Card>
+
+          <Card title={t('reports.specialtyTrend')}>
+            <p className="chart-caption">{t('reports.trendFixedWindow')}</p>
+            {isSpecialtyLoading || !specialtyData ? (
+              <CenteredSpinner />
+            ) : (
+              <div className="chart-container analytics-charts">
+                <SpecialtyTrendLineChart points={specialtyData.monthly_trend} language={language} />
+              </div>
+            )}
+          </Card>
+
           <Card title={t('reports.topDiagnoses')}>
             {!diagnosisData || diagnosisData.diagnoses.length === 0 ? (
               <p>{t('reports.noDiagnoses')}</p>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ color: 'var(--text-muted)' }}>
-                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.diagnosis')}</th>
-                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.count')}</th>
-                    <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {diagnosisData.diagnoses.map((d) => (
-                    <tr key={d.name} style={{ borderTop: '1px solid var(--surface-2)' }}>
-                      <td style={{ padding: 'var(--space-2)' }} dir="auto">
-                        {language === 'ar' && d.name_ar ? d.name_ar : d.name}
-                        {d.icd10_code && <span style={{ color: 'var(--text-muted)' }}> ({d.icd10_code})</span>}
-                      </td>
-                      <td style={{ padding: 'var(--space-2)' }}>{d.count}</td>
-                      <td style={{ padding: 'var(--space-2)', width: '40%' }}><Bar pct={(d.count / maxDiagnosis) * 100} /></td>
+              <div className="analytics-summary-grid">
+                <div className="chart-container analytics-charts">
+                  <DiagnosisPieChart diagnoses={diagnosisData.diagnoses} language={language} />
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: 'var(--text-muted)' }}>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.diagnosis')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.count')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {diagnosisData.diagnoses.map((d) => (
+                      <tr key={d.name} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                        <td style={{ padding: 'var(--space-2)' }} dir="auto">
+                          {language === 'ar' && d.name_ar ? d.name_ar : d.name}
+                          {d.icd10_code && <span style={{ color: 'var(--text-muted)' }}> ({d.icd10_code})</span>}
+                        </td>
+                        <td style={{ padding: 'var(--space-2)' }}>{d.count}</td>
+                        <td style={{ padding: 'var(--space-2)', width: '40%' }}><Bar pct={(d.count / maxDiagnosis) * 100} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card title={t('reports.labAnalytics')}>
+            {isLabLoading || !labData ? (
+              <CenteredSpinner />
+            ) : labData.tests.length === 0 ? (
+              <p>{t('reports.noLabData')}</p>
+            ) : (
+              <>
+                <KpiRow
+                  items={[
+                    { label: t('reports.totalOrders'), value: labData.total_lab_orders },
+                    { label: t('reports.avgTurnaround'), value: labData.overall_avg_turnaround_hours ?? '—' },
+                    { label: t('reports.abnormalRate'), value: `${labData.abnormal_result_pct}%` },
+                  ]}
+                />
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: 'var(--text-muted)' }}>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.testName')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.count')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.avgTurnaround')}</th>
+                      <th style={{ textAlign: 'start', padding: 'var(--space-2)' }}>{t('reports.abnormalRate')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {labData.tests.map((row) => (
+                      <tr key={row.test_name} style={{ borderTop: '1px solid var(--surface-2)' }}>
+                        <td style={{ padding: 'var(--space-2)' }}>{row.test_name}</td>
+                        <td style={{ padding: 'var(--space-2)' }}>{row.count}</td>
+                        <td style={{ padding: 'var(--space-2)' }}>{row.avg_turnaround_hours ?? '—'}</td>
+                        <td style={{ padding: 'var(--space-2)' }}>{row.abnormal_pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             )}
           </Card>
         </>

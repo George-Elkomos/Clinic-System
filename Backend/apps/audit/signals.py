@@ -19,15 +19,21 @@ AUDITED_MODELS = [
     "medical_records.MedicalRecord",
     "medical_records.ClinicalNote",
     "medical_records.Prescription",
+    "medical_records.Scan",
     "reviews.Review",
     "procedures.ClinicalProcedure",
+    "radiology.RadiologyOrder",
 ]
 
 IGNORED_FIELDS = {"created_at", "updated_at", "last_login", "password"}
 
 
 def _serialize(value):
-    if value is None or isinstance(value, (str, int, float, bool)):
+    # Lists/dicts (e.g. ClinicalProcedure.checklist_state) are already JSON-native
+    # -- pass them through as-is so the frontend gets real structured data to
+    # render, instead of Python's str() repr (single-quoted, capitalized
+    # True/False) collapsed into one unreadable string.
+    if value is None or isinstance(value, (str, int, float, bool, list, dict)):
         return value
     return str(value)
 

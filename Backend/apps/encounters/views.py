@@ -32,7 +32,7 @@ class EncounterViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = Encounter.objects.select_related(*_ENCOUNTER_RELATIONS).prefetch_related(
-            "prescriptions__items", "lab_orders__items"
+            "prescriptions__items", "lab_orders__items", "procedures", "radiology_orders"
         )
         if user.role == RoleChoices.MANAGER:
             return qs

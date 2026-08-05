@@ -1,5 +1,5 @@
 import { api } from './apiClient'
-import type { DiagnosisDistribution, Report } from './types'
+import type { DiagnosisDistribution, LabAnalytics, Report, SpecialtyAnalytics } from './types'
 
 export const reportsApi = {
   dashboard: (period: string) =>
@@ -9,6 +9,14 @@ export const reportsApi = {
     api
       .get<DiagnosisDistribution>('/reports/diagnosis-distribution/', { params: { period } })
       .then((r) => r.data),
+
+  specialtyAnalytics: (period: string) =>
+    api
+      .get<SpecialtyAnalytics>('/reports/specialty-analytics/', { params: { period } })
+      .then((r) => r.data),
+
+  labAnalytics: (period: string) =>
+    api.get<LabAnalytics>('/reports/lab-analytics/', { params: { period } }).then((r) => r.data),
 
   // fmt = pdf | csv (param is "fmt"; ?format= is reserved by DRF)
   exportBlob: (fmt: 'pdf' | 'csv', period: string) =>

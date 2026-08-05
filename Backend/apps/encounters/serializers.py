@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.medical_records.serializers import LabOrderListSerializer, PrescriptionSerializer
 from apps.procedures.serializers import ClinicalProcedureListSerializer
+from apps.radiology.serializers import RadiologyOrderListSerializer
 from apps.vital_signs.serializers import VitalSignsReadSerializer
 
 from .models import Complaint, Diagnosis, DiagnosisCategory, Encounter
@@ -38,6 +39,7 @@ class EncounterReadSerializer(serializers.ModelSerializer):
     prescriptions = PrescriptionSerializer(many=True, read_only=True)
     lab_orders = LabOrderListSerializer(many=True, read_only=True)
     procedures = ClinicalProcedureListSerializer(many=True, read_only=True)
+    radiology_orders = RadiologyOrderListSerializer(many=True, read_only=True)
 
     class Meta:
         model = Encounter
@@ -50,7 +52,7 @@ class EncounterReadSerializer(serializers.ModelSerializer):
             "treatment_plan", "treatment_plan_ar",
             "vitals", "vitals_detail",
             "version", "is_current", "supersedes",
-            "prescriptions", "lab_orders", "procedures", "created_at",
+            "prescriptions", "lab_orders", "procedures", "radiology_orders", "created_at",
         ]
         read_only_fields = fields
 

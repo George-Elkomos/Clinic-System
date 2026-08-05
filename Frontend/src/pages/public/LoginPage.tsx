@@ -76,6 +76,9 @@ export function LoginPage() {
           </Button>
         </form>
         <p style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
+          <Link to="/forgot-password">{t('auth.forgotPassword')}</Link>
+        </p>
+        <p style={{ textAlign: 'center', marginTop: 'var(--space-2)' }}>
           <Link to={`/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`}>
             {t('auth.registerLink')}
           </Link>

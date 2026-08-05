@@ -1,4 +1,5 @@
-"""Render a report dict to PDF (reportlab) or CSV (stdlib)."""
+"""Render the dashboard report, plus the Phase 16 specialty/lab/diagnosis
+analytics, to PDF (reportlab) or CSV (stdlib)."""
 import csv
 import io
 
@@ -24,7 +25,7 @@ def _table(rows, col_widths=None):
     return t
 
 
-def render_report_pdf(report, clinic_name="Clinic") -> bytes:
+def render_report_pdf(report, specialty, lab, diagnoses, clinic_name="Clinic") -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, title="Clinic Report",
                             topMargin=18 * mm, bottomMargin=18 * mm,
@@ -64,12 +65,37 @@ def render_report_pdf(report, clinic_name="Clinic") -> bytes:
     for a in report["attendance"]:
         arows.append([a["doctor_name"], a["absence_days"]])
     story.append(_table(arows))
+    story.append(Spacer(1, 6 * mm))
+
+    story.append(Paragraph("Appointments by specialty", styles["Heading3"]))
+    srows = [["Specialty", "Total", "Completed", "Completion rate", "Avg wait (min)"]]
+    for s in specialty["specialties"]:
+        srows.append([
+            s["specialty_name"], s["total_appointments"], s["completed"],
+            f'{s["completion_rate"]}%', s["avg_wait_minutes"],
+        ])
+    story.append(_table(srows))
+    story.append(Spacer(1, 6 * mm))
+
+    story.append(Paragraph("Top diagnoses", styles["Heading3"]))
+    drows = [["Diagnosis", "ICD-10", "Count"]]
+    for d in diagnoses["diagnoses"]:
+        drows.append([d["name"], d["icd10_code"] or "—", d["count"]])
+    story.append(_table(drows))
+    story.append(Spacer(1, 6 * mm))
+
+    story.append(Paragraph("Lab test analytics", styles["Heading3"]))
+    lrows = [["Test", "Count", "Avg turnaround (h)", "Abnormal %"]]
+    for t in lab["tests"]:
+        turnaround = t["avg_turnaround_hours"] if t["avg_turnaround_hours"] is not None else "—"
+        lrows.append([t["test_name"], t["count"], turnaround, f'{t["abnormal_pct"]}%'])
+    story.append(_table(lrows))
 
     doc.build(story)
     return buffer.getvalue()
 
 
-def render_report_csv(report) -> str:
+def render_report_csv(report, specialty, lab, diagnoses) -> str:
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(["Clinic Management Report", f"period={report['period']}"])
@@ -91,4 +117,24 @@ def render_report_csv(report) -> str:
     w.writerow(["Doctor", "Absence days"])
     for a in report["attendance"]:
         w.writerow([a["doctor_name"], a["absence_days"]])
+    w.writerow([])
+
+    w.writerow(["Appointments by specialty"])
+    w.writerow(["Specialty", "Total", "Completed", "Completion rate", "Avg wait (min)"])
+    for s in specialty["specialties"]:
+        w.writerow([s["specialty_name"], s["total_appointments"], s["completed"],
+                    f'{s["completion_rate"]}%', s["avg_wait_minutes"]])
+    w.writerow([])
+
+    w.writerow(["Top diagnoses"])
+    w.writerow(["Diagnosis", "ICD-10", "Count"])
+    for d in diagnoses["diagnoses"]:
+        w.writerow([d["name"], d["icd10_code"] or "", d["count"]])
+    w.writerow([])
+
+    w.writerow(["Lab test analytics"])
+    w.writerow(["Test", "Count", "Avg turnaround (h)", "Abnormal %"])
+    for t in lab["tests"]:
+        turnaround = t["avg_turnaround_hours"] if t["avg_turnaround_hours"] is not None else ""
+        w.writerow([t["test_name"], t["count"], turnaround, f'{t["abnormal_pct"]}%'])
     return out.getvalue()

@@ -98,11 +98,22 @@ def build_report(period="month"):
     }
 
 
-def diagnosis_distribution(period="month", limit=15):
-    """Top diagnoses by encounter count in the period (current submitted encounters)."""
+def diagnosis_distribution(period="month", limit=20):
+    """Top diagnoses by encounter count in the period (current submitted
+    encounters).
+
+    period: "week"/"month"/"all" use the existing rolling lookback
+    (_period_start above) — unchanged, for backward compatibility with the
+    existing frontend caller. "year" is new in Phase 16 and uses the
+    calendar-aligned apps.core.periods.period_start (Jan 1 of the current
+    year) instead of a 365-day rolling window.
+    """
+    from apps.core.enums import PeriodChoices
+    from apps.core.periods import period_start as calendar_period_start
     from apps.encounters.models import Encounter, EncounterStatus
 
-    start = _period_start(period)
+    start = calendar_period_start(PeriodChoices.YEAR) if period == "year" else _period_start(period)
+
     encounters = Encounter.objects.filter(
         status=EncounterStatus.SUBMITTED, is_current=True, diagnosis__isnull=False
     )
@@ -118,6 +129,7 @@ def diagnosis_distribution(period="month", limit=15):
 
     return {
         "period": period,
+        "limit": limit,
         "generated_at": timezone.now().isoformat(),
         "diagnoses": [
             {

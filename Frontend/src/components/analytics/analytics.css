@@ -1,0 +1,77 @@
+/* Phase 16 — Advanced Analytics chart chrome.
+   Categorical hues are the dataviz-skill validated default order (8 hues,
+   fixed sequence, CVD-checked via scripts/validate_palette.js against this
+   app's #ffffff surface) — NOT the app's existing --tag-* tokens, which fail
+   CVD adjacent-pair separation when run through that same validator. Single-
+   series marks (the specialty bar chart) still use --primary for brand
+   consistency; only multi-series charts (trend line, diagnosis pie) draw
+   from this categorical set. */
+.analytics-charts {
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-series-3: #1baf7a;
+  --viz-series-4: #eda100;
+  --viz-series-5: #e87ba4;
+  --viz-series-6: #008300;
+  --viz-series-7: #4a3aa7;
+  --viz-series-8: #e34948;
+  --viz-other: var(--text-muted);
+  --viz-grid: var(--surface-2);
+}
+
+.chart-container {
+  height: 320px;
+  width: 100%;
+}
+
+.chart-empty {
+  color: var(--text-muted);
+}
+
+.chart-caption {
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.viz-tooltip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--shadow);
+}
+
+.viz-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.viz-tooltip__swatch {
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  flex: 0 0 auto;
+}
+
+.viz-tooltip__value {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.viz-tooltip__label {
+  color: var(--text-muted);
+}
+
+.analytics-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .analytics-summary-grid {
+    grid-template-columns: minmax(280px, 1fr) 2fr;
+    align-items: start;
+  }
+}

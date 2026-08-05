@@ -118,6 +118,7 @@ export interface Appointment {
   started_at: string | null
   completed_at: string | null
   created_at: string
+  encounter_id: number | null
 }
 
 export interface QueueAppointment extends Appointment {
@@ -129,6 +130,7 @@ export interface QueueAppointment extends Appointment {
   patient_allergies: string
   patient_chronic_conditions: string
   patient_current_medications: string
+  invoice_id: number | null
 }
 
 export interface DoctorQueue {
@@ -278,6 +280,8 @@ export interface Scan {
   content_type: string
   file_size: number
   description: string
+  appointment: number | null
+  radiology_order: number | null
   taken_at: string | null
   created_at: string
 }
@@ -754,6 +758,7 @@ export interface Encounter {
   prescriptions: Prescription[]
   lab_orders: LabOrderSummary[]
   procedures: ClinicalProcedureSummary[]
+  radiology_orders: RadiologyOrderSummary[]
   created_at: string
 }
 
@@ -966,4 +971,122 @@ export interface CreateProcedurePayload {
   procedure_name?: string
   procedure_name_ar?: string
   pre_procedure_notes?: string
+}
+
+// --- Radiology Order Templates (Phase 15) ---
+
+export type RadiologyModality = 'XRAY' | 'MRI' | 'CT' | 'ULTRASOUND' | 'PET' | 'OTHER'
+export type RadiologyOrderStatus = 'ORDERED' | 'COMPLETED' | 'REPORTED' | 'CANCELLED'
+export type RadiologyOrderPriority = 'ROUTINE' | 'URGENT'
+
+export interface RadiologyTemplate {
+  id: number
+  name: string
+  name_ar: string
+  modality: RadiologyModality
+  body_part: string
+  instructions: string
+  is_active: boolean
+}
+
+export interface RadiologyOrder {
+  id: number
+  accession_number: string
+  patient: number
+  patient_name: string
+  doctor: number
+  doctor_name: string
+  appointment: number | null
+  encounter: number | null
+  template: number | null
+  template_detail: RadiologyTemplate | null
+  study_name: string
+  study_name_ar: string
+  clinical_reason: string
+  priority: RadiologyOrderPriority
+  status: RadiologyOrderStatus
+  findings: string
+  impression: string
+  completed_at: string | null
+  reported_at: string | null
+  cancellation_reason: string
+  cancelled_at: string | null
+  created_at: string
+}
+
+export interface RadiologyOrderSummary {
+  id: number
+  accession_number: string
+  patient: number
+  patient_name: string
+  doctor: number
+  doctor_name: string
+  appointment: number | null
+  encounter: number | null
+  template: number | null
+  study_name: string
+  study_name_ar: string
+  priority: RadiologyOrderPriority
+  status: RadiologyOrderStatus
+  completed_at: string | null
+  reported_at: string | null
+  created_at: string
+}
+
+export interface CreateRadiologyOrderPayload {
+  patient: number
+  appointment?: number | null
+  encounter?: number | null
+  template?: number | null
+  study_name?: string
+  study_name_ar?: string
+  clinical_reason?: string
+  priority?: RadiologyOrderPriority
+}
+
+// --- Advanced Analytics (Phase 16) ---
+
+export interface SpecialtyAnalyticsRow {
+  specialty_id: number
+  specialty_name: string
+  specialty_name_ar: string
+  total_appointments: number
+  completed: number
+  completion_rate: number
+  avg_wait_minutes: number
+}
+
+export interface MonthlyTrendPoint {
+  month: string // "YYYY-MM"
+  specialty_id: number
+  specialty_name: string
+  specialty_name_ar: string
+  count: number
+}
+
+export interface SpecialtyAnalytics {
+  period: string
+  generated_at: string
+  specialties: SpecialtyAnalyticsRow[]
+  monthly_trend: MonthlyTrendPoint[] // fixed last-6-months window, independent of `period`
+}
+
+export interface LabAnalyticsTestRow {
+  test_name: string
+  count: number
+  avg_turnaround_hours: number | null
+  results_count: number
+  abnormal_count: number
+  abnormal_pct: number
+}
+
+export interface LabAnalytics {
+  period: string
+  generated_at: string
+  total_lab_orders: number
+  overall_avg_turnaround_hours: number | null
+  tests: LabAnalyticsTestRow[]
+  total_results: number
+  abnormal_results: number
+  abnormal_result_pct: number
 }
