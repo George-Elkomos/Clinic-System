@@ -77,6 +77,19 @@ rollback() {
     source venv/bin/activate
     pip install -r requirements.txt 2>/dev/null || true
 
+    # Restore the database if a migration had already been applied before
+    # this failure was detected. The pre-migrate backup is deliberately
+    # kept on disk until the whole deploy (including the restart/health
+    # check below) succeeds — not deleted the instant `migrate` itself
+    # succeeds — so this also covers "migrate worked, but the new code
+    # then crashed on startup," not just a failed migration.
+    for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
+        if [ -f "$f.pre-migrate-bak" ]; then
+            mv "$f.pre-migrate-bak" "$f"
+            echo "--- Restored $f from pre-migrate backup. ---"
+        fi
+    done
+
     # Restore Frontend/dist if a botched build left it partially written.
     if [ -d "$APP_DIR/Frontend/dist.bak" ]; then
         rm -rf "$APP_DIR/Frontend/dist"
@@ -106,32 +119,18 @@ rollback() {
 
 git pull origin main || rollback
 
-# --- Backend ---
+# --- Backend deps ---
 cd "$APP_DIR/Backend"
 source venv/bin/activate || rollback
 pip install -r requirements.txt || rollback
 export DJANGO_SETTINGS_MODULE=clinic_project.settings.prod
 
-# Back up the SQLite files (including WAL/SHM, since WAL mode is in use) so
-# a failed/partial migration can be undone by restoring them wholesale,
-# rather than leaving the schema half-migrated.
-for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
-    [ -f "$f" ] && cp "$f" "$f.pre-migrate-bak"
-done
-
-if ! python manage.py migrate; then
-    for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
-        [ -f "$f.pre-migrate-bak" ] && mv "$f.pre-migrate-bak" "$f"
-    done
-    rollback
-fi
-for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
-    rm -f "$f.pre-migrate-bak"
-done
-
 python manage.py collectstatic --noinput || rollback
 
 # --- Frontend ---
+# Deliberately BEFORE `migrate`: this is the step most likely to fail (lock
+# file drift, a bad build) and it doesn't touch the database at all. Doing
+# it first means a frontend failure rolls back with zero database risk.
 cd "$APP_DIR/Frontend"
 npm ci || rollback
 
@@ -140,7 +139,25 @@ rm -rf dist.bak
 npm run build || rollback
 rm -rf dist.bak
 
-# --- Only reached once install/migrate/build all succeeded: sync config
+# --- Database migration — deliberately the LAST thing that can still fail
+#     before we start touching live services. Nothing below this point can
+#     fail in a way that leaves code and schema out of sync: everything
+#     that could still break (frontend build, dependency install) has
+#     already succeeded by the time the schema changes at all. ---
+cd "$APP_DIR/Backend"
+
+# Back up the SQLite files (including WAL/SHM, since WAL mode is in use).
+# Deliberately NOT deleted right after `migrate` succeeds — kept until the
+# restart+health-check below also succeeds (see rollback()'s restore logic
+# for why: a migration can succeed and the new code can still crash on
+# startup, which must undo the schema too, not just the code).
+for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
+    [ -f "$f" ] && cp "$f" "$f.pre-migrate-bak"
+done
+
+python manage.py migrate || rollback
+
+# --- Only reached once install/build/migrate all succeeded: sync config
 #     and restart the live services onto the new code. ---
 cp "$APP_DIR/deploy/clinic-daphne.service" /etc/systemd/system/clinic-daphne.service
 cp "$APP_DIR/deploy/clinic-qcluster.service" /etc/systemd/system/clinic-qcluster.service
@@ -153,5 +170,11 @@ restart_and_verify clinic-daphne || rollback
 verify_daphne_http || rollback
 restart_and_verify clinic-qcluster || rollback
 systemctl reload nginx || rollback
+
+# Every step succeeded — safe to drop the pre-migrate DB backup now.
+cd "$APP_DIR/Backend"
+for f in db.sqlite3 db.sqlite3-wal db.sqlite3-shm; do
+    rm -f "$f.pre-migrate-bak"
+done
 
 echo "=== Deploy finished successfully: $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="

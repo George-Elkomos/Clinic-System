@@ -19,6 +19,9 @@ Frontend/.vite/
 # --- Dev runner ---
 .run/
 
+# --- Downloaded CI logs (from deploy-notification emails) ---
+pipeline.log
+
 # --- Personal server-ops archive (not part of this project's codebase) ---
 Server-Documentation/
 
