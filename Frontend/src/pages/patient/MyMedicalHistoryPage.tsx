@@ -13,8 +13,12 @@ import { authApi } from '../../services/auth.api'
 import { medicalApi } from '../../services/medical.api'
 import type { PatientProfile } from '../../services/types'
 
-const FIELD_CLASS =
-  'w-full rounded-xl border border-slate-200 bg-slate-50/30 p-3 text-sm text-slate-800 outline-none transition-all focus:border-[#3BC9CB] focus:bg-white'
+// Plain CSS class, not Tailwind utilities — globals.css sets
+// input/select/textarea border/radius/background/color/padding as unlayered
+// plain CSS, which silently beats Tailwind's (always-layered) utilities for
+// those same properties regardless of className. See patient-field in
+// patient-tokens.css.
+const FIELD_CLASS = 'patient-field'
 
 function FieldLabel({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
   return (
@@ -28,7 +32,10 @@ function FieldLabel({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-[#F3F4F6] bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-bold text-slate-800">{title}</h2>
+      {/* patient-text-h2 (plain CSS), not text-xl — globals.css's unlayered
+          `h2 { font-size: var(--font-h2) }` (27px) beats any Tailwind size
+          utility here regardless of className. */}
+      <h2 className="patient-text-h2 text-slate-800">{title}</h2>
       {children}
     </div>
   )
@@ -71,7 +78,9 @@ function BackgroundForm({ initial }: { initial: PatientProfile }) {
 
   return (
     <SectionCard title={t('medical.background')}>
-      <p className="mt-1 text-sm text-slate-500">{t('medical.backgroundIntro')}</p>
+      {/* globals.css's unlayered `p { margin: 0 0 var(--space-3) }` forces
+          margin-top:0 regardless of a mt-* class, so this goes inline instead. */}
+      <p className="text-sm text-slate-500" style={{ marginTop: '0.25rem' }}>{t('medical.backgroundIntro')}</p>
 
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col">
@@ -124,7 +133,7 @@ export function MyMedicalHistoryPage() {
   return (
     <div className="flex flex-col gap-6">
       <Breadcrumbs trail={[{ label: t('nav.medicalHistory') }]} />
-      <h1 className="text-xl font-bold sm:text-2xl lg:text-3xl" style={{ color: 'var(--text-primary)' }}>
+      <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>
         {t('nav.medicalHistory')}
       </h1>
 

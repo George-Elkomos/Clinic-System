@@ -118,7 +118,7 @@ function WelcomeBanner({ name }: { name: string }) {
     >
       <HeroIllustration />
       <div className="flex flex-col justify-center gap-2">
-        <h1 className="text-2xl font-bold lg:text-3xl" style={{ color: '#1E293B' }}>
+        <h1 className="patient-text-greeting" style={{ color: '#1E293B' }}>
           {t('dashboard.goodMorning', { name })}
         </h1>
         <p className="text-sm" style={{ color: '#64748B' }}>
@@ -298,24 +298,35 @@ export function PatientDashboard() {
     return ageDays <= RECENT_LAB_WINDOW_DAYS
   }).length
 
-  const weekdayOnly = (iso: string) =>
-    new Intl.DateTimeFormat(language, { weekday: 'long' }).format(new Date(iso))
   const timeOnly = (iso: string) =>
     new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(new Date(iso))
-  // Widget value only — no weekday, matching DESIGN.md's own "May 12, 2024" example
-  // (the appointments list keeps the weekday, per its own "Sunday May 26, 2024" example).
+  // Widget value only — no weekday, matching DESIGN.md's own "May 12, 2024" example.
   const shortDate = (iso: string) =>
     new Intl.DateTimeFormat(language, { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(iso))
+  // Appointment-card date: one inline string ("Wed, Aug 5, 2026") instead of a
+  // stacked weekday/date pair — stacking made row height (and thus wrapping)
+  // depend on each card's own content, so cards looked inconsistent next to
+  // each other.
+  const dateWithWeekday = (iso: string) =>
+    new Intl.DateTimeFormat(language, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }).format(
+      new Date(iso),
+    )
 
   return (
-    <div className="mx-auto flex max-w-[1611px] flex-col gap-8">
+    <div className="mx-auto flex max-w-[1611px] flex-col gap-8 pb-[90px]">
       <WelcomeBanner name={user?.first_name || user?.email || ''} />
 
       <section>
-        <h2 className="mb-4 text-xl font-bold leading-7" style={{ color: '#1F2937' }}>
+        <h2 className="patient-text-h2" style={{ color: '#1F2937', marginBottom: '1rem' }}>
           {t('dashboard.quickActionsTitle')}
         </h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Exactly 2 cards — capped at 2 columns rather than opening a 3rd
+            empty column at lg+ like a generic 3-card grid would. This section
+            sits outside the lg:grid-cols-3 sidebar layout below, so it always
+            has the full page width — the sidebar itself doesn't reappear
+            until lg (1024px), so a 2-up split from sm (640px) never gets
+            squeezed. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <BookAppointmentQuickAction
             to="/patient/book"
             title={t('dashboard.bookApptTitle')}
@@ -329,11 +340,15 @@ export function PatientDashboard() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
-        <section className="flex flex-col gap-4">
+      {/* Mobile/tablet (<lg) DOM order is the visual order: Upcoming, then
+          the summary cards, then Need Help last. At lg+ each item gets an
+          explicit grid position instead, restoring the two-column desktop
+          layout (Upcoming+NeedHelp stacked on the left, summary cards
+          filling the right column) regardless of that DOM order. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:grid-rows-[auto_auto]">
+        <section className="flex flex-col gap-4 lg:col-start-1 lg:col-span-2 lg:row-start-1">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold leading-7" style={{ color: '#1F2937' }}>
+            <h2 className="patient-text-h2" style={{ color: '#1F2937' }}>
               {t('dashboard.upcoming')}
             </h2>
             <Link
@@ -356,44 +371,41 @@ export function PatientDashboard() {
               return (
                 <div
                   key={a.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                  className="flex w-full flex-col items-start gap-3 overflow-hidden rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm"
                 >
-                  <div className="flex items-center gap-4">
-                    <MoreVertical size={16} className="hidden shrink-0 sm:block" style={{ color: 'var(--text-muted)' }} />
-                    <img src={avatarUrl(a.doctor_name)} alt="" className="h-10 w-10 shrink-0 rounded-full" />
-                    <div className="min-w-0">
-                      <div className="patient-text-card-title truncate" style={{ color: 'var(--text-primary)' }}>
-                        {a.doctor_name}
+                  {/* Header: avatar+name/type vs. status badge — its own row so it
+                      never has to compete with the date/time line for width. */}
+                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex w-full items-center gap-3">
+                      <MoreVertical size={16} className="hidden shrink-0 sm:block" style={{ color: 'var(--text-muted)' }} />
+                      <img src={avatarUrl(a.doctor_name)} alt="" className="h-10 w-10 shrink-0 rounded-full" />
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <div className="patient-text-card-title truncate" style={{ color: 'var(--text-primary)' }}>
+                          {a.doctor_name}
+                        </div>
+                        <div className="truncate text-xs font-medium text-slate-500">{a.type_display}</div>
                       </div>
-                      <div className="patient-text-body-secondary truncate" style={{ color: 'var(--text-secondary)' }}>
-                        {a.type_display}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-8">
-                    <div
-                      className="patient-text-body-secondary flex items-center gap-2 whitespace-nowrap"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      <Calendar size={16} />
-                      <div className="flex flex-col">
-                        <span>{weekdayOnly(a.scheduled_start)}</span>
-                        <span>{shortDate(a.scheduled_start)}</span>
-                      </div>
-                    </div>
-                    <div
-                      className="patient-text-body-secondary flex items-center gap-2 whitespace-nowrap"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      <Clock size={16} />
-                      {timeOnly(a.scheduled_start)}
                     </div>
                     <span
-                      className="patient-text-badge shrink-0 self-start rounded-full border px-3 py-1 text-center sm:self-center"
+                      className="patient-text-badge shrink-0 self-start whitespace-nowrap rounded-full border px-3 py-1 sm:self-center"
                       style={{ background: pill.bg, borderColor: pill.border, color: pill.text }}
                     >
                       {t(`status.${a.status}`)}
                     </span>
+                  </div>
+
+                  {/* Date & time — same two flex items in every card, so the
+                      row lines up card-to-card instead of drifting with
+                      each card's own content. */}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-600">
+                      <Calendar size={16} className="shrink-0" />
+                      {dateWithWeekday(a.scheduled_start)}
+                    </div>
+                    <div className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-600">
+                      <Clock size={16} className="shrink-0" />
+                      {timeOnly(a.scheduled_start)}
+                    </div>
                   </div>
                 </div>
               )
@@ -401,33 +413,13 @@ export function PatientDashboard() {
           )}
         </section>
 
-        <section
-          className="flex flex-col items-center justify-between gap-4 rounded-2xl border p-6 sm:flex-row"
-          style={{ background: '#F1F5F9', borderColor: '#E2E8F0' }}
-        >
-          <div className="flex items-center gap-6">
-            <img src="/SupportTeam.svg" alt="" className="h-[56px] w-[89.84px] shrink-0 object-contain" />
-            <div className="flex flex-col gap-1">
-              <h3 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>
-                {t('dashboard.needHelp')}
-              </h3>
-              <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>
-                {t('dashboard.needHelpBody')}
-              </p>
-            </div>
-          </div>
-          <a
-            href="mailto:support@clinic.example"
-            className="patient-text-body flex shrink-0 items-center gap-2 rounded-xl px-6 py-3 font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, #0769AE 0%, #4B9AF0 100%)' }}
-          >
-            <Phone size={16} />
-            {t('dashboard.contactSupport')}
-          </a>
-        </section>
-        </div>
-
-        <div className="flex flex-col gap-4 pb-[90px] lg:col-span-1">
+        {/* sm/md widen this to 2/3 columns since it has the full page width
+            up to lg — at lg (1024px) this column narrows to 1/3 of the page
+            (sidebar reappears), so it drops back to grid-cols-1 there rather
+            than cramming 3 cards into that space. Spans both explicit rows at
+            lg so it runs the full height of the Upcoming+NeedHelp column
+            next to it. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:col-start-3 lg:col-span-1 lg:row-start-1 lg:row-span-2 lg:grid-cols-1">
           <SummaryCard
             icon={CalendarCheckSolidIcon}
             iconBg="#E6F7F7"
@@ -463,6 +455,40 @@ export function PatientDashboard() {
             subtitle={t('dashboard.resultsUnit')}
           />
         </div>
+
+        {/* Last in the mobile/tablet flow — Quick Actions, Upcoming, summary
+            cards, then this. At lg it moves back under Upcoming Appointments,
+            in the same left column. Row layout needs ~470px+ of container
+            width (fixed illustration + button leave little slack for the
+            text): available at sm through just-under-lg (full page width
+            here, sidebar not shown yet) and again from xl (this column is
+            wide enough again by then) — but NOT at lg itself, where the
+            sidebar reappears and the column narrows to ~1/3 of the page,
+            squeezing the row down to one word per line. */}
+        <section
+          className="flex flex-col items-center justify-between gap-4 rounded-2xl border p-6 sm:flex-row lg:col-start-1 lg:col-span-2 lg:row-start-2 lg:flex-col xl:flex-row"
+          style={{ background: '#F1F5F9', borderColor: '#E2E8F0' }}
+        >
+          <div className="flex items-center gap-6">
+            <img src="/SupportTeam.svg" alt="" className="h-[56px] w-[89.84px] shrink-0 object-contain" />
+            <div className="flex flex-col gap-1">
+              <h3 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>
+                {t('dashboard.needHelp')}
+              </h3>
+              <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>
+                {t('dashboard.needHelpBody')}
+              </p>
+            </div>
+          </div>
+          <a
+            href="mailto:support@clinic.example"
+            className="patient-text-body flex shrink-0 items-center gap-2 rounded-xl px-6 py-3 font-semibold text-white"
+            style={{ background: 'linear-gradient(135deg, #0769AE 0%, #4B9AF0 100%)' }}
+          >
+            <Phone size={16} />
+            {t('dashboard.contactSupport')}
+          </a>
+        </section>
       </div>
     </div>
   )

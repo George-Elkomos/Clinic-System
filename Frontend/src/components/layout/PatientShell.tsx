@@ -228,7 +228,7 @@ export function PatientShell() {
     <div className="patient-shell flex min-h-screen">
       {mobileNavOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm transition-opacity md:hidden"
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm transition-opacity lg:hidden"
           onClick={() => setMobileNavOpen(false)}
           aria-hidden="true"
         />
@@ -247,7 +247,7 @@ export function PatientShell() {
           </Link>
           <button
             type="button"
-            className="border-0 bg-transparent p-1 md:hidden"
+            className="border-0 bg-transparent p-1 lg:hidden"
             onClick={() => setMobileNavOpen(false)}
             aria-label={t('nav.close')}
           >
@@ -319,16 +319,16 @@ export function PatientShell() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="-ms-1 border-0 bg-transparent p-2 md:hidden"
+              className="-ms-1 border-0 bg-transparent p-2 lg:hidden"
               onClick={() => setMobileNavOpen(true)}
               aria-label={t('nav.menu')}
             >
               <Menu size={22} style={{ color: 'var(--text-secondary)' }} />
             </button>
-            <Link to="/patient" className="md:hidden">
+            <Link to="/patient" className="lg:hidden">
               <Logo className="h-8 w-auto object-contain" />
             </Link>
-            <h1 className="hidden text-2xl font-bold leading-8 md:block lg:text-3xl" style={{ color: '#1C4879' }}>
+            <h1 className="hidden text-3xl font-bold leading-8 lg:block" style={{ color: '#1C4879' }}>
               {t(currentItem?.labelKey ?? 'nav.dashboard')}
             </h1>
           </div>
@@ -339,8 +339,8 @@ export function PatientShell() {
               className="h-9 w-9 rounded-full border border-gray-200 object-cover"
             />
             <PatientHeaderBell />
-            <div className="hidden h-6 w-px bg-gray-200 md:block" aria-hidden="true" />
-            <div className="hidden md:block">
+            <div className="hidden h-6 w-px bg-gray-200 lg:block" aria-hidden="true" />
+            <div className="hidden lg:block">
               <PatientLanguageToggle />
             </div>
           </div>

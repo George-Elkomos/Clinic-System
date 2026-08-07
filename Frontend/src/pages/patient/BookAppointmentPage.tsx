@@ -292,7 +292,7 @@ export function BookAppointmentPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {(slots ?? []).map((s) => (
               <button
                 key={s.id}

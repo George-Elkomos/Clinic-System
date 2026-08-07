@@ -45,6 +45,11 @@
 }
 
 @theme {
+  /* Extra breakpoint below Tailwind's default `sm` (640px), for the point
+     where an appointment card's date/time/badge row needs to go back to
+     a single column on very narrow phones. */
+  --breakpoint-xs: 30rem;
+
   --color-bg-app: var(--bg-app);
   --color-bg-surface: var(--bg-surface);
   --color-brand-teal-start: var(--brand-teal-start);
@@ -96,31 +101,43 @@
   font-size: inherit;
   min-height: 0; /* overrides globals.css's 48px elder-friendly tap-target floor */
 }
-/* globals.css's `input, select, textarea {...}` (unlayered) sets its own
-   border/radius/background/color/padding/width — since it's unlayered, it
-   beats Tailwind's layered utilities on every field regardless of the
-   className used. Reset those specific properties back to nothing here so
-   Tailwind classes (border, rounded-*, bg-*, p-*, text-*) actually take
-   effect on patient-shell fields, same fix as the `.patient-shell a` reset
-   above for anchors. */
-.patient-shell input,
-.patient-shell select,
-.patient-shell textarea {
-  width: auto;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: inherit;
+/* globals.css's `input, select, textarea {...}` and `h1`/`h2`/`h3` rules are
+   unlayered plain CSS, which beats ANY Tailwind utility (always layered) for
+   the same property — no matter the className, no matter specificity. A
+   "reset to neutral" here doesn't fix that: it would just be a different
+   unlayered value still blocking Tailwind. The actual fix is to give these
+   elements their real, final style as plain CSS too — unlayered vs.
+   unlayered plays by normal specificity, so a single class already outranks
+   globals.css's bare element selectors, same as `.patient-shell a` above. */
+.patient-field {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  background: rgba(248, 250, 252, 0.3);
+  font-size: 0.875rem;
+  color: #1E293B;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-/* Same problem for h1/h2/h3/p — globals.css sets font-size/margin unlayered. */
-.patient-shell h1,
-.patient-shell h2,
-.patient-shell h3,
-.patient-shell p {
-  margin: 0;
-  font-size: inherit;
-}
+.patient-field:focus { border-color: #3BC9CB; background: #FFFFFF; }
+/* Variant for fields that want a plain white background + smaller text
+   instead of the tinted default above (e.g. the review-comment box). */
+.patient-field--compact { background: #FFFFFF; font-size: 0.75rem; }
+
+.patient-text-h2 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.4; }
+
+/* Page-level h1 title — scales per the responsive typography spec. */
+.patient-text-page-title { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.3; }
+@media (min-width: 640px) { .patient-text-page-title { font-size: 1.5rem; } }
+@media (min-width: 1024px) { .patient-text-page-title { font-size: 1.875rem; } }
+
+/* Welcome Banner greeting h1 — was silently rendering at globals.css's 34px
+   elder-friendly default this whole time (text-2xl lg:text-3xl is layered,
+   loses to the unlayered h1 rule), never the intended 24px/30px. */
+.patient-text-greeting { margin: 0; font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+@media (min-width: 1024px) { .patient-text-greeting { font-size: 1.875rem; } }
 /* Tailwind's preflight (which normally unsets this) is intentionally skipped,
    so the browser's default underlined/blue anchor styling has to be reset
    here instead — scoped to .patient-shell only. §5 underlines are opt-in via
@@ -140,8 +157,9 @@
 .patient-sidebar.is-open { transform: translateX(0); }
 /* [dir] (attribute selector) matches specificity with [dir='rtl'] above so this
    reliably wins at desktop widths regardless of language direction. Breakpoint
-   is md (768px), matching PatientShell's own md:hidden drawer-trigger controls. */
-@media (min-width: 768px) {
+   is lg (1024px), matching PatientShell's own lg:hidden drawer-trigger controls
+   — tablets (iPad Air/Pro, Nest Hub, etc.) stay on the drawer nav. */
+@media (min-width: 1024px) {
   [dir] .patient-sidebar { position: sticky; transform: none; }
 }
 

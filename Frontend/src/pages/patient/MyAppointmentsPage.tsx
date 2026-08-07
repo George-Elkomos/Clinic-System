@@ -153,7 +153,7 @@ function LeaveReviewBox({ appointmentId, onDone }: { appointmentId: number; onDo
       <div>
         <div className="mb-1.5 text-xs font-semibold text-slate-700">{t('reviews.comment')}</div>
         <textarea
-          className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 transition-all focus:border-[#3BC9CB] focus:outline-none"
+          className="patient-field patient-field--compact h-20 resize-none"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
         />
@@ -241,7 +241,9 @@ export function MyAppointmentsPage() {
     <div className="space-y-6">
       <div>
         <Breadcrumbs trail={[{ label: t('appointments.myTitle') }]} />
-        <h1>{t('appointments.myTitle')}</h1>
+        <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>
+          {t('appointments.myTitle')}
+        </h1>
       </div>
 
       {todayActive && <TodayStatusCard appt={todayActive} />}
@@ -307,9 +309,9 @@ export function MyAppointmentsPage() {
           const canCancel = ['PENDING', 'CONFIRMED'].includes(a.status)
           const canReview = a.status === 'COMPLETED' && !reviewedIds.has(a.id) && reviewingId !== a.id
           return (
-            <div key={a.id} className="flex flex-col">
-              <div className="flex flex-col gap-3 rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
+            <div key={a.id} className="flex w-full flex-col overflow-hidden">
+              <div className="flex w-full flex-col items-start justify-between gap-2 overflow-hidden rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+                <div className="flex min-w-0 items-center gap-4">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
                     {doctorInitials(a.doctor_name)}
                   </span>
@@ -320,15 +322,15 @@ export function MyAppointmentsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                   <div className="flex items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-600">
-                    <Calendar size={14} className="text-slate-400" />
+                    <Calendar size={14} className="shrink-0 text-slate-400" />
                     {dateLabel}
                   </div>
                   <div className="flex items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-600">
-                    <Clock size={14} className="text-slate-400" />
+                    <Clock size={14} className="shrink-0 text-slate-400" />
                     {timeLabel}
                   </div>
                   <span
-                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${STATUS_BADGE[a.status] ?? STATUS_BADGE.CANCELLED}`}
+                    className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[a.status] ?? STATUS_BADGE.CANCELLED}`}
                   >
                     {t(`status.${a.status}`)}
                   </span>
@@ -387,22 +389,22 @@ export function MyAppointmentsPage() {
             return (
               <div
                 key={w.id}
-                className="mb-3 flex flex-col gap-3 rounded-2xl border border-[#F3F4F6] bg-white p-4 shadow-sm last:mb-0 sm:flex-row sm:items-center sm:justify-between"
+                className="mb-3 flex w-full flex-col items-start justify-between gap-2 overflow-hidden rounded-2xl border border-[#F3F4F6] bg-white p-4 shadow-sm last:mb-0 sm:flex-row sm:items-center"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex min-w-0 items-center gap-4">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
                     {doctorInitials(w.doctor_name)}
                   </span>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-slate-800">{w.doctor_name}</div>
                     <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <Calendar size={13} className="text-slate-400" />
-                      {rangeLabel}
+                      <Calendar size={13} className="shrink-0 text-slate-400" />
+                      <span className="truncate">{rangeLabel}</span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>
                     {w.status === 'NOTIFIED' ? t('waitlist.statusNotified') : t('waitlist.statusWaiting')}
                   </span>
                   <button
