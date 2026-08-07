@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Sunrise Family Clinic",
+    "name": "Nabda",
     "tagline": "Professional healthcare management"
   },
   "common": {
@@ -45,8 +45,8 @@
     "reports": "Reports",
     "reviews": "Reviews",
     "auditLog": "Audit Log",
-    "medicalHistory": "Medical History",
-    "scansLabs": "Scans & Lab Results",
+    "medicalHistory": "My History",
+    "scansLabs": "Scans & Labs",
     "prescriptions": "Prescriptions",
     "patients": "My Patients",
     "allPatients": "Patients",
@@ -54,21 +54,27 @@
     "liveQueue": "Live Queue",
     "settings": "Settings",
     "signOut": "Sign Out",
+    "logOut": "Log Out",
     "users": "Users",
     "menu": "Open menu",
     "close": "Close menu",
     "vitals": "Vital Signs",
     "labOrders": "Lab Orders",
     "labResults": "Lab Results",
-    "timeline": "History Timeline",
+    "timeline": "Medical Timeline",
     "encounter": "Clinical Encounter",
     "billing": "Billing Desk",
-    "myInvoices": "My Invoices",
+    "myInvoices": "Invoices",
     "billingReports": "Financials",
-    "myReferrals": "My Referrals",
+    "myReferrals": "Referrals",
     "referrals": "Referrals",
     "radiology": "Radiology",
-    "radiologyWorklist": "Radiology Worklist"
+    "radiologyWorklist": "Radiology Worklist",
+    "patientDashboard": "Dashboard",
+    "sectionMain": "Main",
+    "sectionRecords": "Medical Records",
+    "sectionServices": "Services",
+    "sectionSettings": "Settings"
   },
   "roles": {
     "PATIENT": "Patient",
@@ -116,13 +122,29 @@
   },
   "dashboard": {
     "welcome": "Welcome, {{name}}",
-    "patientIntro": "Book a visit or review your upcoming appointments.",
+    "goodMorning": "Good morning, {{name}}!",
+    "patientIntro": "Track your appointments and medical records with ease.",
     "doctorIntro": "Here is your schedule and today's patients.",
     "secretaryIntro": "Manage appointments, doctors, and the waiting room.",
     "managerIntro": "Review clinic activity, reports, and audit logs.",
-    "upcoming": "Your upcoming appointments",
+    "upcoming": "Upcoming appointments",
     "todayQueue": "Today's queue",
-    "quickActions": "Quick actions"
+    "quickActions": "Quick actions",
+    "quickActionsTitle": "Quick Actions",
+    "bookApptTitle": "Book New Appointment",
+    "bookApptSubtitle": "Book an appointment with the right doctor",
+    "viewApptsTitle": "View My Appointments",
+    "viewApptsSubtitle": "Browse all your upcoming appointments",
+    "upcomingWidget": "Upcoming Appointments",
+    "appointmentsUnit": "Appointments",
+    "latestPrescription": "Latest Prescription",
+    "viewPrescription": "View Prescription",
+    "newLabResults": "New Lab Results",
+    "resultsUnit": "New Results",
+    "needHelp": "Need Help?",
+    "needHelpBody": "Our support team is available to answer your questions and assist you anytime.",
+    "contactSupport": "Contact Support",
+    "viewAll": "View All"
   },
   "booking": {
     "title": "Book an Appointment",
@@ -156,6 +178,8 @@
     "start": "Start visit",
     "complete": "Complete",
     "filterAll": "All",
+    "filterUpcoming": "Upcoming",
+    "filterCompleted": "Completed",
     "noResults": "No appointments match this filter."
   },
   "schedule": {

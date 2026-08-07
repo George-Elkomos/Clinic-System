@@ -1,10 +1,11 @@
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // Dev server proxies API + media to the Django backend so the SPA and API share
 // an origin in development (keeps the httpOnly refresh cookie same-site).
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     proxy: {

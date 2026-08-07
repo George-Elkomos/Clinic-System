@@ -4,6 +4,7 @@ import { Link, Outlet } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { Button } from '../primitives/Button'
 import { LanguageSwitcher } from '../primitives/LanguageSwitcher'
+import { Logo } from './Logo'
 import { NotificationBell } from './NotificationBell'
 import { RoleNav } from './RoleNav'
 import './layout.css'
@@ -22,7 +23,7 @@ export function AppShell() {
         <label htmlFor="nav-open" className="nav-toggle__btn" aria-label={t('nav.menu')}>
           <span aria-hidden="true">☰</span>
         </label>
-        <h1 className="shell__brand">{t('app.name')}</h1>
+        <Logo className="h-8" />
         <div className="shell__spacer" />
         <div className="shell__actions">
           <span className="shell__user">

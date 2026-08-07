@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 
 import { AppShell } from '../components/layout/AppShell'
+import { PatientShell } from '../components/layout/PatientShell'
 import { ForbiddenPage, NotFoundPage } from '../pages/public/ErrorPages'
 import { KioskQueuePage } from '../pages/public/KioskQueuePage'
 import { LoginPage } from '../pages/public/LoginPage'
@@ -69,7 +70,7 @@ export const router = createBrowserRouter([
   // Patient
   {
     path: '/patient',
-    element: <RoleRoute roles={['PATIENT']}><AppShell /></RoleRoute>,
+    element: <RoleRoute roles={['PATIENT']}><PatientShell /></RoleRoute>,
     children: [
       { index: true, element: <PatientDashboard /> },
       { path: 'book', element: <BookAppointmentPage /> },
@@ -83,6 +84,7 @@ export const router = createBrowserRouter([
       { path: 'invoices', element: <MyInvoicesPage /> },
       { path: 'referrals', element: <MyReferralsPage /> },
       { path: 'radiology', element: <MyRadiologyPage /> },
+      { path: 'settings', element: <NotificationPrefsPage /> },
     ],
   },
 

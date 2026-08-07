@@ -15,6 +15,11 @@ import './components/primitives/primitives.css'
 import './components/ai/ai-scribe.css'
 import './components/billing/billing.css'
 import './components/analytics/analytics.css'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+import '@fontsource/inter/700.css'
+import './theme/patient-tokens.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "عيادة الشروق العائلية",
+    "name": "Nabda",
     "tagline": "رعاية صحية احترافية متكاملة"
   },
   "common": {
@@ -45,7 +45,7 @@
     "reports": "التقارير",
     "reviews": "التقييمات",
     "auditLog": "سجل التدقيق",
-    "medicalHistory": "السجل الطبي",
+    "medicalHistory": "سجلي الطبي",
     "scansLabs": "الأشعة والتحاليل",
     "prescriptions": "الوصفات الطبية",
     "patients": "مرضاي",
@@ -54,21 +54,27 @@
     "liveQueue": "قائمة الانتظار الحية",
     "settings": "الإعدادات",
     "signOut": "تسجيل الخروج",
+    "logOut": "تسجيل الخروج",
     "users": "المستخدمون",
     "menu": "فتح القائمة",
     "close": "إغلاق القائمة",
     "vitals": "العلامات الحيوية",
     "labOrders": "طلبات المختبر",
     "labResults": "نتائج المختبر",
-    "timeline": "الخط الزمني للتاريخ",
+    "timeline": "الخط الزمني الطبي",
     "encounter": "الزيارة السريرية",
     "billing": "مكتب الفواتير",
-    "myInvoices": "فواتيري",
+    "myInvoices": "الفواتير",
     "billingReports": "التقارير المالية",
-    "myReferrals": "إحالاتي",
+    "myReferrals": "الإحالات",
     "referrals": "الإحالات",
     "radiology": "الأشعة",
-    "radiologyWorklist": "قائمة عمل الأشعة"
+    "radiologyWorklist": "قائمة عمل الأشعة",
+    "patientDashboard": "الرئيسية",
+    "sectionMain": "الرئيسية",
+    "sectionRecords": "السجلات الطبية",
+    "sectionServices": "الخدمات",
+    "sectionSettings": "الإعدادات"
   },
   "roles": {
     "PATIENT": "مريض",
@@ -116,13 +122,29 @@
   },
   "dashboard": {
     "welcome": "مرحبًا، {{name}}",
-    "patientIntro": "احجز زيارة أو راجع مواعيدك القادمة.",
+    "goodMorning": "صباح الخير، {{name}}!",
+    "patientIntro": "تابع مواعيدك وسجلاتك الطبية بسهولة.",
     "doctorIntro": "هذا جدولك ومرضى اليوم.",
     "secretaryIntro": "إدارة المواعيد والأطباء وغرفة الانتظار.",
     "managerIntro": "راجع نشاط العيادة والتقارير وسجلات التدقيق.",
-    "upcoming": "مواعيدك القادمة",
+    "upcoming": "المواعيد القادمة",
     "todayQueue": "قائمة اليوم",
-    "quickActions": "إجراءات سريعة"
+    "quickActions": "إجراءات سريعة",
+    "quickActionsTitle": "إجراءات سريعة",
+    "bookApptTitle": "حجز موعد جديد",
+    "bookApptSubtitle": "احجز موعدًا مع الطبيب المناسب",
+    "viewApptsTitle": "عرض مواعيدي",
+    "viewApptsSubtitle": "تصفح جميع مواعيدك القادمة",
+    "upcomingWidget": "المواعيد القادمة",
+    "appointmentsUnit": "موعد",
+    "latestPrescription": "آخر وصفة طبية",
+    "viewPrescription": "عرض الوصفة",
+    "newLabResults": "نتائج تحاليل جديدة",
+    "resultsUnit": "نتيجة جديدة",
+    "needHelp": "تحتاج مساعدة؟",
+    "needHelpBody": "فريق الدعم لدينا متاح للإجابة عن استفساراتك ومساعدتك في أي وقت.",
+    "contactSupport": "تواصل مع الدعم",
+    "viewAll": "عرض الكل"
   },
   "booking": {
     "title": "حجز موعد",
@@ -156,6 +178,8 @@
     "start": "بدء الزيارة",
     "complete": "إنهاء",
     "filterAll": "الكل",
+    "filterUpcoming": "القادمة",
+    "filterCompleted": "المكتملة",
     "noResults": "لا توجد مواعيد تطابق هذا التصفية."
   },
   "schedule": {

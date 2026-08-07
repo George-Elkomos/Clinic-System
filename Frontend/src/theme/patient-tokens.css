@@ -1,0 +1,198 @@
+/* Tailwind, scoped to utilities only — no preflight, so the elder-friendly
+   reset in globals.css (used by Doctor/Secretary/Manager) is untouched. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* DESIGN.md §2 — exact token values for the patient dashboard redesign. */
+:root {
+  /* Backgrounds */
+  --bg-app: #F8FAFC;
+  --bg-surface: #FFFFFF;
+
+  /* Primary & Accents (Gradients & Solid) */
+  --brand-teal-start: #1AB5B3;
+  --brand-teal-end: #38E4DD;
+  --brand-blue-start: #2A79DF;
+  --brand-blue-end: #54A2FF;
+  --btn-blue: #1E73E8;
+
+  --brand-purple-bg: #F3E8FF;
+  --brand-purple-text: #8B5CF6;
+
+  /* Text Colors */
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  --text-inverse: #FFFFFF;
+
+  /* Status Colors (Badges) */
+  --status-warning-bg: #FFF7ED;
+  --status-warning-text: #F97316;
+  --status-info-bg: #EFF6FF;
+  --status-info-text: #3B82F6;
+  --status-success-bg: #ECFDF5;
+  --status-success-text: #10B981;
+  /* Extension beyond the 3 named states, for CANCELLED/NO_SHOW rows the mock never shows */
+  --status-neutral-bg: #F1F5F9;
+  --status-neutral-text: #64748B;
+
+  /* Structural */
+  --border-light: #E2E8F0;
+  --border-teal-soft: #A4DDD1; /* Welcome Banner border */
+
+  --patient-font-family: 'Inter', 'Noto Naskh Arabic', system-ui, sans-serif;
+  --patient-shadow-card: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+@theme {
+  --color-bg-app: var(--bg-app);
+  --color-bg-surface: var(--bg-surface);
+  --color-brand-teal-start: var(--brand-teal-start);
+  --color-brand-teal-end: var(--brand-teal-end);
+  --color-brand-blue-start: var(--brand-blue-start);
+  --color-brand-blue-end: var(--brand-blue-end);
+  --color-btn-blue: var(--btn-blue);
+  --color-brand-purple-bg: var(--brand-purple-bg);
+  --color-brand-purple-text: var(--brand-purple-text);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+  --color-status-warning-bg: var(--status-warning-bg);
+  --color-status-warning-text: var(--status-warning-text);
+  --color-status-info-bg: var(--status-info-bg);
+  --color-status-info-text: var(--status-info-text);
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-success-text: var(--status-success-text);
+  --color-status-neutral-bg: var(--status-neutral-bg);
+  --color-status-neutral-text: var(--status-neutral-text);
+  --color-border-light: var(--border-light);
+
+  --radius-card: 16px;
+  --radius-action: 20px;
+  --radius-btn: 8px;
+  --radius-banner: 24px;
+
+  --font-patient: var(--patient-font-family);
+
+  --shadow-card: var(--patient-shadow-card);
+}
+
+/* Root scope for every patient-shell screen — resets the inherited
+   elder-friendly body font-size/color (globals.css) to the §2 scale without
+   touching globals.css itself, so Doctor/Secretary/Manager are unaffected. */
+.patient-shell {
+  font-family: var(--patient-font-family);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.patient-shell button,
+.patient-shell input,
+.patient-shell select,
+.patient-shell textarea {
+  font-family: inherit;
+  font-size: inherit;
+  min-height: 0; /* overrides globals.css's 48px elder-friendly tap-target floor */
+}
+/* globals.css's `input, select, textarea {...}` (unlayered) sets its own
+   border/radius/background/color/padding/width — since it's unlayered, it
+   beats Tailwind's layered utilities on every field regardless of the
+   className used. Reset those specific properties back to nothing here so
+   Tailwind classes (border, rounded-*, bg-*, p-*, text-*) actually take
+   effect on patient-shell fields, same fix as the `.patient-shell a` reset
+   above for anchors. */
+.patient-shell input,
+.patient-shell select,
+.patient-shell textarea {
+  width: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+/* Same problem for h1/h2/h3/p — globals.css sets font-size/margin unlayered. */
+.patient-shell h1,
+.patient-shell h2,
+.patient-shell h3,
+.patient-shell p {
+  margin: 0;
+  font-size: inherit;
+}
+/* Tailwind's preflight (which normally unsets this) is intentionally skipped,
+   so the browser's default underlined/blue anchor styling has to be reset
+   here instead — scoped to .patient-shell only. §5 underlines are opt-in via
+   the hover:underline utility on "View All"/"View Prescription" links. */
+.patient-shell a { text-decoration: none; color: inherit; }
+
+/* Sidebar drawer positioning — plain CSS instead of Tailwind's rtl:/lg:
+   variants, which raced each other and made the sidebar's transform apply
+   even at desktop widths when dir="rtl". */
+.patient-sidebar {
+  position: fixed;
+  inset-inline-start: 0;
+  top: 0;
+  transform: translateX(-100%);
+}
+[dir='rtl'] .patient-sidebar { transform: translateX(100%); }
+.patient-sidebar.is-open { transform: translateX(0); }
+/* [dir] (attribute selector) matches specificity with [dir='rtl'] above so this
+   reliably wins at desktop widths regardless of language direction. Breakpoint
+   is md (768px), matching PatientShell's own md:hidden drawer-trigger controls. */
+@media (min-width: 768px) {
+  [dir] .patient-sidebar { position: sticky; transform: none; }
+}
+
+/* Type scale (DESIGN.md §2) */
+.patient-text-hero { font-size: 1.625rem; font-weight: 700; line-height: 1.2; }
+.patient-text-section { font-size: 1.125rem; font-weight: 700; line-height: 1.4; }
+.patient-text-card-title { font-size: 0.937rem; font-weight: 600; line-height: 1.4; }
+.patient-text-body { font-size: 0.875rem; font-weight: 500; line-height: 1.5; }
+.patient-text-body-secondary { font-size: 0.812rem; font-weight: 400; line-height: 1.5; }
+.patient-text-overline { font-size: 0.625rem; font-weight: 600; line-height: 1.6; text-transform: uppercase; letter-spacing: 0.05em; }
+.patient-text-badge { font-size: 0.75rem; font-weight: 600; line-height: 1rem; }
+
+/* Gradients (kept as plain classes — clearer and more literal to §2/§4 than
+   composing them from Tailwind's gradient utilities). */
+.patient-gradient-teal { background: linear-gradient(135deg, var(--brand-teal-start) 0%, var(--brand-teal-end) 100%); }
+.patient-gradient-blue { background: linear-gradient(135deg, var(--brand-blue-start) 0%, var(--brand-blue-end) 100%); }
+/* Angle wasn't in the extracted Figma properties (only the two stop colors
+   were) — kept at the previously-established 135deg diagonal; confirm
+   against the Figma fill panel if that's wrong. */
+.patient-gradient-hero { background: linear-gradient(135deg, #F0FDFA 0%, #FFFFFF 100%); }
+/* Active sidebar nav item — the same 3-stop gradient as the Nabda logo
+   itself (#0466AE / #4AA6B8 / #35D6D1), not the brand teal/blue tokens
+   used on the quick-action cards elsewhere. */
+.patient-gradient-active-nav { background: linear-gradient(to right, #0466AE 0%, #4AA6B8 50%, #35D6D1 100%); }
+
+.patient-shadow-card { box-shadow: var(--patient-shadow-card); }
+.patient-shadow-teal { box-shadow: 0 8px 20px rgba(26, 181, 179, 0.20); }
+.patient-shadow-blue { box-shadow: 0 8px 20px rgba(42, 121, 223, 0.20); }
+/* Welcome Banner — exact Figma effect value, distinct from patient-shadow-teal above. */
+.patient-shadow-banner { box-shadow: 0px 8px 17.1px rgba(56, 208, 206, 0.15); }
+
+/* Focus ring (§5) */
+.patient-shell :focus-visible {
+  outline: 2px solid var(--brand-teal-start);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Hover lift for cards/buttons (§5) */
+.patient-hover-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.patient-hover-lift:hover { transform: translateY(-2px); }
+
+/* Hide the sidebar nav's native scrollbar — it still scrolls, just without
+   the browser's default scrollbar chrome cluttering the sidebar. */
+.patient-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.patient-hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Thin, unobtrusive scrollbar for the notifications popover list — the
+   tailwind-scrollbar plugin isn't installed in this project, so this is
+   hand-rolled via the standard scrollbar-width/webkit properties instead. */
+.patient-thin-scrollbar { scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
+.patient-thin-scrollbar::-webkit-scrollbar { width: 6px; }
+.patient-thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.patient-thin-scrollbar::-webkit-scrollbar-thumb { background-color: #E2E8F0; border-radius: 9999px; }
