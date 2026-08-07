@@ -43,6 +43,16 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
+    # Without this, two pushes close together trigger two independent
+    # workflow runs that both SSH into the same server and run deploy.sh at
+    # the same time — no shared state between them, so their git/npm/pip/
+    # systemctl operations race each other. cancel-in-progress: false means
+    # the second one queues and waits instead of running concurrently OR
+    # killing the first one mid-deploy (either of which is worse than
+    # waiting a few extra minutes).
+    concurrency:
+      group: clinic-app-deploy
+      cancel-in-progress: false
     steps:
       - name: Deploy via SSH (output captured live, no separate fetch needed)
         env:

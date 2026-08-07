@@ -4,6 +4,22 @@ set -uo pipefail
 # so a bad deploy can restore the previous working state instead of just
 # stopping halfway.
 
+# Defense-in-depth against a second deploy.sh instance running concurrently
+# with this one (the workflow's `concurrency:` guard should already prevent
+# two CI-triggered deploys overlapping, but this also covers a manual run
+# on the server while CI is mid-deploy). Two instances racing each other's
+# git/npm/pip/systemctl operations against the same directory is exactly
+# what caused a real incident once — this must run BEFORE the log redirect
+# below, since that redirect truncates the log file, which would otherwise
+# clobber a still-running instance's active log the moment a second
+# instance starts up and exits.
+LOCK_FILE=/tmp/clinic-app-deploy.lock
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+    echo "Another deploy is already in progress (lock: $LOCK_FILE) — exiting without touching anything. If this seems stuck, check 'ps aux | grep deploy.sh' on the server."
+    exit 1
+fi
+
 # Full run (stdout+stderr) is saved here, overwritten each deploy, AND still
 # streamed back over the SSH session that invoked this script — the log is
 # both persisted on the server for manual debugging and captured by CI in
