@@ -3,15 +3,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { AUTH_INPUT_CLASS } from '../../components/layout/authFormStyles'
 import { PublicLayout } from '../../components/layout/PublicLayout'
 import { FormField } from '../../components/primitives/FormField'
 import { useAuth } from '../../hooks/useAuth'
 import { roleHome } from '../../routes/roleHome'
 import { authApi } from '../../services/auth.api'
 import { errorMessage } from '../../services/apiClient'
-
-const INPUT_CLASS =
-  'w-full h-12 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-800 text-sm font-medium placeholder:text-slate-400 outline-none focus:outline-none focus:bg-white focus:ring-4 focus:ring-[#0D9488]/15 focus:border-[#0D9488] shadow-sm focus:shadow-md transition-all duration-200'
 
 export function RegisterPage() {
   const { t } = useTranslation()
@@ -66,7 +64,11 @@ export function RegisterPage() {
             </div>
           </div>
 
-          <form onSubmit={submit} noValidate className="space-y-5">
+          {/* No space-y-* here — Tailwind v4 implements it via margin-bottom on
+              non-last children, which .field's own margin-bottom (public.css)
+              already supplies; space-y-* would be a second, inert declaration
+              for the same blocked property. */}
+          <form onSubmit={submit} noValidate>
             <FormField label={t('auth.firstName')}>
               {(p) => (
                 <input
@@ -75,7 +77,7 @@ export function RegisterPage() {
                   onChange={(e) => update('first_name', e.target.value)}
                   autoComplete="given-name"
                   required
-                  className={INPUT_CLASS}
+                  className={AUTH_INPUT_CLASS}
                 />
               )}
             </FormField>
@@ -88,7 +90,7 @@ export function RegisterPage() {
                   onChange={(e) => update('last_name', e.target.value)}
                   autoComplete="family-name"
                   required
-                  className={INPUT_CLASS}
+                  className={AUTH_INPUT_CLASS}
                 />
               )}
             </FormField>
@@ -100,7 +102,7 @@ export function RegisterPage() {
                   value={form.phone}
                   onChange={(e) => update('phone', e.target.value)}
                   autoComplete="tel"
-                  className={INPUT_CLASS}
+                  className={AUTH_INPUT_CLASS}
                 />
               )}
             </FormField>
@@ -119,7 +121,7 @@ export function RegisterPage() {
                     onChange={(e) => update('email', e.target.value)}
                     autoComplete="email"
                     required
-                    className={`${INPUT_CLASS} public-input--with-icon`}
+                    className={`${AUTH_INPUT_CLASS} public-input--with-icon`}
                   />
                 </div>
               )}
@@ -139,7 +141,7 @@ export function RegisterPage() {
                     onChange={(e) => update('password', e.target.value)}
                     autoComplete="new-password"
                     required
-                    className={`${INPUT_CLASS} pe-16 public-input--with-icon public-input--with-toggle`}
+                    className={`${AUTH_INPUT_CLASS} pe-16 public-input--with-icon public-input--with-toggle`}
                   />
                   <button
                     type="button"

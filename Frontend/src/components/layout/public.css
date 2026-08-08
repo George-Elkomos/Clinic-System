@@ -46,15 +46,16 @@
 .public-shell button.public-btn--xs {
   font-size: 0.75rem;
 }
-/* Navbar CTAs (Sign In / Create Account / Dashboard) step up from text-xs to
-   text-sm at the sm breakpoint, matching the Doctors <a> link's sizing —
-   plain Tailwind text-xs/sm classes can't do this on a <button> since the
-   base rule above (unlayered) pins font-size. */
-.public-shell button.public-btn--nav-cta {
+/* Any <button> styled to read as text (navbar CTAs, "Sign Out" on the
+   must-change-password page, ...) that needs to step up from text-xs to
+   text-sm at the sm breakpoint, matching sibling <a> links' sizing — plain
+   Tailwind text-xs/sm classes can't do this on a <button> since the base
+   rule above (unlayered) pins font-size. */
+.public-shell button.public-btn--responsive-text {
   font-size: 0.75rem;
 }
 @media (min-width: 640px) {
-  .public-shell button.public-btn--nav-cta {
+  .public-shell button.public-btn--responsive-text {
     font-size: 0.875rem;
   }
 }
@@ -128,9 +129,16 @@
   padding-inline-start: 2.75rem;
 }
 
-/* Field wrapper (shared FormField primitive) */
+/* Field wrapper (shared FormField primitive). primitives.css's unlayered
+   `.field { margin-bottom: var(--space-4) }` needs neutralizing here same as
+   everywhere else in this file — but Tailwind's `space-y-*` on the <form>
+   can't fill the gap back in afterward: Tailwind v4 implements space-y-* as
+   `margin-bottom` on non-last children (not `margin-top` on non-first
+   children like v3), so it's the exact same blocked property, just via a
+   different mechanism. Supply the real final value directly instead of
+   relying on a `space-y-*` class in the JSX. */
 .public-shell .field {
-  margin-bottom: 0;
+  margin-bottom: 1.25rem;
 }
 .public-shell .field__label {
   display: block;

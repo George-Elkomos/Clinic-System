@@ -3,14 +3,12 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
+import { AUTH_INPUT_CLASS } from '../../components/layout/authFormStyles'
 import { PublicLayout } from '../../components/layout/PublicLayout'
 import { FormField } from '../../components/primitives/FormField'
 import { useAuth } from '../../hooks/useAuth'
 import { errorMessage, isConnectivityError } from '../../services/apiClient'
 import { roleHome } from '../../routes/roleHome'
-
-const INPUT_CLASS =
-  'w-full h-12 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-800 text-sm font-medium placeholder:text-slate-400 outline-none focus:outline-none focus:bg-white focus:ring-4 focus:ring-[#0D9488]/15 focus:border-[#0D9488] shadow-sm focus:shadow-md transition-all duration-200'
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -58,7 +56,11 @@ export function LoginPage() {
             </div>
           </div>
 
-          <form onSubmit={submit} noValidate className="space-y-5">
+          {/* No space-y-* here — Tailwind v4 implements it via margin-bottom on
+              non-last children, which .field's own margin-bottom (public.css)
+              already supplies; space-y-* would be a second, inert declaration
+              for the same blocked property. */}
+          <form onSubmit={submit} noValidate>
             <FormField label={t('auth.email')}>
               {(p) => (
                 <div className="relative">
@@ -73,7 +75,7 @@ export function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className={`${INPUT_CLASS} public-input--with-icon`}
+                    className={`${AUTH_INPUT_CLASS} public-input--with-icon`}
                   />
                 </div>
               )}
@@ -93,7 +95,7 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className={`${INPUT_CLASS} public-input--with-icon`}
+                    className={`${AUTH_INPUT_CLASS} public-input--with-icon`}
                   />
                 </div>
               )}

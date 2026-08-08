@@ -1,10 +1,11 @@
+import { Lock } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
-import { Button } from '../../components/primitives/Button'
+import { AuthCardShell } from '../../components/layout/AuthCardShell'
+import { AUTH_INPUT_CLASS, AUTH_LINK_CLASS } from '../../components/layout/authFormStyles'
 import { FormField } from '../../components/primitives/FormField'
-import { LanguageSwitcher } from '../../components/primitives/LanguageSwitcher'
 import { useAuth } from '../../hooks/useAuth'
 import { errorMessage } from '../../services/apiClient'
 import { authApi } from '../../services/auth.api'
@@ -42,18 +43,24 @@ export function MustChangePasswordPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)' }}>
-      <div className="card" style={{ maxWidth: 440, width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ color: 'var(--primary)' }}>{t('app.name')}</h1>
-          <LanguageSwitcher />
-        </div>
-        <h2>{t('auth.mustChangePasswordTitle')}</h2>
-        <p style={{ color: 'var(--text-muted)' }}>{t('auth.mustChangePasswordIntro')}</p>
+    <AuthCardShell>
+      <h1 className="public-title-auth font-bold text-slate-900 tracking-tight">
+        {t('auth.mustChangePasswordTitle')}
+      </h1>
+      {/* div, not p — globals.css unlayered-resets `p { margin: 0 }`, which
+          blocks Tailwind's mt-1/mb-6 the same way it blocks input padding/color. */}
+      <div className="text-xs sm:text-sm text-slate-500 mt-1 mb-6 leading-relaxed">
+        {t('auth.mustChangePasswordIntro')}
+      </div>
 
-        <form onSubmit={submit} noValidate>
-          <FormField label={t('auth.currentPassword')}>
-            {(p) => (
+      <form onSubmit={submit} noValidate>
+        <FormField label={t('auth.currentPassword')}>
+          {(p) => (
+            <div className="relative">
+              <Lock
+                className="pointer-events-none absolute inset-y-0 start-3.5 my-auto h-4 w-4 text-slate-400"
+                aria-hidden="true"
+              />
               <input
                 {...p}
                 type={showPassword ? 'text' : 'password'}
@@ -61,31 +68,46 @@ export function MustChangePasswordPage() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
+                className={`${AUTH_INPUT_CLASS} public-input--with-icon`}
               />
-            )}
-          </FormField>
+            </div>
+          )}
+        </FormField>
 
-          <FormField label={t('auth.newPassword')}>
-            {(p) => (
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'stretch' }}>
-                <input
-                  {...p}
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  style={{ flex: 1 }}
-                />
-                <Button variant="secondary" type="button" onClick={() => setShowPassword((v) => !v)}>
-                  {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                </Button>
-              </div>
-            )}
-          </FormField>
+        <FormField label={t('auth.newPassword')}>
+          {(p) => (
+            <div className="relative">
+              <Lock
+                className="pointer-events-none absolute inset-y-0 start-3.5 my-auto h-4 w-4 text-slate-400"
+                aria-hidden="true"
+              />
+              <input
+                {...p}
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                className={`${AUTH_INPUT_CLASS} public-input--with-icon public-input--with-toggle`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute end-3 top-1/2 -translate-y-1/2 bg-transparent text-xs font-medium text-slate-500 hover:text-slate-700"
+              >
+                {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+              </button>
+            </div>
+          )}
+        </FormField>
 
-          <FormField label={t('auth.confirmNewPassword')} error={error || undefined}>
-            {(p) => (
+        <FormField label={t('auth.confirmNewPassword')} error={error || undefined}>
+          {(p) => (
+            <div className="relative">
+              <Lock
+                className="pointer-events-none absolute inset-y-0 start-3.5 my-auto h-4 w-4 text-slate-400"
+                aria-hidden="true"
+              />
               <input
                 {...p}
                 type={showPassword ? 'text' : 'password'}
@@ -93,25 +115,28 @@ export function MustChangePasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
+                className={`${AUTH_INPUT_CLASS} public-input--with-icon`}
               />
-            )}
-          </FormField>
+            </div>
+          )}
+        </FormField>
 
-          <Button type="submit" loading={loading} block>
-            {loading ? t('auth.changingPassword') : t('auth.changePasswordSubmit')}
-          </Button>
-        </form>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full h-12 bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center cursor-pointer mt-6 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {loading ? t('auth.changingPassword') : t('auth.changePasswordSubmit')}
+        </button>
+      </form>
 
-        <p style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', cursor: 'pointer' }}
-          >
-            {t('nav.signOut')}
-          </button>
-        </p>
-      </div>
-    </div>
+      <button
+        type="button"
+        onClick={() => void logout()}
+        className={`${AUTH_LINK_CLASS} public-btn--responsive-text mt-6 w-full bg-transparent p-0`}
+      >
+        {t('nav.signOut')}
+      </button>
+    </AuthCardShell>
   )
 }
