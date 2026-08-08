@@ -1,14 +1,17 @@
+import { Lock, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { PublicLayout } from '../../components/layout/PublicLayout'
-import { Button } from '../../components/primitives/Button'
 import { FormField } from '../../components/primitives/FormField'
 import { useAuth } from '../../hooks/useAuth'
 import { roleHome } from '../../routes/roleHome'
 import { authApi } from '../../services/auth.api'
 import { errorMessage } from '../../services/apiClient'
+
+const INPUT_CLASS =
+  'w-full h-12 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-800 text-sm font-medium placeholder:text-slate-400 outline-none focus:outline-none focus:bg-white focus:ring-4 focus:ring-[#0D9488]/15 focus:border-[#0D9488] shadow-sm focus:shadow-md transition-all duration-200'
 
 export function RegisterPage() {
   const { t } = useTranslation()
@@ -50,94 +53,127 @@ export function RegisterPage() {
 
   return (
     <PublicLayout>
-      <main className="pub-main" style={{ maxWidth: 620 }}>
-        <h1>{t('auth.registerTitle')}</h1>
-        <p style={{ color: 'var(--text-muted)' }}>{t('auth.registerIntro')}</p>
+      <div className="min-h-[calc(100vh-4rem)] bg-slate-50/50 flex flex-col items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6">
+          <div className="min-w-0">
+            <h1 className="public-title-auth font-bold text-slate-900 tracking-tight text-center">
+              {t('auth.registerTitle')}
+            </h1>
+            {/* div, not p — globals.css unlayered-resets `p { margin: 0 }`, which
+                blocks Tailwind's mt-1 the same way it blocks input padding/color. */}
+            <div className="text-sm text-slate-500 text-center mt-1">
+              {t('auth.registerIntro')}
+            </div>
+          </div>
 
-        <form className="card" onSubmit={submit} noValidate>
-          <FormField label={t('auth.firstName')}>
-            {(p) => (
-              <input
-                {...p}
-                value={form.first_name}
-                onChange={(e) => update('first_name', e.target.value)}
-                autoComplete="given-name"
-                required
-              />
-            )}
-          </FormField>
-
-          <FormField label={t('auth.lastName')}>
-            {(p) => (
-              <input
-                {...p}
-                value={form.last_name}
-                onChange={(e) => update('last_name', e.target.value)}
-                autoComplete="family-name"
-                required
-              />
-            )}
-          </FormField>
-
-          <FormField label={t('auth.phone')}>
-            {(p) => (
-              <input
-                {...p}
-                value={form.phone}
-                onChange={(e) => update('phone', e.target.value)}
-                autoComplete="tel"
-              />
-            )}
-          </FormField>
-
-          <FormField label={t('auth.email')}>
-            {(p) => (
-              <input
-                {...p}
-                type="email"
-                value={form.email}
-                onChange={(e) => update('email', e.target.value)}
-                autoComplete="email"
-                required
-              />
-            )}
-          </FormField>
-
-          <FormField label={t('auth.password')} error={error || undefined}>
-            {(p) => (
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'stretch' }}>
+          <form onSubmit={submit} noValidate className="space-y-5">
+            <FormField label={t('auth.firstName')}>
+              {(p) => (
                 <input
                   {...p}
-                  type={showPassword ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={(e) => update('password', e.target.value)}
-                  autoComplete="new-password"
+                  value={form.first_name}
+                  onChange={(e) => update('first_name', e.target.value)}
+                  autoComplete="given-name"
                   required
-                  style={{ flex: 1 }}
+                  className={INPUT_CLASS}
                 />
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                >
-                  {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                </Button>
-              </div>
-            )}
-          </FormField>
+              )}
+            </FormField>
 
-          <Button type="submit" loading={loading} block>
-            {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
-          </Button>
-        </form>
+            <FormField label={t('auth.lastName')}>
+              {(p) => (
+                <input
+                  {...p}
+                  value={form.last_name}
+                  onChange={(e) => update('last_name', e.target.value)}
+                  autoComplete="family-name"
+                  required
+                  className={INPUT_CLASS}
+                />
+              )}
+            </FormField>
 
-        <p style={{ textAlign: 'center' }}>
-          {t('auth.alreadyHaveAccount')}{' '}
-          <Link to={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`}>
-            {t('auth.signIn')}
-          </Link>
-        </p>
-      </main>
+            <FormField label={t('auth.phone')}>
+              {(p) => (
+                <input
+                  {...p}
+                  value={form.phone}
+                  onChange={(e) => update('phone', e.target.value)}
+                  autoComplete="tel"
+                  className={INPUT_CLASS}
+                />
+              )}
+            </FormField>
+
+            <FormField label={t('auth.email')}>
+              {(p) => (
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute inset-y-0 start-3.5 my-auto h-4 w-4 text-slate-400"
+                    aria-hidden="true"
+                  />
+                  <input
+                    {...p}
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => update('email', e.target.value)}
+                    autoComplete="email"
+                    required
+                    className={`${INPUT_CLASS} public-input--with-icon`}
+                  />
+                </div>
+              )}
+            </FormField>
+
+            <FormField label={t('auth.password')} error={error || undefined}>
+              {(p) => (
+                <div className="relative w-full min-w-0">
+                  <Lock
+                    className="pointer-events-none absolute inset-y-0 start-3.5 my-auto h-4 w-4 text-slate-400"
+                    aria-hidden="true"
+                  />
+                  <input
+                    {...p}
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={(e) => update('password', e.target.value)}
+                    autoComplete="new-password"
+                    required
+                    className={`${INPUT_CLASS} pe-16 public-input--with-icon public-input--with-toggle`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute end-3 top-1/2 -translate-y-1/2 bg-transparent text-xs font-medium text-slate-500 hover:text-slate-700"
+                  >
+                    {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                  </button>
+                </div>
+              )}
+            </FormField>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold tracking-wide rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
+            </button>
+          </form>
+
+          {/* div, not p — it's the last child of the card's space-y-6, and that
+              utility's margin-top is inert on a <p> for the same reason. */}
+          <div className="text-sm text-slate-500 text-center min-w-0">
+            {t('auth.alreadyHaveAccount')}{' '}
+            <Link
+              to={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`}
+              className="font-medium hover:underline"
+            >
+              {t('auth.signIn')}
+            </Link>
+          </div>
+        </div>
+      </div>
     </PublicLayout>
   )
 }

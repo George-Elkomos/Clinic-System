@@ -1,13 +1,16 @@
+import { Lock, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
-import { Button } from '../../components/primitives/Button'
+import { PublicLayout } from '../../components/layout/PublicLayout'
 import { FormField } from '../../components/primitives/FormField'
-import { LanguageSwitcher } from '../../components/primitives/LanguageSwitcher'
 import { useAuth } from '../../hooks/useAuth'
 import { errorMessage, isConnectivityError } from '../../services/apiClient'
 import { roleHome } from '../../routes/roleHome'
+
+const INPUT_CLASS =
+  'w-full h-12 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 text-slate-800 text-sm font-medium placeholder:text-slate-400 outline-none focus:outline-none focus:bg-white focus:ring-4 focus:ring-[#0D9488]/15 focus:border-[#0D9488] shadow-sm focus:shadow-md transition-all duration-200'
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -38,52 +41,83 @@ export function LoginPage() {
     }
   }
 
+  const registerHref = `/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)' }}>
-      <div className="card" style={{ maxWidth: 440, width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ color: 'var(--primary)' }}>{t('app.name')}</h1>
-          <LanguageSwitcher />
+    <PublicLayout>
+      <div className="min-h-[calc(100vh-4rem)] bg-slate-50/50 flex flex-col items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6">
+          <div className="min-w-0">
+            <h1 className="public-title-auth font-bold text-slate-900 tracking-tight text-center">
+              {t('auth.loginTitle')}
+            </h1>
+            {/* div, not p — globals.css unlayered-resets `p { margin: 0 }`, which
+                blocks Tailwind's mt-1 the same way it blocks input padding/color. */}
+            <div className="text-sm text-slate-500 text-center mt-1">
+              {t('app.tagline', { defaultValue: 'Professional healthcare management' })}
+            </div>
+          </div>
+
+          <form onSubmit={submit} noValidate className="space-y-5">
+            <FormField label={t('auth.email')}>
+              {(p) => (
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute inset-y-0 start-3.5 my-auto h-4 w-4 text-slate-400"
+                    aria-hidden="true"
+                  />
+                  <input
+                    {...p}
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className={`${INPUT_CLASS} public-input--with-icon`}
+                  />
+                </div>
+              )}
+            </FormField>
+
+            <FormField label={t('auth.password')} error={error || undefined}>
+              {(p) => (
+                <div className="relative">
+                  <Lock
+                    className="pointer-events-none absolute inset-y-0 start-3.5 my-auto h-4 w-4 text-slate-400"
+                    aria-hidden="true"
+                  />
+                  <input
+                    {...p}
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className={`${INPUT_CLASS} public-input--with-icon`}
+                  />
+                </div>
+              )}
+            </FormField>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-12 bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold tracking-wide rounded-xl text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? t('auth.signingIn') : t('auth.signIn')}
+            </button>
+          </form>
+
+          <div className="space-y-2 text-center">
+            <Link to="/forgot-password" className="block text-sm font-medium hover:underline">
+              {t('auth.forgotPassword')}
+            </Link>
+            <Link to={registerHref} className="block text-sm font-medium hover:underline">
+              {t('auth.registerLink')}
+            </Link>
+          </div>
         </div>
-        <h2>{t('auth.loginTitle')}</h2>
-        <form onSubmit={submit} noValidate>
-          <FormField label={t('auth.email')}>
-            {(p) => (
-              <input
-                {...p}
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            )}
-          </FormField>
-          <FormField label={t('auth.password')} error={error || undefined}>
-            {(p) => (
-              <input
-                {...p}
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            )}
-          </FormField>
-          <Button type="submit" loading={loading} block>
-            {loading ? t('auth.signingIn') : t('auth.signIn')}
-          </Button>
-        </form>
-        <p style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
-          <Link to="/forgot-password">{t('auth.forgotPassword')}</Link>
-        </p>
-        <p style={{ textAlign: 'center', marginTop: 'var(--space-2)' }}>
-          <Link to={`/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`}>
-            {t('auth.registerLink')}
-          </Link>
-        </p>
       </div>
-    </div>
+    </PublicLayout>
   )
 }

@@ -1,0 +1,195 @@
+/* Public / Auth pages redesign, scoped under `.public-shell`.
+   Tailwind's utility layer (`@import '...' layer(utilities)`, see
+   patient-tokens.css) always loses to unlayered CSS for the same property,
+   regardless of specificity. globals.css's elder-friendly defaults on bare
+   h1-h3/a/button/input/select/textarea elements (including its app-wide
+   yellow `:focus-visible` outline), and primitives.css's
+   .field__label/.search-input/.select__control, are all unlayered — so
+   Tailwind classes on those elements are otherwise inert here. This sheet
+   supplies the real final values for just the blocked properties; everything
+   else is styled directly with Tailwind utilities in the JSX. Same pattern as
+   patient-tokens.css's `.patient-field`. */
+
+.public-shell h1,
+.public-shell h2,
+.public-shell h3,
+.public-shell p {
+  margin: 0;
+}
+
+.public-shell a {
+  color: #0d9488;
+}
+
+.public-shell h1.public-title-auth {
+  font-size: 1.5rem;
+}
+@media (min-width: 640px) {
+  .public-shell h1.public-title-auth {
+    font-size: 1.875rem;
+  }
+}
+.public-shell h1.public-title-page {
+  font-size: 1.875rem;
+}
+
+.public-shell button {
+  min-height: 0;
+  font-size: 0.875rem;
+  /* Tailwind's Preflight (which normally zeroes native button chrome) isn't
+     loaded app-wide (see patient-tokens.css) — without this, the browser's
+     default outset border/buttonface background shows through on any button
+     that doesn't set its own background. */
+  border: none;
+  cursor: pointer;
+}
+.public-shell button.public-btn--xs {
+  font-size: 0.75rem;
+}
+/* Navbar CTAs (Sign In / Create Account / Dashboard) step up from text-xs to
+   text-sm at the sm breakpoint, matching the Doctors <a> link's sizing —
+   plain Tailwind text-xs/sm classes can't do this on a <button> since the
+   base rule above (unlayered) pins font-size. */
+.public-shell button.public-btn--nav-cta {
+  font-size: 0.75rem;
+}
+@media (min-width: 640px) {
+  .public-shell button.public-btn--nav-cta {
+    font-size: 0.875rem;
+  }
+}
+
+.public-shell input,
+.public-shell select,
+.public-shell textarea {
+  width: 100%;
+  min-height: 0;
+  height: 3rem;
+  padding-inline: 0.875rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  /* rest state: bg-slate-50/50 */
+  background-color: rgb(248 250 252 / 0.5);
+  color: #1e293b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.public-shell input:hover,
+.public-shell select:hover,
+.public-shell textarea:hover {
+  background-color: #f8fafc; /* slate-50 */
+}
+.public-shell input:focus,
+.public-shell select:focus,
+.public-shell textarea:focus {
+  border-color: #0d9488;
+  background-color: #ffffff;
+}
+.public-shell input::placeholder,
+.public-shell textarea::placeholder {
+  color: #94a3b8; /* slate-400 */
+}
+/* box-shadow isn't touched by any unlayered rule, so the ring/shadow itself
+   (focus:ring-4 focus:ring-[#0D9488]/15, shadow-sm, focus:shadow-md) is
+   applied as plain Tailwind utilities directly in the JSX, not here. */
+/* globals.css's app-wide `:focus-visible { outline: 3px solid #ffbf47 }` is
+   unlayered, so it always wins over Tailwind's focus:ring/focus:outline-none
+   utilities and was rendering as a harsh yellow ring doubled up on top of the
+   teal box-shadow ring above. Scoped to form fields only — they already have
+   a clear focus indicator from the rule above; buttons/links elsewhere in
+   .public-shell intentionally keep the yellow outline for a11y. */
+.public-shell input:focus-visible,
+.public-shell select:focus-visible,
+.public-shell textarea:focus-visible {
+  outline: none;
+}
+/* Chrome/Edge/Safari tint autofilled fields yellow via an internal UA style
+   that ignores `background`/`background-color` — only -webkit-box-shadow
+   (with a huge inset spread) can override it. */
+.public-shell input:-webkit-autofill,
+.public-shell input:-webkit-autofill:hover,
+.public-shell input:-webkit-autofill:active,
+.public-shell input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #1e293b !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Password field with an in-field Show/Hide toggle needs extra end-padding
+   so typed text never renders underneath the absolutely-positioned button —
+   the base rule above already claims `padding-inline` (unlayered), so
+   Tailwind's `pe-16` utility can't add it on its own. */
+.public-shell input.public-input--with-toggle {
+  padding-inline-end: 4rem;
+}
+/* Same trap for the start side — a leading Mail/Lock icon needs room so the
+   caret/text never renders underneath it. */
+.public-shell input.public-input--with-icon {
+  padding-inline-start: 2.75rem;
+}
+
+/* Field wrapper (shared FormField primitive) */
+.public-shell .field {
+  margin-bottom: 0;
+}
+.public-shell .field__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+.public-shell .field__error {
+  color: #dc2626;
+  font-size: 0.75rem;
+  margin-top: 0.375rem;
+}
+.public-shell .field--invalid input,
+.public-shell .field--invalid select,
+.public-shell .field--invalid textarea {
+  border-color: #dc2626;
+  border-width: 1px;
+  background: #fef2f2;
+}
+.public-shell .field--invalid .field__label {
+  color: #dc2626;
+}
+
+/* Search input (shared SearchInput primitive, used in the doctors filter bar) */
+.public-shell .search-input input {
+  height: 2.75rem;
+  min-height: 0;
+  padding-inline: 2.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  background: #ffffff;
+  color: #1e293b;
+}
+.public-shell .search-input input:focus {
+  border-color: #0d9488;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 201, 203, 0.5);
+}
+.public-shell .search-input__icon {
+  font-size: 1rem;
+  color: #94a3b8;
+}
+
+/* Specialty select (shared Select primitive) — matched height/border to sit
+   flush with the search input in the same filter row. */
+.public-shell .select__control {
+  min-height: 0;
+  height: 2.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  background: #ffffff;
+}
+.public-shell .select__control:focus-within {
+  border-color: #0d9488;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 201, 203, 0.5);
+}
