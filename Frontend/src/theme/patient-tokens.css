@@ -50,6 +50,14 @@
      a single column on very narrow phones. */
   --breakpoint-xs: 30rem;
 
+  /* Default `lg` (1024px) is inclusive, which put common tablet widths —
+     iPad Air/Pro and iPad landscape are exactly 1024px — on the desktop
+     static-sidebar layout instead of the drawer nav both PatientShell's
+     media query and its own code comments say those devices should get.
+     Nudged one pixel past 1024px so the drawer breakpoint and the desktop
+     breakpoint agree at the exact width real tablets report. */
+  --breakpoint-lg: 64.0625rem;
+
   --color-bg-app: var(--bg-app);
   --color-bg-surface: var(--bg-surface);
   --color-brand-teal-start: var(--brand-teal-start);
@@ -157,9 +165,11 @@
 .patient-sidebar.is-open { transform: translateX(0); }
 /* [dir] (attribute selector) matches specificity with [dir='rtl'] above so this
    reliably wins at desktop widths regardless of language direction. Breakpoint
-   is lg (1024px), matching PatientShell's own lg:hidden drawer-trigger controls
-   — tablets (iPad Air/Pro, Nest Hub, etc.) stay on the drawer nav. */
-@media (min-width: 1024px) {
+   matches the --breakpoint-lg override above (1025px, not Tailwind's default
+   1024px) so PatientShell's own lg:hidden drawer-trigger controls flip in the
+   same instant this does — tablets (iPad Air/Pro, Nest Hub, etc., which report
+   exactly 1024px) stay on the drawer nav instead of landing on the boundary. */
+@media (min-width: 1025px) {
   [dir] .patient-sidebar { position: sticky; transform: none; }
 }
 

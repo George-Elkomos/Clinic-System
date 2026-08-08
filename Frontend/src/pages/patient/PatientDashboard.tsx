@@ -419,7 +419,13 @@ export function PatientDashboard() {
             than cramming 3 cards into that space. Spans both explicit rows at
             lg so it runs the full height of the Upcoming+NeedHelp column
             next to it. */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:col-start-3 lg:col-span-1 lg:row-start-1 lg:row-span-2 lg:grid-cols-1">
+        {/* content-start: this column spans both grid rows (lg:row-span-2) to
+            match the Upcoming Appointments column's height, which is often
+            taller once there are several real appointments — without it, the
+            grid's default stretch alignment expands each SummaryCard's own
+            row track to fill that leftover space, ballooning the cards with
+            empty padding instead of leaving the extra space below them. */}
+        <div className="grid grid-cols-1 content-start gap-4 sm:grid-cols-2 md:grid-cols-3 lg:col-start-3 lg:col-span-1 lg:row-start-1 lg:row-span-2 lg:grid-cols-1">
           <SummaryCard
             icon={CalendarCheckSolidIcon}
             iconBg="#E6F7F7"
