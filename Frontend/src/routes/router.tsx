@@ -46,11 +46,13 @@ import { BillingDeskPage } from '../pages/secretary/BillingDeskPage'
 import { MyInvoicesPage } from '../pages/patient/MyInvoicesPage'
 import { BillingReportsPage } from '../pages/manager/BillingReportsPage'
 import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
+import { MustChangePasswordPage } from '../pages/account/MustChangePasswordPage'
 import { MyReferralsPage } from '../pages/patient/MyReferralsPage'
 import { DoctorReferralsPage } from '../pages/doctor/DoctorReferralsPage'
 import { SecretaryReferralsPage } from '../pages/secretary/SecretaryReferralsPage'
 import { MyRadiologyPage } from '../pages/patient/MyRadiologyPage'
 import { RadiologyWorklistPage } from '../pages/secretary/RadiologyWorklistPage'
+import { ProtectedRoute } from './ProtectedRoute'
 import { RoleRoute } from './RoleRoute'
 import { RootRedirect } from './RootRedirect'
 
@@ -124,6 +126,12 @@ export const router = createBrowserRouter([
       { path: 'referrals', element: <SecretaryReferralsPage /> },
       { path: 'radiology', element: <RadiologyWorklistPage /> },
     ],
+  },
+
+  // Forced password change — available to any authenticated role, no AppShell.
+  {
+    path: '/change-password',
+    element: <ProtectedRoute><MustChangePasswordPage /></ProtectedRoute>,
   },
 
   // Account settings — available to every authenticated role.

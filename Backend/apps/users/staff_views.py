@@ -58,6 +58,7 @@ class CreateDoctorView(APIView):
                 preferred_language=d.get("preferred_language", "en"),
             )
             user.set_password(raw_password)
+            user.must_change_password = temp_password is not None
             user.save()
 
             profile = DoctorProfile.objects.create(
@@ -112,6 +113,7 @@ class CreateSecretaryView(APIView):
                 preferred_language=d.get("preferred_language", "en"),
             )
             user.set_password(raw_password)
+            user.must_change_password = temp_password is not None
             user.save()
 
         _audit(request.user, AuditAction.CREATE, user, request)
@@ -151,6 +153,7 @@ class CreatePatientView(APIView):
                 phone=d.get("phone", ""),
             )
             user.set_password(temp_password)
+            user.must_change_password = True
             user.save()  # post_save signal auto-creates PatientProfile + NotificationPreference
 
             national_id = d.get("national_id", "").strip()
@@ -246,7 +249,8 @@ class UserResetPasswordView(APIView):
         user = get_object_or_404(User, pk=pk)
         temp_password = secrets.token_urlsafe(12)
         user.set_password(temp_password)
-        user.save(update_fields=["password"])
+        user.must_change_password = True
+        user.save(update_fields=["password", "must_change_password"])
         _audit(request.user, AuditAction.UPDATE, user, request)
         return Response({"temp_password": temp_password})
 

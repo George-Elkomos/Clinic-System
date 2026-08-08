@@ -197,6 +197,8 @@ def test_manager_resets_password(api, manager, patient):
         "email": patient.email, "password": "Clinic123!",
     }, format="json")
     assert login_resp.status_code == 401
+    patient.refresh_from_db()
+    assert patient.must_change_password is True
 
 
 # --- Patient profile staff edit ---------------------------------------------

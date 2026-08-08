@@ -15,8 +15,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "id", "email", "role", "first_name", "last_name", "full_name",
             "phone", "preferred_language", "is_active", "date_joined",
+            "must_change_password",
         ]
-        read_only_fields = ["id", "role", "is_active", "date_joined"]
+        read_only_fields = ["id", "role", "is_active", "date_joined", "must_change_password"]
 
     def get_full_name(self, obj):
         return obj.get_full_name()
@@ -123,3 +124,16 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
     new_password = serializers.CharField(validators=[validate_password])
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Authenticated self-service password change (also clears must_change_password)."""
+
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    def validate_current_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Your current password is incorrect.")
+        return value

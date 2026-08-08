@@ -36,6 +36,7 @@ export interface User {
   full_name: string
   phone: string
   preferred_language: Language
+  must_change_password: boolean
   patient_profile?: PatientProfile | null
   notification_preference?: NotificationPreference | null
   doctor_profile?: { id: number; specialties_detail: Specialty[] } | null

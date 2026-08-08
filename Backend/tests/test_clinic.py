@@ -35,6 +35,40 @@ def test_me_returns_profile(api, patient):
     assert resp.status_code == 200
     assert resp.data["email"] == patient.email
     assert resp.data["patient_profile"] is not None  # auto-created by signal
+    assert resp.data["must_change_password"] is False
+
+
+def test_login_surfaces_must_change_password_flag(api, patient):
+    patient.must_change_password = True
+    patient.save(update_fields=["must_change_password"])
+    resp = api.post(reverse("auth-login"),
+                     {"email": patient.email, "password": "Clinic123!"}, format="json")
+    assert resp.status_code == 200
+    assert resp.data["user"]["must_change_password"] is True
+
+
+def test_change_password_requires_correct_current_password(api, patient):
+    api.force_authenticate(patient)
+    resp = api.post(reverse("auth-change-password"), {
+        "current_password": "WrongPass1!", "new_password": "NewSecurePass1!",
+    }, format="json")
+    assert resp.status_code == 400
+
+
+def test_change_password_clears_must_change_password_flag(api, patient):
+    patient.must_change_password = True
+    patient.save(update_fields=["must_change_password"])
+    api.force_authenticate(patient)
+    resp = api.post(reverse("auth-change-password"), {
+        "current_password": "Clinic123!", "new_password": "NewSecurePass1!",
+    }, format="json")
+    assert resp.status_code == 200
+    patient.refresh_from_db()
+    assert patient.must_change_password is False
+    login_resp = api.post(reverse("auth-login"), {
+        "email": patient.email, "password": "NewSecurePass1!",
+    }, format="json")
+    assert login_resp.status_code == 200
 
 
 # --- RBAC scoping -----------------------------------------------------------

@@ -118,7 +118,13 @@
     "resetPasswordSuccess": "تم تحديث كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.",
     "resetLinkMissing": "رابط إعادة التعيين هذا ناقص المعلومات. يرجى طلب رابط جديد.",
     "passwordMismatch": "كلمتا المرور غير متطابقتين.",
-    "requestNewLink": "طلب رابط إعادة تعيين جديد"
+    "requestNewLink": "طلب رابط إعادة تعيين جديد",
+    "mustChangePasswordTitle": "اختر كلمة مرور جديدة",
+    "mustChangePasswordIntro": "أنت تستخدم كلمة مرور مؤقتة. اختر كلمة مرور جديدة للاستمرار.",
+    "currentPassword": "كلمة المرور المؤقتة",
+    "changePasswordSubmit": "تعيين كلمة المرور الجديدة",
+    "changingPassword": "جارٍ الحفظ…",
+    "changePasswordSuccess": "تم تغيير كلمة المرور بنجاح."
   },
   "dashboard": {
     "welcome": "مرحبًا، {{name}}",

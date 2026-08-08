@@ -118,7 +118,13 @@
     "resetPasswordSuccess": "Your password has been updated. You can sign in now.",
     "resetLinkMissing": "This reset link is missing information. Please request a new one.",
     "passwordMismatch": "Passwords don't match.",
-    "requestNewLink": "Request a new reset link"
+    "requestNewLink": "Request a new reset link",
+    "mustChangePasswordTitle": "Choose a new password",
+    "mustChangePasswordIntro": "You're using a temporary password. Set a new one to continue.",
+    "currentPassword": "Temporary password",
+    "changePasswordSubmit": "Set new password",
+    "changingPassword": "Saving…",
+    "changePasswordSuccess": "Your password has been changed."
   },
   "dashboard": {
     "welcome": "Welcome, {{name}}",

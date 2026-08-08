@@ -18,6 +18,9 @@ class User(AbstractUser):
     preferred_language = models.CharField(
         max_length=5, choices=LanguageChoices.choices, default=LanguageChoices.EN
     )
+    # Set whenever staff assign a temp/generated password; cleared once the
+    # user sets a password of their own choosing.
+    must_change_password = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # email + password are prompted automatically

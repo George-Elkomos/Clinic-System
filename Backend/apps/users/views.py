@@ -15,6 +15,7 @@ from apps.core.enums import AuditAction
 
 from .models import NotificationPreference, PatientProfile, User
 from .serializers import (
+    ChangePasswordSerializer,
     LoginSerializer,
     MeUpdateSerializer,
     NotificationPreferenceSerializer,
@@ -217,5 +218,21 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user.set_password(data["new_password"])
-        user.save(update_fields=["password"])
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
         return Response({"detail": "Your password has been updated. You can sign in now."})
+
+
+class ChangePasswordView(APIView):
+    """Authenticated self-service change — also clears must_change_password."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
+        return Response({"detail": "Your password has been changed."})
