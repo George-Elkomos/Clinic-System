@@ -368,44 +368,59 @@ export function PatientDashboard() {
           ) : (
             upcoming.map((a) => {
               const pill = STATUS_PILL[a.status] ?? STATUS_PILL.CANCELLED
+              const badge = (extraClassName: string) => (
+                <span
+                  className={`patient-text-badge shrink-0 whitespace-nowrap rounded-full border px-3 py-1 ${extraClassName}`}
+                  style={{ background: pill.bg, borderColor: pill.border, color: pill.text }}
+                >
+                  {t(`status.${a.status}`)}
+                </span>
+              )
               return (
                 <div
                   key={a.id}
-                  className="flex w-full flex-col items-start gap-3 overflow-hidden rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm"
+                  className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:shadow-md md:flex-row md:items-center md:justify-between md:gap-4"
                 >
-                  {/* Header: avatar+name/type vs. status badge — its own row so it
-                      never has to compete with the date/time line for width. */}
-                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex w-full items-center gap-3">
-                      <MoreVertical size={16} className="hidden shrink-0 sm:block" style={{ color: 'var(--text-muted)' }} />
+                  {/* Top row (<md) / left side (md+): menu icon + avatar + name/type,
+                      plus the status badge — only on this row below md, since it
+                      moves in next to date/time on the row below at md+. min-w-0 +
+                      truncate so a long doctor name yields instead of pushing the
+                      badge off-card. */}
+                  <div className="flex w-full items-center justify-between gap-3 md:w-auto md:justify-start">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Link
+                        to="/patient/appointments"
+                        aria-label={t('dashboard.viewAll')}
+                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                      >
+                        <MoreVertical size={16} className="shrink-0" />
+                      </Link>
                       <img src={avatarUrl(a.doctor_name)} alt="" className="h-10 w-10 shrink-0 rounded-full" />
-                      <div className="flex min-w-0 flex-1 flex-col">
+                      <div className="flex min-w-0 flex-col">
                         <div className="patient-text-card-title truncate" style={{ color: 'var(--text-primary)' }}>
                           {a.doctor_name}
                         </div>
                         <div className="truncate text-xs font-medium text-slate-500">{a.type_display}</div>
                       </div>
                     </div>
-                    <span
-                      className="patient-text-badge shrink-0 self-start whitespace-nowrap rounded-full border px-3 py-1 sm:self-center"
-                      style={{ background: pill.bg, borderColor: pill.border, color: pill.text }}
-                    >
-                      {t(`status.${a.status}`)}
-                    </span>
+                    {badge('md:hidden')}
                   </div>
 
-                  {/* Date & time — same two flex items in every card, so the
-                      row lines up card-to-card instead of drifting with
-                      each card's own content. */}
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <div className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-600">
+                  {/* Bottom row (<md): date + time on their own line under a
+                      divider, so they never compete with the name/badge row for
+                      width. At md+ this becomes the right side, inline next to
+                      its own copy of the status badge (the <md one above is
+                      hidden there instead). */}
+                  <div className="flex items-center gap-3 border-t border-slate-100/80 pt-2 text-xs font-medium text-slate-600 md:border-none md:justify-end md:gap-3 md:pt-0">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
                       <Calendar size={16} className="shrink-0" />
                       {dateWithWeekday(a.scheduled_start)}
                     </div>
-                    <div className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-slate-600">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
                       <Clock size={16} className="shrink-0" />
                       {timeOnly(a.scheduled_start)}
                     </div>
+                    {badge('hidden md:inline-flex md:items-center')}
                   </div>
                 </div>
               )
