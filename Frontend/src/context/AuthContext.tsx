@@ -35,6 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const bootstrapped = useRef(false)
   const qc = useQueryClient()
 
+  // Resets local auth state only — no prior session to protect, so there's
+  // nothing worth dropping from the query cache (see resetToAnon below for
+  // why this must stay separate from clearSession).
+  const resetToAnon = useCallback(() => {
+    tokenStore.clear()
+    setUser(null)
+    setStatus('anon')
+  }, [])
+
   const clearSession = useCallback(() => {
     tokenStore.clear()
     qc.clear()   // drop all cached query data so stale requests can't fire after logout
@@ -47,7 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOnAuthExpired(clearSession)
   }, [clearSession])
 
-  // On boot, try to rehydrate the session from the refresh cookie.
+  // On boot, try to rehydrate the session from the refresh cookie. For an
+  // anonymous visitor this 401s every time — expected, not a session loss —
+  // so it must use resetToAnon, not clearSession: qc.clear() wipes the ENTIRE
+  // query cache, including whatever public queries (e.g. the doctors list)
+  // other components kicked off in parallel and are still awaiting. Since
+  // those requests aren't wired to an AbortController, clearing the cache
+  // doesn't stop them — it just orphans their eventual result: react-query
+  // has no query entry left to write it into and no observer left to notify,
+  // so the requesting component's isLoading never leaves true even though
+  // the request succeeded. clearSession (with the cache wipe) stays reserved
+  // for actual session-loss paths — the onAuthExpired callback above and
+  // logout() below — where there may be real per-user data worth scrubbing.
   useEffect(() => {
     if (bootstrapped.current) return
     bootstrapped.current = true
@@ -59,10 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(me)
         setStatus('authed')
       } catch {
-        clearSession()
+        resetToAnon()
       }
     })()
-  }, [clearSession])
+  }, [resetToAnon])
 
   const login = useCallback(async (email: string, password: string) => {
     const { access, user: loggedIn } = await authApi.login(email, password)
