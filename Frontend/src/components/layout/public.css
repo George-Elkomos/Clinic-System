@@ -33,6 +33,38 @@
   font-size: 1.875rem;
 }
 
+/* Landing page typography — same trap as public-title-auth/public-title-page:
+   globals.css sets a fixed unlayered font-size on bare h1/h2/h3 (34/27/22px),
+   which beats Tailwind's layered text-* utilities regardless of specificity. */
+.public-shell h1.public-title-hero {
+  font-size: 1.875rem;
+}
+@media (min-width: 640px) {
+  .public-shell h1.public-title-hero {
+    font-size: 3rem;
+  }
+}
+.public-shell h2.public-title-section {
+  font-size: 1.5rem;
+}
+@media (min-width: 640px) {
+  .public-shell h2.public-title-section {
+    font-size: 1.875rem;
+  }
+}
+.public-shell h2.public-title-callout {
+  font-size: 1.5rem;
+}
+.public-shell h3.public-title-step {
+  font-size: 1.125rem;
+}
+.public-shell h3.public-title-doctor-name {
+  font-size: 1rem;
+}
+.public-shell button.public-btn--hero-cta {
+  font-size: 1rem;
+}
+
 .public-shell button {
   min-height: 0;
   font-size: 0.875rem;

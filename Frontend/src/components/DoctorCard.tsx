@@ -1,8 +1,8 @@
+import { Star } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../hooks/useAuth'
-import { StarRating } from './primitives/StarRating'
 
 interface DoctorCardDoctor {
   id: number
@@ -21,14 +21,6 @@ interface DoctorCardDoctor {
   next_available_date?: string | null
 }
 
-function availabilityColorClass(date: string | null | undefined) {
-  if (!date) return 'text-slate-500'
-  const diff = (new Date(date).getTime() - Date.now()) / 86400000
-  if (diff <= 3) return 'text-emerald-600'
-  if (diff <= 7) return 'text-amber-600'
-  return 'text-slate-500'
-}
-
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
@@ -45,15 +37,17 @@ export function DoctorCard({ doctor }: { doctor: DoctorCardDoctor }) {
     .slice(0, 2)
     .toUpperCase()
 
+  const avgRating = doctor.average_rating ?? null
+
   const handleBook = () => {
     navigate(`/doctors/${doctor.id}`)
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4">
-      <div className="space-y-4 min-w-0">
-        <div className="flex items-start gap-4 min-w-0">
-          <div className="w-16 h-16 rounded-full bg-teal-50 text-[#0D9488] font-bold text-lg flex items-center justify-center shrink-0 overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between">
+      <div className="flex flex-col gap-4 min-w-0">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-12 h-12 rounded-full bg-[#0D9488]/10 text-[#0D9488] font-bold flex items-center justify-center shrink-0 overflow-hidden">
             {doctor.photo ? (
               <img src={doctor.photo} alt={doctor.full_name} className="w-full h-full object-cover" />
             ) : (
@@ -61,38 +55,57 @@ export function DoctorCard({ doctor }: { doctor: DoctorCardDoctor }) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-slate-900 text-base truncate">{doctor.full_name}</h3>
+            <h3 className="public-title-doctor-name font-bold text-slate-800 truncate">{doctor.full_name}</h3>
             {doctor.room_number && (
-              <p className="text-slate-500 text-xs mt-0.5">
+              <span className="block text-xs text-slate-400">
                 {t('doctors.room')} {doctor.room_number}
-              </p>
+              </span>
             )}
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {doctor.specialties_detail.map((s) => (
-                <span
-                  key={s.id}
-                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200/50"
-                >
-                  {s.name}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
 
-        {doctor.average_rating != null && (
-          <div className="flex items-center gap-2 min-w-0">
-            <StarRating value={Math.round(doctor.average_rating)} readOnly />
-            <span className="text-xs text-slate-500">
-              {doctor.average_rating.toFixed(1)} ({doctor.review_count ?? 0})
-            </span>
+        {doctor.specialties_detail.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {doctor.specialties_detail.map((s) => (
+              <span
+                key={s.id}
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-[#0D9488]/10 text-[#0D9488]"
+              >
+                {s.name}
+              </span>
+            ))}
           </div>
         )}
 
-        {doctor.next_available_date && (
-          <p className={`text-xs font-medium ${availabilityColorClass(doctor.next_available_date)}`}>
-            {t('doctors.nextAvailable')}: {formatDate(doctor.next_available_date)}
-          </p>
+        {(avgRating != null || doctor.next_available_date) && (
+          <div className="flex flex-col gap-1.5">
+            {avgRating != null && (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Star
+                      key={i}
+                      className={
+                        i < Math.round(avgRating)
+                          ? 'h-3.5 w-3.5 text-amber-400 fill-amber-400'
+                          : 'h-3.5 w-3.5 text-slate-200 fill-slate-200'
+                      }
+                      aria-hidden="true"
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-slate-500">
+                  {avgRating.toFixed(1)} ({doctor.review_count ?? 0})
+                </span>
+              </div>
+            )}
+
+            {doctor.next_available_date && (
+              <span className="text-xs text-[#0D9488] font-medium">
+                {t('doctors.nextAvailable')}: {formatDate(doctor.next_available_date)}
+              </span>
+            )}
+          </div>
         )}
 
         {doctor.bio && (
@@ -102,20 +115,22 @@ export function DoctorCard({ doctor }: { doctor: DoctorCardDoctor }) {
         )}
       </div>
 
-      <div className="space-y-2">
+      <div>
         {doctor.is_accepting_patients !== false ? (
           <button
             type="button"
             onClick={handleBook}
-            className="public-btn--xs w-full h-10 bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold text-xs rounded-xl flex items-center justify-center transition-all"
+            className="w-full h-10 bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold rounded-xl shadow-sm transition-all mt-4 flex items-center justify-center"
           >
             {status === 'authed' ? t('doctors.bookAppointment') : t('doctors.viewAndBook')}
           </button>
         ) : (
-          <span className="block text-xs font-medium text-red-600">{t('doctors.notAccepting')}</span>
+          <span className="block text-center text-xs font-medium text-red-500 mt-4">
+            {t('doctors.notAccepting')}
+          </span>
         )}
         {doctor.accepts_walk_ins && (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+          <span className="block mt-2 text-center text-xs text-slate-400 font-medium">
             {t('doctors.acceptsWalkIns')}
           </span>
         )}
