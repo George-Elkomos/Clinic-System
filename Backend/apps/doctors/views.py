@@ -1,7 +1,8 @@
 from django.db.models import Avg, Count, Q
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
 from apps.core.enums import RoleChoices, SlotStatus
 from apps.users.permissions import ReadOnlyOrManager
@@ -55,7 +56,28 @@ class DoctorProfileViewSet(viewsets.ModelViewSet):
         return DoctorProfileSerializer
 
 
-class WorkingScheduleViewSet(viewsets.ModelViewSet):
+class DoctorSelfServiceCreateMixin:
+    """`doctor` is a required, writable field on these serializers (secretary/
+    manager must say which doctor they're acting on behalf of). But a DOCTOR
+    submitting their own schedule/absence never sends it, and DRF validates
+    the payload — rejecting the missing required field — before
+    perform_create() ever runs, so perform_create()'s own `doctor=user.
+    doctor_profile` injection was unreachable dead code. Fill it in here,
+    before validation, instead."""
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if request.user.role == RoleChoices.DOCTOR:
+            data = request.data.copy()
+            data["doctor"] = request.user.doctor_profile.id
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class WorkingScheduleViewSet(DoctorSelfServiceCreateMixin, viewsets.ModelViewSet):
     serializer_class = WorkingScheduleSerializer
     permission_classes = [OwnsDoctorResource]
     filterset_fields = ["doctor", "weekday", "is_active"]
@@ -75,7 +97,7 @@ class WorkingScheduleViewSet(viewsets.ModelViewSet):
             serializer.save()
 
 
-class DoctorAbsenceViewSet(viewsets.ModelViewSet):
+class DoctorAbsenceViewSet(DoctorSelfServiceCreateMixin, viewsets.ModelViewSet):
     serializer_class = DoctorAbsenceSerializer
     permission_classes = [OwnsDoctorResource]
     filterset_fields = ["doctor", "absence_type"]
