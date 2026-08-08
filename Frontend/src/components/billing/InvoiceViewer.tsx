@@ -3,10 +3,19 @@ import { useTranslation } from 'react-i18next'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatDate, formatDateTime, formatMoney } from '../../lib/format'
 import type { Invoice } from '../../services/types'
+import { Logo } from '../layout/Logo'
 import { StatusBadge } from '../primitives/StatusBadge'
 
 /** Printable invoice sheet: header, line items, totals, payment history. */
-export function InvoiceViewer({ invoice }: { invoice: Invoice }) {
+export function InvoiceViewer({
+  invoice,
+  hideStatusBadge = false,
+}: {
+  invoice: Invoice
+  /** The caller already shows its own status pill next to the invoice number in its
+   * modal header (see MyInvoicesPage's InvoiceModal) — set this to avoid showing it twice. */
+  hideStatusBadge?: boolean
+}) {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const money = (v: string) => formatMoney(v, invoice.currency, language)
@@ -15,12 +24,12 @@ export function InvoiceViewer({ invoice }: { invoice: Invoice }) {
     <div className="invoice-viewer">
       <div className="invoice-viewer__header">
         <div>
-          <div className="invoice-viewer__clinic">{t('app.name')}</div>
+          <Logo className="h-7 w-auto" />
           <div style={{ color: 'var(--text-muted)' }}>{t('billing.invoiceTitle')}</div>
         </div>
         <div>
           <div className="invoice-viewer__number">{invoice.number}</div>
-          <StatusBadge status={invoice.status} />
+          {!hideStatusBadge && <StatusBadge status={invoice.status} />}
         </div>
       </div>
 

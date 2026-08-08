@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
+import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { useLanguage } from '../../hooks/useLanguage'
@@ -19,6 +20,12 @@ import type { PatientProfile } from '../../services/types'
 // those same properties regardless of className. See patient-field in
 // patient-tokens.css.
 const FIELD_CLASS = 'patient-field'
+const TEXTAREA_CLASS = `${FIELD_CLASS} resize-none`
+
+const BLOOD_OPTIONS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((value) => ({
+  value,
+  label: value || '-',
+}))
 
 function FieldLabel({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
   return (
@@ -85,34 +92,40 @@ function BackgroundForm({ initial }: { initial: PatientProfile }) {
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex flex-col">
           <FieldLabel icon={Droplets} text={t('medical.bloodType')} />
-          <input className={FIELD_CLASS} value={form.blood_type} onChange={set('blood_type')} />
+          <Select
+            options={BLOOD_OPTIONS}
+            value={form.blood_type}
+            onChange={(value) => setForm((f) => ({ ...f, blood_type: String(value) }))}
+          />
         </label>
         <label className="flex flex-col">
           <FieldLabel icon={AlertTriangle} text={t('medical.allergies')} />
-          <textarea rows={2} className={FIELD_CLASS} value={form.allergies_summary} onChange={set('allergies_summary')} />
+          <textarea rows={2} className={TEXTAREA_CLASS} value={form.allergies_summary} onChange={set('allergies_summary')} />
         </label>
         <label className="flex flex-col">
           <FieldLabel icon={Activity} text={t('medical.chronicConditions')} />
-          <textarea rows={2} className={FIELD_CLASS} value={form.chronic_conditions} onChange={set('chronic_conditions')} />
+          <textarea rows={2} className={TEXTAREA_CLASS} value={form.chronic_conditions} onChange={set('chronic_conditions')} />
         </label>
         <label className="flex flex-col">
           <FieldLabel icon={Pill} text={t('medical.currentMedications')} />
-          <textarea rows={2} className={FIELD_CLASS} value={form.current_medications} onChange={set('current_medications')} />
+          <textarea rows={2} className={TEXTAREA_CLASS} value={form.current_medications} onChange={set('current_medications')} />
         </label>
         <label className="flex flex-col sm:col-span-2">
           <FieldLabel icon={Scissors} text={t('medical.previousSurgeries')} />
-          <textarea rows={2} className={FIELD_CLASS} value={form.previous_surgeries} onChange={set('previous_surgeries')} />
+          <textarea rows={2} className={TEXTAREA_CLASS} value={form.previous_surgeries} onChange={set('previous_surgeries')} />
         </label>
       </div>
 
-      <button
-        type="button"
-        onClick={() => save.mutate()}
-        disabled={save.isPending}
-        className="mt-5 h-11 rounded-xl bg-gradient-to-r from-[#0769AE] to-[#4B9AF0] px-6 font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60"
-      >
-        {t('medical.saveBackground')}
-      </button>
+      <div className="mt-5 flex justify-end">
+        <button
+          type="button"
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+          className="rounded-xl border-none bg-[#0D9488] px-6 py-2.5 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60"
+        >
+          {t('medical.saveBackground')}
+        </button>
+      </div>
     </SectionCard>
   )
 }

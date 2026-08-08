@@ -40,7 +40,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
             <button
               type="button"
               onClick={() => navigate(roleHome(user.role))}
-              className="public-btn--responsive-text shrink-0 whitespace-nowrap rounded-xl bg-[#0D9488] px-2.5 py-1 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] sm:px-4 sm:py-2"
+              className="public-btn--responsive-text shrink-0 whitespace-nowrap rounded-xl border-none bg-[#0D9488] px-2.5 py-1 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] sm:px-4 sm:py-2"
             >
               {t('nav.dashboard')}
             </button>
@@ -49,14 +49,14 @@ export function PublicLayout({ children }: PublicLayoutProps) {
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="public-btn--responsive-text shrink-0 whitespace-nowrap rounded-xl bg-transparent px-2 py-1 font-semibold text-slate-700 hover:text-[#0D9488] transition-all sm:px-3.5 sm:py-1.5"
+                className="public-btn--responsive-text shrink-0 whitespace-nowrap rounded-xl border-none bg-transparent px-2 py-1 font-semibold text-slate-700 hover:text-[#0D9488] transition-all sm:px-3.5 sm:py-1.5"
               >
                 {t('auth.signIn')}
               </button>
               <button
                 type="button"
                 onClick={() => navigate('/register')}
-                className="public-btn--responsive-text shrink-0 whitespace-nowrap rounded-xl bg-[#0D9488] px-2.5 py-1 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] sm:px-4 sm:py-2"
+                className="public-btn--responsive-text shrink-0 whitespace-nowrap rounded-xl border-none bg-[#0D9488] px-2.5 py-1 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] sm:px-4 sm:py-2"
               >
                 {t('auth.createAccount')}
               </button>

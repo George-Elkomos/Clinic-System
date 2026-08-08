@@ -241,7 +241,9 @@ export function MyAppointmentsPage() {
     <div className="space-y-6">
       <div>
         <Breadcrumbs trail={[{ label: t('appointments.myTitle') }]} />
-        <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>
+        {/* PatientShell already renders this same title (hidden lg:block) in its
+            own sticky header — shown only below lg so the two never duplicate. */}
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>
           {t('appointments.myTitle')}
         </h1>
       </div>
@@ -277,7 +279,7 @@ export function MyAppointmentsPage() {
       )}
 
       <div>
-        <div className="mb-4 inline-flex gap-1 rounded-xl bg-slate-100 p-1">
+        <div className="mb-4 flex flex-wrap gap-2">
           {FILTERS.map((f) => (
             <button
               key={f.key}
@@ -285,8 +287,8 @@ export function MyAppointmentsPage() {
               onClick={() => setFilter(f.key)}
               className={
                 filter === f.key
-                  ? 'rounded-xl border border-slate-200/60 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm'
-                  : 'rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700'
+                  ? 'rounded-xl border border-[#0D9488] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
+                  : 'rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 sm:text-sm'
               }
             >
               {f.label}
@@ -339,7 +341,7 @@ export function MyAppointmentsPage() {
                       type="button"
                       onClick={() => onCancel(a)}
                       disabled={cancel.isPending && cancel.variables === a.id}
-                      className="h-9 rounded-xl border border-rose-200 bg-rose-50/50 px-4 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100"
+                      className="rounded-xl border-none bg-rose-50 px-3.5 py-1.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100"
                     >
                       {t('appointments.cancel')}
                     </button>
@@ -348,7 +350,7 @@ export function MyAppointmentsPage() {
                     <button
                       type="button"
                       onClick={() => setReviewingId(a.id)}
-                      className="h-9 rounded-xl border border-sky-200 bg-sky-50/50 px-4 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100"
+                      className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488]"
                     >
                       {t('reviews.leaveReview')}
                     </button>

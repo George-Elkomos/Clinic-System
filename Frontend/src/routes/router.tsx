@@ -46,6 +46,7 @@ import { BillingDeskPage } from '../pages/secretary/BillingDeskPage'
 import { MyInvoicesPage } from '../pages/patient/MyInvoicesPage'
 import { BillingReportsPage } from '../pages/manager/BillingReportsPage'
 import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
+import { PatientNotificationSettingsPage } from '../pages/patient/PatientNotificationSettingsPage'
 import { MustChangePasswordPage } from '../pages/account/MustChangePasswordPage'
 import { MyReferralsPage } from '../pages/patient/MyReferralsPage'
 import { DoctorReferralsPage } from '../pages/doctor/DoctorReferralsPage'
@@ -86,7 +87,7 @@ export const router = createBrowserRouter([
       { path: 'invoices', element: <MyInvoicesPage /> },
       { path: 'referrals', element: <MyReferralsPage /> },
       { path: 'radiology', element: <MyRadiologyPage /> },
-      { path: 'settings', element: <NotificationPrefsPage /> },
+      { path: 'settings', element: <PatientNotificationSettingsPage /> },
     ],
   },
 

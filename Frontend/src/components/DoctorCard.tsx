@@ -120,7 +120,7 @@ export function DoctorCard({ doctor }: { doctor: DoctorCardDoctor }) {
           <button
             type="button"
             onClick={handleBook}
-            className="w-full h-10 bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold rounded-xl shadow-sm transition-all mt-4 flex items-center justify-center"
+            className="w-full h-10 border-none bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold rounded-xl shadow-sm transition-all mt-4 flex items-center justify-center"
           >
             {status === 'authed' ? t('doctors.bookAppointment') : t('doctors.viewAndBook')}
           </button>

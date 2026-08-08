@@ -81,7 +81,7 @@ function PrescriptionCard({
               type="button"
               onClick={() => onOpenPdf(p.id)}
               disabled={pdfLoading}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-[#0D9488] px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60 sm:text-sm"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border-none bg-[#0D9488] px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60 sm:text-sm"
             >
               <Printer size={14} aria-hidden="true" />
               {t('medical.openPdf')}
@@ -149,7 +149,9 @@ export function MyPrescriptionsPage() {
   return (
     <div>
       <Breadcrumbs trail={[{ label: t('nav.prescriptions') }]} />
-      <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>
+      {/* PatientShell already renders this same title (hidden lg:block) in its
+          own sticky header — shown only below lg so the two never duplicate. */}
+      <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>
         {t('nav.prescriptions')}
       </h1>
       <div className="mt-1 mb-6">

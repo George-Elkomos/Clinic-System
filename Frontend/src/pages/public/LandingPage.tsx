@@ -45,7 +45,7 @@ export function LandingPage() {
             <button
               type="button"
               onClick={() => navigate('/doctors')}
-              className="public-btn--hero-cta bg-white text-[#0D9488] hover:bg-slate-50 font-bold px-8 py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all inline-flex items-center gap-2"
+              className="public-btn--hero-cta border-none bg-white text-[#0D9488] hover:bg-slate-50 font-bold px-8 py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all inline-flex items-center gap-2"
             >
               {t('landing.findDoctor')}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -102,7 +102,7 @@ export function LandingPage() {
         <button
           type="button"
           onClick={() => navigate('/register')}
-          className="mt-4 inline-flex items-center justify-center bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold px-8 py-3 rounded-xl shadow-md transition-all"
+          className="mt-4 inline-flex items-center justify-center border-none bg-[#0D9488] hover:bg-[#0B7A70] text-white font-semibold px-8 py-3 rounded-xl shadow-md transition-all"
         >
           {t('auth.createAccount')}
         </button>
