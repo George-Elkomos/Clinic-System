@@ -27,6 +27,7 @@ env = environ.Env(
     REMINDER_1H_WINDOW_MINUTES=(int, 15),
     WAITLIST_HOLD_HOURS=(int, 24),
     CLINIC_NAME=(str, "Nabda"),
+    TIME_ZONE=(str, "Africa/Cairo"),
     BILLING_FOLLOWUP_DAYS=(int, 14),
     BILLING_INVOICE_DUE_DAYS=(int, 7),
     BILLING_DEFAULT_CONSULTATION_PRICE=(str, "50.00"),
@@ -193,7 +194,7 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 # --- I18N -------------------------------------------------------------------
 LANGUAGE_CODE = "en"
 LANGUAGES = [("en", "English"), ("ar", "Arabic")]
-TIME_ZONE = "UTC"
+TIME_ZONE = env("TIME_ZONE")
 USE_I18N = True
 USE_TZ = True
 
