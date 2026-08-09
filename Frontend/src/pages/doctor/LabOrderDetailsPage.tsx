@@ -8,6 +8,7 @@ import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { StatusBadge } from '../../components/primitives/StatusBadge'
+import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { useToast } from '../../components/primitives/Toast'
 import { FormField } from '../../components/primitives/FormField'
@@ -74,7 +75,7 @@ function ResultEntryRow({
         </div>
         <div className="lab-item-row__code">
           <FormField label={t('lab.resultDate')} error={errors?.result_date}>
-            {(p) => <input {...p} type="date" value={value.result_date} onChange={(e) => set('result_date', e.target.value)} />}
+            {(p) => <CustomDatePicker {...p} variant="field" value={value.result_date} onChange={(iso) => set('result_date', iso)} />}
           </FormField>
         </div>
       </div>

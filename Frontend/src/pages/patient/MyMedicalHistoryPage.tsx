@@ -90,14 +90,19 @@ function BackgroundForm({ initial }: { initial: PatientProfile }) {
       <p className="text-sm text-slate-500" style={{ marginTop: '0.25rem' }}>{t('medical.backgroundIntro')}</p>
 
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="flex flex-col">
+        {/* A plain <div>, not <label> — wrapping <Select> in a bare <label> makes the
+            browser's implicit label-activation fire a phantom second click on whatever
+            labelable element (e.g. the "×" clear button) appears inside it right after
+            a selection, which immediately re-clears the value. FormField-driven Selects
+            elsewhere avoid this because their <label> is a sibling with htmlFor, not a wrapper. */}
+        <div className="flex flex-col">
           <FieldLabel icon={Droplets} text={t('medical.bloodType')} />
           <Select
             options={BLOOD_OPTIONS}
             value={form.blood_type}
             onChange={(value) => setForm((f) => ({ ...f, blood_type: String(value) }))}
           />
-        </label>
+        </div>
         <label className="flex flex-col">
           <FieldLabel icon={AlertTriangle} text={t('medical.allergies')} />
           <textarea rows={2} className={TEXTAREA_CLASS} value={form.allergies_summary} onChange={set('allergies_summary')} />

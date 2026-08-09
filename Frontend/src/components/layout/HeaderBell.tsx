@@ -43,8 +43,9 @@ function relativeTime(iso: string, locale: string) {
 
 // Notifications bell + popover — custom spec matching the dashboard's own
 // style guide (#1E293B text, rounded-2xl, Inter), not the literal DESIGN.md
-// dropdown from earlier (which this replaces).
-export function PatientHeaderBell() {
+// dropdown from earlier (which this replaces). Shared by every role's shell
+// header, not patient-specific despite the file's original name.
+export function HeaderBell() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const [open, setOpen] = useState(false)

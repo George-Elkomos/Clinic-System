@@ -1,4 +1,28 @@
-import { ArrowRightLeft, Bell, ChevronDown, Clock, Folder, LogOut, Menu, X } from 'lucide-react'
+import {
+  ArrowRightLeft,
+  Bell,
+  CalendarDays,
+  CalendarX,
+  ChevronDown,
+  ClipboardList,
+  Clock,
+  DollarSign,
+  Folder,
+  FlaskConical,
+  Inbox,
+  LayoutGrid,
+  LogOut,
+  Menu,
+  ScanLine,
+  ScrollText,
+  Star,
+  Stethoscope,
+  TrendingUp,
+  Users,
+  Wallet,
+  X,
+  Zap,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
@@ -6,9 +30,9 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
 import { authApi } from '../../services/auth.api'
-import type { Language } from '../../services/types'
+import type { Language, Role } from '../../services/types'
+import { HeaderBell } from './HeaderBell'
 import { Logo } from './Logo'
-import { PatientHeaderBell } from './PatientHeaderBell'
 
 type NavIcon = (props: { className?: string }) => React.JSX.Element
 
@@ -19,7 +43,12 @@ interface NavItem {
   end?: boolean
 }
 
-// Hardcoded solid (Heroicons-sourced) icons for the sidebar nav, per exact
+interface NavGroup {
+  headerKey?: string
+  items: NavItem[]
+}
+
+// Hardcoded solid (Heroicons-sourced) icons for the patient sidebar, per exact
 // spec — lucide has no solid variant, so these are separate from the rest
 // of the app's line icons. Kept prop-less on color: each is rendered inside
 // a NavLink that already sets `color` via style/text-white, and
@@ -123,48 +152,111 @@ function InvoicesSolidIcon({ className = '' }: { className?: string }) {
 }
 
 // Wraps a lucide component to the same {className} call signature as the
-// hand-authored solids above, so NAV_GROUPS can mix both uniformly.
+// hand-authored solids above, so NAV_BY_ROLE can mix both uniformly.
 function fromLucide(LucideComp: React.ComponentType<{ className?: string }>): NavIcon {
   return ({ className }) => <LucideComp className={className} />
 }
 
-// Radiology intentionally has no sidebar entry (not in the target nav), but
-// the route itself is left in router.tsx so the page stays reachable directly
-// rather than deleting a working feature over a nav-only request.
-const NAV_GROUPS: { headerKey: string; items: NavItem[] }[] = [
-  {
-    headerKey: 'nav.sectionMain',
-    items: [
-      { to: '/patient', labelKey: 'nav.patientDashboard', icon: HomeSolidIcon, end: true },
-      { to: '/patient/book', labelKey: 'nav.bookAppointment', icon: BookAppointmentSolidIcon },
-      { to: '/patient/appointments', labelKey: 'nav.myAppointments', icon: fromLucide(Clock) },
-    ],
-  },
-  {
-    headerKey: 'nav.sectionRecords',
-    items: [
-      { to: '/patient/history', labelKey: 'nav.medicalHistory', icon: fromLucide(Folder) },
-      { to: '/patient/prescriptions', labelKey: 'nav.prescriptions', icon: PrescriptionsSolidIcon },
-      { to: '/patient/scans', labelKey: 'nav.scansLabs', icon: ScansLabsSolidIcon },
-      { to: '/patient/lab-results', labelKey: 'nav.labResults', icon: LabResultsBeakerIcon },
-      { to: '/patient/vitals', labelKey: 'nav.vitals', icon: VitalsSolidIcon },
-      { to: '/patient/timeline', labelKey: 'nav.timeline', icon: TimelineNodesSolidIcon },
-    ],
-  },
-  {
-    headerKey: 'nav.sectionServices',
-    items: [
-      { to: '/patient/invoices', labelKey: 'nav.myInvoices', icon: InvoicesSolidIcon },
-      { to: '/patient/referrals', labelKey: 'nav.myReferrals', icon: fromLucide(ArrowRightLeft) },
-    ],
-  },
-  {
-    headerKey: 'nav.sectionSettings',
-    items: [{ to: '/patient/settings', labelKey: 'notifications.title', icon: fromLucide(Bell) }],
-  },
-]
+// Radiology intentionally has no patient sidebar entry (not in the target
+// nav), but the route itself is left in router.tsx so the page stays
+// reachable directly rather than deleting a working feature over a nav-only
+// request.
+const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
+  PATIENT: [
+    {
+      headerKey: 'nav.sectionMain',
+      items: [
+        { to: '/patient', labelKey: 'nav.patientDashboard', icon: HomeSolidIcon, end: true },
+        { to: '/patient/book', labelKey: 'nav.bookAppointment', icon: BookAppointmentSolidIcon },
+        { to: '/patient/appointments', labelKey: 'nav.myAppointments', icon: fromLucide(Clock) },
+      ],
+    },
+    {
+      headerKey: 'nav.sectionRecords',
+      items: [
+        { to: '/patient/history', labelKey: 'nav.medicalHistory', icon: fromLucide(Folder) },
+        { to: '/patient/prescriptions', labelKey: 'nav.prescriptions', icon: PrescriptionsSolidIcon },
+        { to: '/patient/scans', labelKey: 'nav.scansLabs', icon: ScansLabsSolidIcon },
+        { to: '/patient/lab-results', labelKey: 'nav.labResults', icon: LabResultsBeakerIcon },
+        { to: '/patient/vitals', labelKey: 'nav.vitals', icon: VitalsSolidIcon },
+        { to: '/patient/timeline', labelKey: 'nav.timeline', icon: TimelineNodesSolidIcon },
+      ],
+    },
+    {
+      headerKey: 'nav.sectionServices',
+      items: [
+        { to: '/patient/invoices', labelKey: 'nav.myInvoices', icon: InvoicesSolidIcon },
+        { to: '/patient/referrals', labelKey: 'nav.myReferrals', icon: fromLucide(ArrowRightLeft) },
+      ],
+    },
+    {
+      headerKey: 'nav.sectionSettings',
+      items: [{ to: '/patient/settings', labelKey: 'notifications.title', icon: fromLucide(Bell) }],
+    },
+  ],
+  DOCTOR: [
+    {
+      items: [
+        { to: '/doctor', labelKey: 'nav.dashboard', icon: HomeSolidIcon, end: true },
+        { to: '/doctor/queue', labelKey: 'nav.liveQueue', icon: fromLucide(Zap) },
+        { to: '/doctor/schedule', labelKey: 'nav.schedule', icon: fromLucide(CalendarDays) },
+        { to: '/doctor/appointments', labelKey: 'nav.appointments', icon: fromLucide(ClipboardList) },
+        { to: '/doctor/patients', labelKey: 'nav.patients', icon: fromLucide(Users) },
+        { to: '/doctor/reviews', labelKey: 'nav.reviews', icon: fromLucide(Star) },
+        { to: '/doctor/lab-orders', labelKey: 'nav.labOrders', icon: fromLucide(FlaskConical) },
+        { to: '/doctor/referrals', labelKey: 'nav.referrals', icon: fromLucide(ArrowRightLeft) },
+      ],
+    },
+    {
+      headerKey: 'nav.sectionSettings',
+      items: [{ to: '/account/notifications', labelKey: 'notifications.title', icon: fromLucide(Bell) }],
+    },
+  ],
+  SECRETARY: [
+    {
+      items: [
+        { to: '/secretary', labelKey: 'nav.dashboard', icon: HomeSolidIcon, end: true },
+        { to: '/secretary/desk', labelKey: 'nav.appointmentDesk', icon: fromLucide(Inbox) },
+        { to: '/secretary/queue', labelKey: 'nav.queueBoard', icon: fromLucide(LayoutGrid) },
+        { to: '/secretary/patients', labelKey: 'nav.allPatients', icon: fromLucide(Users) },
+        { to: '/secretary/absences', labelKey: 'nav.absences', icon: fromLucide(CalendarX) },
+        { to: '/secretary/doctors', labelKey: 'nav.doctors', icon: fromLucide(Stethoscope) },
+        { to: '/secretary/lab', labelKey: 'nav.labOrders', icon: fromLucide(FlaskConical) },
+        { to: '/secretary/billing', labelKey: 'nav.billing', icon: fromLucide(Wallet) },
+        { to: '/secretary/referrals', labelKey: 'nav.referrals', icon: fromLucide(ArrowRightLeft) },
+        { to: '/secretary/radiology', labelKey: 'nav.radiologyWorklist', icon: fromLucide(ScanLine) },
+      ],
+    },
+    {
+      headerKey: 'nav.sectionSettings',
+      items: [{ to: '/account/notifications', labelKey: 'notifications.title', icon: fromLucide(Bell) }],
+    },
+  ],
+  MANAGER: [
+    {
+      items: [
+        { to: '/manager', labelKey: 'nav.dashboard', icon: HomeSolidIcon, end: true },
+        { to: '/manager/users', labelKey: 'nav.users', icon: fromLucide(Users) },
+        { to: '/secretary/doctors', labelKey: 'nav.doctors', icon: fromLucide(Stethoscope) },
+        { to: '/manager/reports', labelKey: 'nav.reports', icon: fromLucide(TrendingUp) },
+        { to: '/manager/billing', labelKey: 'nav.billingReports', icon: fromLucide(DollarSign) },
+        { to: '/manager/reviews', labelKey: 'nav.reviews', icon: fromLucide(Star) },
+        { to: '/manager/audit', labelKey: 'nav.auditLog', icon: fromLucide(ScrollText) },
+      ],
+    },
+    {
+      headerKey: 'nav.sectionSettings',
+      items: [{ to: '/account/notifications', labelKey: 'notifications.title', icon: fromLucide(Bell) }],
+    },
+  ],
+}
 
-const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
+const HOME_BY_ROLE: Record<Role, string> = {
+  PATIENT: '/patient',
+  DOCTOR: '/doctor',
+  SECRETARY: '/secretary',
+  MANAGER: '/manager',
+}
 
 function avatarUrl(name: string, size: number) {
   return `https://ui-avatars.com/api/?background=1AB5B3&color=fff&size=${size}&name=${encodeURIComponent(name)}`
@@ -174,7 +266,7 @@ function avatarUrl(name: string, size: number) {
 // and underlined. Buttons need an explicit border-0 bg-transparent reset —
 // .patient-shell skips Tailwind preflight, so unstyled <button>s otherwise
 // keep native browser chrome (a visible box), not just the className's look.
-function PatientLanguageToggle() {
+function ShellLanguageToggle() {
   const { language, setLanguage } = useLanguage()
   const { user } = useAuth()
 
@@ -211,8 +303,22 @@ function PatientLanguageToggle() {
   )
 }
 
-// DESIGN.md §4.A/B — sidebar + header shell for the Patient role only.
-export function PatientShell() {
+/**
+ * The single sidebar + header shell for every role. Visual design (colors,
+ * spacing, avatar footer, active-nav gradient) is shared verbatim across
+ * Patient/Doctor/Secretary/Manager — only the nav item list and home route
+ * change per role. Replaces the old patient-only PatientShell and the
+ * separate CSS-driven AppShell used by the other three roles.
+ *
+ * Only Patient's own page content (<main>/<Outlet>) opts into the
+ * `.patient-shell` Tailwind-enabling scope — Doctor/Secretary/Manager pages
+ * haven't been redesigned onto this system yet, so wrapping their existing
+ * content in that scope would silently reset button/input tap-target sizes
+ * and font scale across pages this task never touched. The sidebar and
+ * header are always inside the scope regardless of role, since those are
+ * brand new for every role here.
+ */
+export function PortalShell() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const location = useLocation()
@@ -220,29 +326,33 @@ export function PatientShell() {
   if (!user) return null
 
   const displayName = user.full_name || user.email
-  const currentItem = ALL_ITEMS.find((item) =>
+  const navGroups = NAV_BY_ROLE[user.role]
+  const allItems = navGroups.flatMap((g) => g.items)
+  const currentItem = allItems.find((item) =>
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   )
+  const homeTo = HOME_BY_ROLE[user.role]
+  const isPatient = user.role === 'PATIENT'
 
   return (
-    <div className="patient-shell flex min-h-screen">
+    <div className="flex min-h-screen">
       {mobileNavOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm transition-opacity lg:hidden"
+          className="patient-shell fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm transition-opacity lg:hidden"
           onClick={() => setMobileNavOpen(false)}
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`patient-sidebar z-[60] flex h-screen w-[296px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white transition-transform duration-200 ${
+        className={`patient-shell patient-sidebar z-[60] flex h-screen w-[296px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white transition-transform duration-200 ${
           mobileNavOpen ? 'is-open' : ''
         }`}
       >
         {/* Fixed to h-20, same as the page header, so their bottom borders
             align across the sidebar/header boundary at the top of the page. */}
         <div className="flex h-20 shrink-0 items-center justify-between border-b border-[#F3F4F6] px-6">
-          <Link to="/patient">
+          <Link to={homeTo}>
             <Logo className="h-[54px] w-[122px] object-contain" />
           </Link>
           <button
@@ -259,11 +369,13 @@ export function PatientShell() {
           className="patient-hide-scrollbar flex flex-1 flex-col space-y-8 overflow-y-auto px-4 py-6"
           aria-label={t('nav.dashboard')}
         >
-          {NAV_GROUPS.map((group) => (
-            <div key={group.headerKey}>
-              <div className="patient-text-overline mb-2" style={{ color: 'var(--text-muted)' }}>
-                {t(group.headerKey)}
-              </div>
+          {navGroups.map((group, i) => (
+            <div key={group.headerKey ?? i}>
+              {group.headerKey && (
+                <div className="patient-text-overline mb-2" style={{ color: 'var(--text-muted)' }}>
+                  {t(group.headerKey)}
+                </div>
+              )}
               <div className="flex flex-col gap-3">
                 {group.items.map((item) => (
                   <NavLink
@@ -296,7 +408,7 @@ export function PatientShell() {
                   {displayName}
                 </div>
                 <div className="patient-text-body-secondary truncate" style={{ color: 'var(--text-secondary)' }}>
-                  {t('roles.PATIENT')}
+                  {t(`roles.${user.role}`)}
                 </div>
               </div>
             </div>
@@ -315,7 +427,7 @@ export function PatientShell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-20 w-full shrink-0 items-center justify-between border-b border-[#E5E7EB] bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-10">
+        <header className="patient-shell sticky top-0 z-30 flex h-20 w-full shrink-0 items-center justify-between border-b border-[#E5E7EB] bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-10">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -325,7 +437,7 @@ export function PatientShell() {
             >
               <Menu size={22} style={{ color: 'var(--text-secondary)' }} />
             </button>
-            <Link to="/patient" className="lg:hidden">
+            <Link to={homeTo} className="lg:hidden">
               <Logo className="h-8 w-auto object-contain" />
             </Link>
             <h1 className="hidden text-3xl font-bold leading-8 lg:block" style={{ color: '#1C4879' }}>
@@ -338,14 +450,18 @@ export function PatientShell() {
               alt=""
               className="h-9 w-9 rounded-full border border-gray-200 object-cover"
             />
-            <PatientHeaderBell />
+            <HeaderBell />
             <div className="hidden h-6 w-px bg-gray-200 lg:block" aria-hidden="true" />
             <div className="hidden lg:block">
-              <PatientLanguageToggle />
+              <ShellLanguageToggle />
             </div>
           </div>
         </header>
-        <main className="min-h-screen flex-1 overflow-x-hidden bg-slate-50/50 p-4 transition-all sm:p-6 lg:p-8">
+        <main
+          className={`min-h-screen flex-1 overflow-x-hidden bg-slate-50/50 p-4 transition-all sm:p-6 lg:p-8 ${
+            isPatient ? 'patient-shell' : ''
+          }`}
+        >
           <Outlet />
         </main>
       </div>

@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
+import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
@@ -39,7 +40,7 @@ function FollowUpBox({ appointmentId, onDone }: { appointmentId: number; onDone:
   return (
     <div className="appt-followup-box">
       <FormField label={t('followups.recommendedDate')}>
-        {(p) => <input {...p} type="date" min={todayISO()} value={date} onChange={(e) => setDate(e.target.value)} />}
+        {(p) => <CustomDatePicker {...p} variant="field" allowClear={false} min={todayISO()} value={date} onChange={setDate} />}
       </FormField>
       <FormField label={t('followups.notes')}>
         {(p) => <input {...p} value={notes} onChange={(e) => setNotes(e.target.value)} />}

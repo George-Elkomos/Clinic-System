@@ -6,6 +6,7 @@ import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
+import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
@@ -82,12 +83,12 @@ export function DoctorAbsencePage() {
         <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 150 }}>
             <FormField label={t('absence.startDate')}>
-              {(p) => <input {...p} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />}
+              {(p) => <CustomDatePicker {...p} variant="field" allowClear={false} value={startDate} onChange={setStartDate} />}
             </FormField>
           </div>
           <div style={{ flex: 1, minWidth: 150 }}>
             <FormField label={t('absence.endDate')}>
-              {(p) => <input {...p} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />}
+              {(p) => <CustomDatePicker {...p} variant="field" allowClear={false} value={endDate} onChange={setEndDate} />}
             </FormField>
           </div>
           <div style={{ flex: 1, minWidth: 150 }}>

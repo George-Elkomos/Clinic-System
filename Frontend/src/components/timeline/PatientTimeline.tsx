@@ -2,6 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { CustomDatePicker } from '../primitives/CustomDatePicker'
 import { CenteredSpinner, Spinner } from '../primitives/Spinner'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatDate, formatDateTime } from '../../lib/format'
@@ -272,11 +273,11 @@ export function PatientTimeline({ patientId }: { patientId: number }) {
         <div className="timeline__dates">
           <label>
             {t('timeline.dateFrom')}
-            <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} />
+            <CustomDatePicker value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} placeholder={t('timeline.dateFrom')} />
           </label>
           <label>
             {t('timeline.dateTo')}
-            <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} />
+            <CustomDatePicker value={dateTo} min={dateFrom || undefined} onChange={setDateTo} placeholder={t('timeline.dateTo')} />
           </label>
         </div>
       </div>

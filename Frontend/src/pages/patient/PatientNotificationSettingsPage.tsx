@@ -89,7 +89,8 @@ function PrefsForm({ initial }: { initial: NotificationPreference }) {
 }
 
 // Patient-only fork of NotificationPrefsPage — that component is also mounted at
-// /account/notifications under the generic AppShell for Doctor/Secretary/Manager,
+// /account/notifications for Doctor/Secretary/Manager (still on the old un-restyled
+// page content, even though PortalShell's chrome now looks the same for every role),
 // so it can't be restyled with teal in place without leaking into their UI.
 export function PatientNotificationSettingsPage() {
   const { t } = useTranslation()

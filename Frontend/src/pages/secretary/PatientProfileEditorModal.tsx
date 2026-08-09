@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '../../components/primitives/Button'
+import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
@@ -74,11 +75,11 @@ function ProfileForm({
       <div className="form-grid">
         <FormField label={t('patients.dateOfBirth')}>
           {(p) => (
-            <input
+            <CustomDatePicker
               {...p}
-              type="date"
+              variant="field"
               value={draft.date_of_birth ?? ''}
-              onChange={(e) => update('date_of_birth', e.target.value || null)}
+              onChange={(iso) => update('date_of_birth', iso || null)}
             />
           )}
         </FormField>

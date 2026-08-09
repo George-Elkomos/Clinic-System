@@ -1,9 +1,10 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { CalendarDays, ChevronLeft, ChevronRight, History } from 'lucide-react'
+import { ChevronRight, History } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
+import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
@@ -190,196 +191,6 @@ function EventRow({ event }: { event: TimelineEvent }) {
   )
 }
 
-function toISO(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-// Closes a popover on outside click, since it isn't a native element that gives us that for free.
-function useOutsideClose(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open, onClose])
-  return ref
-}
-
-// Custom calendar popover replacing the native <input type="date"> for the From/To
-// filters — the OS-rendered native popup can't be restyled and clipped behind the
-// timeline's own content on some browsers.
-function DateFilterPicker({
-  value,
-  onChange,
-  min,
-  max,
-  locale,
-  placeholder,
-}: {
-  value: string
-  onChange: (iso: string) => void
-  min?: string
-  max?: string
-  locale: string
-  placeholder: string
-}) {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const ref = useOutsideClose(open, () => setOpen(false))
-
-  const selectedDate = value ? new Date(`${value}T00:00:00`) : null
-  const minDate = min ? new Date(`${min}T00:00:00`) : null
-  const maxDate = max ? new Date(`${max}T00:00:00`) : null
-  const today = new Date()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const isTodayDisabled = !!((minDate && todayStart < minDate) || (maxDate && todayStart > maxDate))
-
-  const [viewMonth, setViewMonth] = useState(() => {
-    const base = selectedDate ?? today
-    return new Date(base.getFullYear(), base.getMonth(), 1)
-  })
-
-  // Jump the visible month back to the current selection whenever the popover reopens.
-  useEffect(() => {
-    if (!open) return
-    const base = selectedDate ?? today
-    setViewMonth(new Date(base.getFullYear(), base.getMonth(), 1))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
-
-  const weekdayLabels = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short' })
-    // Jan 4, 2026 is a Sunday — a stable anchor to enumerate Sun..Sat labels from.
-    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2026, 0, 4 + i)))
-  }, [locale])
-
-  const cells = useMemo(() => {
-    const firstOfMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1)
-    const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate()
-    const out: { date: Date; outside: boolean }[] = []
-    for (let i = firstOfMonth.getDay(); i > 0; i--) {
-      out.push({ date: new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1 - i), outside: true })
-    }
-    for (let d = 1; d <= daysInMonth; d++) {
-      out.push({ date: new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d), outside: false })
-    }
-    while (out.length < 42) {
-      const last = out[out.length - 1].date
-      out.push({ date: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1), outside: true })
-    }
-    return out
-  }, [viewMonth])
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-700 outline-none transition-all focus:border-[#0D9488] focus:ring-2 focus:ring-[#0D9488]/20 sm:text-sm"
-      >
-        <CalendarDays size={14} className="shrink-0 text-slate-400" aria-hidden="true" />
-        <span className={value ? '' : 'text-slate-400'}>
-          {selectedDate
-            ? selectedDate.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })
-            : placeholder}
-        </span>
-      </button>
-
-      {open && (
-        <div className="absolute start-0 z-50 mt-2 w-72 rounded-2xl border border-slate-100 bg-white p-4 text-slate-700 shadow-xl">
-          <div className="mb-3 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
-              className="rounded-lg border-none bg-transparent p-1 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm font-bold text-slate-800">
-              {viewMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
-            </span>
-            <button
-              type="button"
-              onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
-              className="rounded-lg border-none bg-transparent p-1 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          <div className="mb-1 grid grid-cols-7 text-center text-xs font-semibold text-slate-400">
-            {weekdayLabels.map((d, i) => (
-              <div key={i}>{d}</div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map(({ date, outside }, i) => {
-              const iso = toISO(date)
-              const isSelected = !outside && iso === value
-              const isDisabled = !!((minDate && date < minDate) || (maxDate && date > maxDate))
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={outside || isDisabled}
-                  onClick={() => {
-                    onChange(iso)
-                    setOpen(false)
-                  }}
-                  className={
-                    outside
-                      ? 'pointer-events-none flex h-8 w-8 items-center justify-center rounded-xl border-none bg-transparent text-xs text-slate-300'
-                      : isSelected
-                        ? 'flex h-8 w-8 items-center justify-center rounded-xl border-none bg-[#0D9488] text-xs font-bold text-white shadow-sm'
-                        : isDisabled
-                          ? 'flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-xl border-none bg-transparent text-xs text-slate-300'
-                          : 'flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border-none bg-transparent text-xs text-slate-700 transition-all hover:bg-teal-50 hover:text-[#0D9488]'
-                  }
-                >
-                  {date.getDate()}
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                onChange('')
-                setOpen(false)
-              }}
-              className="border-none bg-transparent text-xs font-semibold text-[#0D9488] transition-all hover:text-[#0B7A70]"
-            >
-              {t('common.clear')}
-            </button>
-            <button
-              type="button"
-              disabled={isTodayDisabled}
-              onClick={() => {
-                setViewMonth(new Date(today.getFullYear(), today.getMonth(), 1))
-                if (!isTodayDisabled) {
-                  onChange(toISO(today))
-                  setOpen(false)
-                }
-              }}
-              className={`border-none bg-transparent text-xs font-semibold transition-all ${
-                isTodayDisabled ? 'cursor-not-allowed text-slate-300' : 'text-[#0D9488] hover:text-[#0B7A70]'
-              }`}
-            >
-              {t('common.today')}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function EmptyTimelineState({ text }: { text: string }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-slate-50/60 p-8 text-center">
@@ -477,21 +288,19 @@ export function PatientTimelinePage() {
       <div className="relative z-30 mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 sm:text-sm">
           <span className="shrink-0">{t('timeline.dateFrom')}</span>
-          <DateFilterPicker
+          <CustomDatePicker
             value={dateFrom}
             max={dateTo || undefined}
             onChange={setDateFrom}
-            locale={language}
             placeholder={t('timeline.dateFrom')}
           />
         </div>
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 sm:text-sm">
           <span className="shrink-0">{t('timeline.dateTo')}</span>
-          <DateFilterPicker
+          <CustomDatePicker
             value={dateTo}
             min={dateFrom || undefined}
             onChange={setDateTo}
-            locale={language}
             placeholder={t('timeline.dateTo')}
           />
         </div>

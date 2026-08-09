@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, CalendarCheck, CalendarX, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { CalendarCheck, CalendarX, Check, ChevronDown, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { useLanguage } from '../../hooks/useLanguage'
@@ -14,10 +15,6 @@ import { waitlistApi } from '../../services/waitlist.api'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function toISO(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // Closes a popover on outside click, since neither custom control below
@@ -83,92 +80,6 @@ function DoctorCombobox({
               {value === o.value && <Check size={14} className="shrink-0" style={{ color: '#0D9488' }} />}
             </button>
           ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Custom calendar popover replacing the native <input type="date"> — its
-// OS-rendered calendar popup can't be restyled at all via CSS.
-function DatePicker({ value, min, locale, onChange }: { value: string; min: string; locale: string; onChange: (iso: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useOutsideClose(open, () => setOpen(false))
-  const selectedDate = new Date(`${value}T00:00:00`)
-  const minDate = new Date(`${min}T00:00:00`)
-  const [viewMonth, setViewMonth] = useState(() => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))
-
-  const firstOfMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1)
-  const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate()
-  const cells: (Date | null)[] = Array.from({ length: firstOfMonth.getDay() }, (): Date | null => null).concat(
-    Array.from({ length: daysInMonth }, (_, i) => new Date(viewMonth.getFullYear(), viewMonth.getMonth(), i + 1)),
-  )
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex h-12 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-800 focus:border-[#3BC9CB] focus:outline-none"
-      >
-        <span>{selectedDate.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-        <Calendar size={16} className="shrink-0 text-slate-400" />
-      </button>
-      {open && (
-        <div className="absolute start-0 z-50 mt-2 w-72 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl">
-          <div className="mb-3 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm font-semibold text-slate-800">
-              {viewMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
-            </span>
-            <button
-              type="button"
-              onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-          <div className="mb-1 grid grid-cols-7 text-center text-[11px] font-medium text-slate-400">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i}>{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((d, i) => {
-              if (!d) return <div key={i} />
-              const iso = toISO(d)
-              const isSelected = iso === value
-              const isDisabled = d < minDate
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => {
-                    onChange(iso)
-                    setOpen(false)
-                  }}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs transition-colors ${
-                    isSelected
-                      ? 'font-semibold text-white'
-                      : isDisabled
-                        ? 'cursor-not-allowed text-slate-300'
-                        : 'text-slate-700 hover:bg-slate-50 hover:text-[#0D9488]'
-                  }`}
-                  style={isSelected ? { background: '#3BC9CB' } : undefined}
-                >
-                  {d.getDate()}
-                </button>
-              )
-            })}
-          </div>
         </div>
       )}
     </div>
@@ -242,10 +153,11 @@ export function BookAppointmentPage() {
 
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-800">{t('booking.chooseDate')}</label>
-            <DatePicker
+            <CustomDatePicker
               value={date}
               min={todayISO()}
-              locale={language}
+              variant="field"
+              allowClear={false}
               onChange={(iso) => {
                 setDate(iso)
                 setSelectedSlot(null)

@@ -1,7 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 
-import { AppShell } from '../components/layout/AppShell'
-import { PatientShell } from '../components/layout/PatientShell'
+import { PortalShell } from '../components/layout/PortalShell'
 import { ForbiddenPage, NotFoundPage } from '../pages/public/ErrorPages'
 import { KioskQueuePage } from '../pages/public/KioskQueuePage'
 import { LoginPage } from '../pages/public/LoginPage'
@@ -73,7 +72,7 @@ export const router = createBrowserRouter([
   // Patient
   {
     path: '/patient',
-    element: <RoleRoute roles={['PATIENT']}><PatientShell /></RoleRoute>,
+    element: <RoleRoute roles={['PATIENT']}><PortalShell /></RoleRoute>,
     children: [
       { index: true, element: <PatientDashboard /> },
       { path: 'book', element: <BookAppointmentPage /> },
@@ -94,7 +93,7 @@ export const router = createBrowserRouter([
   // Doctor
   {
     path: '/doctor',
-    element: <RoleRoute roles={['DOCTOR']}><AppShell /></RoleRoute>,
+    element: <RoleRoute roles={['DOCTOR']}><PortalShell /></RoleRoute>,
     children: [
       { index: true, element: <DoctorDashboard /> },
       { path: 'queue', element: <DoctorQueuePage /> },
@@ -113,7 +112,7 @@ export const router = createBrowserRouter([
   // Secretary
   {
     path: '/secretary',
-    element: <RoleRoute roles={['SECRETARY', 'MANAGER']}><AppShell /></RoleRoute>,
+    element: <RoleRoute roles={['SECRETARY', 'MANAGER']}><PortalShell /></RoleRoute>,
     children: [
       { index: true, element: <SecretaryDashboard /> },
       { path: 'desk', element: <AppointmentDeskPage /> },
@@ -129,7 +128,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Forced password change — available to any authenticated role, no AppShell.
+  // Forced password change — available to any authenticated role, no PortalShell.
   {
     path: '/change-password',
     element: <ProtectedRoute><MustChangePasswordPage /></ProtectedRoute>,
@@ -138,7 +137,7 @@ export const router = createBrowserRouter([
   // Account settings — available to every authenticated role.
   {
     path: '/account',
-    element: <RoleRoute roles={['PATIENT', 'DOCTOR', 'SECRETARY', 'MANAGER']}><AppShell /></RoleRoute>,
+    element: <RoleRoute roles={['PATIENT', 'DOCTOR', 'SECRETARY', 'MANAGER']}><PortalShell /></RoleRoute>,
     children: [
       { path: 'notifications', element: <NotificationPrefsPage /> },
     ],
@@ -147,7 +146,7 @@ export const router = createBrowserRouter([
   // Manager
   {
     path: '/manager',
-    element: <RoleRoute roles={['MANAGER']}><AppShell /></RoleRoute>,
+    element: <RoleRoute roles={['MANAGER']}><PortalShell /></RoleRoute>,
     children: [
       { index: true, element: <ManagerDashboard /> },
       { path: 'reports', element: <ReportsDashboardPage /> },
