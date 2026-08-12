@@ -117,7 +117,7 @@ function InvoiceModal({ invoice, onClose }: { invoice: Invoice; onClose: () => v
           <button
             type="button"
             onClick={printInvoice}
-            className="rounded-xl border-none bg-[#0D9488] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70]"
+            className="rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70]"
           >
             {t('billing.downloadPdf')}
           </button>

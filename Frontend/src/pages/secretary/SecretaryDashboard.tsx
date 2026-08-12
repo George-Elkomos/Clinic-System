@@ -7,8 +7,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { labOrdersApi } from '../../services/labOrders.api'
 import type { LabOrderStatus } from '../../services/types'
 
-const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 sm:text-sm'
-const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] sm:text-sm'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all sm:text-sm'
 
 const LAB_STATUS_BADGE: Record<LabOrderStatus, string> = {
   DRAFT: 'bg-slate-50 text-slate-500 border-slate-200/60',

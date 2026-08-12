@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, ClipboardList, FileText } from 'lucide-react'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { Activity, ClipboardList, FileImage, FileText, FlaskConical, HeartPulse, NotebookPen, Pill, ScanLine, Stethoscope, UploadCloud } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { MedicationItemRow } from '../../components/medical/MedicationItemRow'
@@ -32,12 +32,124 @@ import { proceduresApi } from '../../services/procedures.api'
 import { radiologyApi } from '../../services/radiology.api'
 import type { Diagnosis, Prescription, PrescriptionItem, ProcedureStatus, RadiologyOrderStatus } from '../../services/types'
 
+function ageFromDob(dob: string | null): string {
+  if (!dob) return ''
+  const years = Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000))
+  return `${years}y`
+}
+
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
-const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
-const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-teal-700 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
 const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60 sm:text-sm'
-const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60'
 const SECTION_DIVIDER = 'patient-text-card-title mb-3 mt-5 border-t border-slate-100 pt-4 first:mt-0 first:border-t-0 first:pt-0'
+
+// Consistent icon + title + description placeholder for empty lists across every tab.
+function EmptyState({ icon: Icon, title, description }: { icon: ComponentType<{ className?: string }>; title: string; description?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-slate-50/60 p-8 text-center">
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0D9488]/10 text-[#0D9488]">
+        <Icon className="h-6 w-6" />
+      </div>
+      <span className="text-sm font-semibold text-slate-700">{title}</span>
+      {description && <span className="mt-1 max-w-xs text-xs text-slate-500">{description}</span>}
+    </div>
+  )
+}
+
+// Horizontally-scrolling tab row with a hidden scrollbar and edge fade masks
+// that appear only on the side(s) that actually have more tabs off-screen.
+function CategoryTabs({ children, ariaLabel }: { children: ReactNode; ariaLabel: string }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [fade, setFade] = useState({ start: false, end: false })
+
+  const updateFade = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setFade({
+      start: el.scrollLeft > 4,
+      end: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    })
+  }
+
+  useEffect(() => {
+    updateFade()
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => updateFade()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [])
+
+  const maskGradient = (fade.start || fade.end)
+    ? `linear-gradient(to right, ${fade.start ? 'transparent' : 'black'} 0, black 20px, black calc(100% - 20px), ${fade.end ? 'transparent' : 'black'} 100%)`
+    : undefined
+
+  return (
+    <div
+      ref={scrollRef}
+      className="patient-hide-scrollbar flex items-center gap-2 overflow-x-auto scroll-smooth p-1"
+      style={maskGradient ? { maskImage: maskGradient, WebkitMaskImage: maskGradient } : undefined}
+      role="tablist"
+      aria-label={ariaLabel}
+    >
+      {children}
+    </div>
+  )
+}
+
+// Mirrors the patient-facing FileDropzone (MyScansLabsPage.tsx) so the scan
+// upload UI looks identical for doctors and patients.
+function FileDropzone({ file, onFileSelect }: { file: File | null; onFileSelect: (f: File | null) => void }) {
+  const { t } = useTranslation()
+  const [isDragging, setIsDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click() }}
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        setIsDragging(false)
+        const dropped = e.dataTransfer.files?.[0]
+        if (dropped) onFileSelect(dropped)
+      }}
+      className={`my-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-all ${
+        isDragging ? 'border-[#0D9488] bg-[#0D9488]/5' : 'border-slate-200 bg-slate-50/50 hover:border-[#0D9488] hover:bg-[#0D9488]/5'
+      }`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom"
+        onChange={(e) => onFileSelect(e.target.files?.[0] ?? null)}
+      />
+      <UploadCloud className="mb-2 h-10 w-10 text-[#0D9488]" aria-hidden="true" />
+      {file ? (
+        <>
+          <span className="max-w-full truncate text-sm font-semibold text-slate-700">{file.name}</span>
+          <span className="mt-1 text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+        </>
+      ) : (
+        <>
+          <span className="text-sm font-semibold text-slate-700">{t('medical.dropzoneLabel')}</span>
+          <span className="mt-1 text-xs text-slate-400">{t('medical.fileHint')}</span>
+        </>
+      )}
+    </div>
+  )
+}
 
 const PROCEDURE_STATUS_BADGE: Record<ProcedureStatus, string> = {
   SCHEDULED: 'bg-amber-50 text-amber-700 border-amber-200/60',
@@ -119,10 +231,7 @@ function RecordsSection({ patientId }: { patientId: number }) {
     <div className={CARD}>
       <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.records')}</h2>
       {records.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <FileText className="mb-2 h-10 w-10 text-slate-300" />
-          <p className="text-xs font-medium text-slate-400">{t('medical.noRecords')}</p>
-        </div>
+        <div className="mt-4"><EmptyState icon={FileText} title={t('medical.noRecords')} /></div>
       ) : (
         <div className="relative mt-4">
           {/* Continuous rail behind the version dots — a single absolutely
@@ -225,10 +334,7 @@ function NotesSection({ patientId, categories }: { patientId: number; categories
     <div className={CARD}>
       <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.notes')}</h2>
       {notes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <FileText className="mb-2 h-10 w-10 text-slate-300" />
-          <p className="text-xs font-medium text-slate-400">{t('medical.noNotes')}</p>
-        </div>
+        <div className="mt-4"><EmptyState icon={NotebookPen} title={t('medical.noNotes')} /></div>
       ) : (
         <div className="mt-4 flex flex-col gap-3">
           {notes.map((n) => (
@@ -353,7 +459,7 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
   return (
     <div className={CARD}>
       <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.prescriptions')}</h2>
-      {prescriptions.length === 0 ? <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('medical.noPrescriptions')}</p> : (
+      {prescriptions.length === 0 ? <div className="mt-4"><EmptyState icon={Pill} title={t('medical.noPrescriptions')} /></div> : (
         <div className="mt-4 flex flex-col gap-4">
           {prescriptions.map((p) => {
             const isCancelled = p.status === 'CANCELLED'
@@ -515,7 +621,7 @@ function ProceduresSection({ patientId }: { patientId: number }) {
     <div className={CARD}>
       <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('procedures.title')}</h2>
       {procedures.length === 0 ? (
-        <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('procedures.none')}</p>
+        <div className="mt-4"><EmptyState icon={Stethoscope} title={t('procedures.none')} /></div>
       ) : (
         <ul className="mt-2 flex flex-col divide-y divide-slate-100">
           {procedures.map((proc) => (
@@ -569,7 +675,7 @@ function RadiologySection({ patientId }: { patientId: number }) {
     <div className={CARD}>
       <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('radiology.title')}</h2>
       {orders.length === 0 ? (
-        <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('radiology.none')}</p>
+        <div className="mt-4"><EmptyState icon={ScanLine} title={t('radiology.none')} /></div>
       ) : (
         <ul className="mt-2 flex flex-col divide-y divide-slate-100">
           {orders.map((order) => (
@@ -662,7 +768,7 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
 
       <h3 className={SECTION_DIVIDER}>{t('medical.uploadedScans')}</h3>
       {scans.length === 0 ? (
-        <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('medical.noScans')}</p>
+        <EmptyState icon={FileImage} title={t('medical.noScans')} description={t('medical.recordsEmptySub')} />
       ) : (
         <div>
           {scans.map((s) => (
@@ -690,7 +796,7 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
 
       <h3 className={SECTION_DIVIDER}>{t('medical.labDocuments')}</h3>
       {labs.length === 0 ? (
-        <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('medical.noLabs')}</p>
+        <EmptyState icon={FlaskConical} title={t('medical.noLabs')} />
       ) : (
         <div>
           {labs.map((l) => (
@@ -721,12 +827,8 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
           />
         )}
       </FormField>
-      <FormField label={t('medical.file')} hint={t('medical.fileHint')}>
-        {(p) => (
-          <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        )}
-      </FormField>
-      <button type="button" disabled={upload.isPending || !file} onClick={() => upload.mutate()} className={`${BTN_PRIMARY} mt-2`}>
+      <FileDropzone file={file} onFileSelect={setFile} />
+      <button type="button" disabled={upload.isPending || !file} onClick={() => upload.mutate()} className={BTN_PRIMARY}>
         {upload.isPending && <Spinner size={14} />}{t('medical.uploadScan')}
       </button>
     </div>
@@ -758,7 +860,7 @@ function ChronicDiagnosesSection({ patientId }: { patientId: number }) {
     <div className={CARD}>
       <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.chronicDiagnoses')}</h2>
       {chronic.length === 0 ? (
-        <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('medical.noChronicDiagnoses')}</p>
+        <div className="mt-4"><EmptyState icon={HeartPulse} title={t('medical.noChronicDiagnoses')} /></div>
       ) : (
         <ul className="mt-2 list-disc space-y-1.5 ps-5 patient-text-body" style={{ color: 'var(--text-primary)' }}>
           {chronic.map(({ d, count }) => (
@@ -831,7 +933,11 @@ export function PatientRecordPage() {
             {(p) => (
               <Select
                 id={p.id}
-                options={(patients ?? []).map((pt) => ({ value: pt.id, label: pt.full_name || pt.email || String(pt.id) }))}
+                options={(patients ?? []).map((pt) => ({
+                  value: pt.id,
+                  label: pt.full_name || pt.email || String(pt.id),
+                  sublabel: ageFromDob(pt.date_of_birth),
+                }))}
                 value={patientId}
                 onChange={(v) => {
                   setPatientId(Array.isArray(v) || v === '' ? '' : Number(v))
@@ -847,23 +953,25 @@ export function PatientRecordPage() {
 
       {patientId !== '' && (
         <>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label={t('nav.patients')}>
-            {RECORD_TABS.map((tb) => (
-              <button
-                key={tb.key}
-                type="button"
-                role="tab"
-                aria-selected={tab === tb.key}
-                onClick={() => setTab(tb.key)}
-                className={
-                  tab === tb.key
-                    ? 'shrink-0 whitespace-nowrap rounded-xl border border-[#0D9488] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm'
-                    : 'shrink-0 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50'
-                }
-              >
-                {tb.key === 'scans' ? `${t('medical.scans')} / ${t('medical.labs')}` : t(tb.labelKey)}
-              </button>
-            ))}
+          <div className="-mx-1">
+            <CategoryTabs ariaLabel={t('nav.patients')}>
+              {RECORD_TABS.map((tb) => (
+                <button
+                  key={tb.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === tb.key}
+                  onClick={() => setTab(tb.key)}
+                  className={
+                    tab === tb.key
+                      ? 'shrink-0 whitespace-nowrap rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-sm'
+                      : 'shrink-0 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50'
+                  }
+                >
+                  {tb.key === 'scans' ? `${t('medical.scans')} / ${t('medical.labs')}` : t(tb.labelKey)}
+                </button>
+              ))}
+            </CategoryTabs>
           </div>
 
           <TabPanel active={tab === 'scribe'}><AIScribePanel patientId={patientId} /></TabPanel>

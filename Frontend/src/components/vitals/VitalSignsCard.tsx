@@ -6,7 +6,7 @@ import { formatDate } from '../../lib/format'
 import { useLanguage } from '../../hooks/useLanguage'
 import type { VitalAlertLevel, VitalSigns } from '../../services/types'
 
-const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60'
 const BTN_DANGER_SM = 'inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60'
 
 type FieldKey = 'bp_systolic' | 'bp_diastolic' | 'heart_rate' | 'temperature' | 'respiratory_rate' | 'oxygen_saturation' | 'bmi' | 'blood_glucose'

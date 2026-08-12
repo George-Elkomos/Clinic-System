@@ -19,18 +19,18 @@ import type { Appointment, AppointmentStatus } from '../../services/types'
 const STATUSES: AppointmentStatus[] = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
 
 const STATUS_BADGE: Record<AppointmentStatus, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200/60',
-  CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
-  CHECKED_IN: 'bg-teal-50 text-teal-700 border-teal-200/60',
-  IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-200/60',
-  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
-  CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200/60',
-  NO_SHOW: 'bg-slate-50 text-slate-500 border-slate-200/60',
+  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
+  CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  CHECKED_IN: 'bg-teal-50 text-teal-700 border-teal-200',
+  IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-200',
+  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200',
+  NO_SHOW: 'bg-slate-50 text-slate-500 border-slate-200',
 }
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
-const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60'
-const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -116,8 +116,8 @@ export function DoctorAppointmentsPage() {
     const pending = transition.isPending && transition.variables?.id === a.id
     return (
       <div className={pinned ? 'overflow-hidden rounded-2xl border-l-4 border-[#1AB5B3]' : undefined}>
-        <div className={CARD}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="min-w-0">
               <h3 className="patient-text-card-title truncate" style={{ color: 'var(--text-primary)' }}>{a.patient_name}</h3>
               <div className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{formatDateTime(a.scheduled_start, language)}</div>

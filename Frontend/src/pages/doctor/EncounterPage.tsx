@@ -29,10 +29,10 @@ import { localizedName } from '../../lib/format'
 import type { Complaint, Encounter, EncounterStatus, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
-const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
-const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
 const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60 sm:text-sm'
-const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60'
 const SECTION_DIVIDER = 'patient-text-card-title mb-3 mt-5 border-t border-slate-100 pt-4 first:mt-0 first:border-t-0 first:pt-0'
 
 const ENCOUNTER_STATUS_BADGE: Record<EncounterStatus, string> = {
@@ -642,11 +642,11 @@ export function EncounterPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="flex flex-col gap-4 lg:col-span-8">
           <div className={CARD}>
             <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.blockComplaint')}</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField label={t('encounters.chiefComplaint')}>
                 {(p) => (
                   <AsyncCombobox
@@ -724,7 +724,7 @@ export function EncounterPage() {
 
           <div className={CARD}>
             <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.blockExamination')}</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField label={t('encounters.examinationFindings')}>
                 {(p) => <textarea {...p} className="patient-field" rows={3} value={form.examination_findings} onChange={(e) => set('examination_findings', e.target.value)} disabled={readOnly} />}
               </FormField>
@@ -751,7 +751,7 @@ export function EncounterPage() {
             <FormField label={t('encounters.diagnosisNotes')}>
               {(p) => <textarea {...p} className="patient-field" rows={2} value={form.diagnosis_notes} onChange={(e) => set('diagnosis_notes', e.target.value)} disabled={readOnly} />}
             </FormField>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField label={t('encounters.treatmentPlan')}>
                 {(p) => <textarea {...p} className="patient-field" rows={3} value={form.treatment_plan} onChange={(e) => set('treatment_plan', e.target.value)} disabled={readOnly} />}
               </FormField>
@@ -771,15 +771,27 @@ export function EncounterPage() {
           )}
         </div>
 
-        <aside className="flex flex-col gap-4 lg:col-span-1">
+        {/* top-24 (not top-6) clears PortalShell's h-20 sticky header + a gap — a
+            literal top-6 would tuck the sticky sidebar under the header, hidden
+            behind its higher z-index while scrolling. self-start is required, not
+            optional: without it, the grid's default align-items:stretch grows this
+            item's own box to match the taller main column, leaving sticky zero
+            slack to hold within (offset range = cellHeight - itemHeight = 0) — it
+            then behaves exactly like `static`. self-start keeps the box at its own
+            content height so there's real room for it to stick. Verified by
+            measuring getBoundingClientRect().top before/after a real scroll, not
+            just by eyeballing a screenshot — the visual symptom of the stretched
+            version (scrolling away 1:1 with the page) is easy to misread as
+            "sticky isn't applying at all". */}
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:col-span-4 lg:self-start">
           <div className={CARD}>
             <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.sidebarTitle')}</h2>
             <div className="flex flex-col gap-2">
-              <button type="button" disabled={readOnly} onClick={() => setShowRx(true)} className={BTN_SECONDARY}>{t('encounters.addPrescription')}</button>
-              <button type="button" disabled={readOnly} onClick={() => setShowLab(true)} className={BTN_SECONDARY}>{t('encounters.orderLab')}</button>
-              <button type="button" disabled={readOnly} onClick={() => setShowProcedure(true)} className={BTN_SECONDARY}>{t('encounters.addProcedure')}</button>
-              <button type="button" disabled={readOnly} onClick={() => setShowRadiologyOrder(true)} className={BTN_SECONDARY}>{t('encounters.addRadiologyOrder')}</button>
-              <button type="button" disabled={!isOwner} onClick={() => setShowReferral(true)} className={BTN_SECONDARY}>{t('referrals.referPatient')}</button>
+              <button type="button" disabled={readOnly} onClick={() => setShowRx(true)} className={`${BTN_SECONDARY} w-full`}>{t('encounters.addPrescription')}</button>
+              <button type="button" disabled={readOnly} onClick={() => setShowLab(true)} className={`${BTN_SECONDARY} w-full`}>{t('encounters.orderLab')}</button>
+              <button type="button" disabled={readOnly} onClick={() => setShowProcedure(true)} className={`${BTN_SECONDARY} w-full`}>{t('encounters.addProcedure')}</button>
+              <button type="button" disabled={readOnly} onClick={() => setShowRadiologyOrder(true)} className={`${BTN_SECONDARY} w-full`}>{t('encounters.addRadiologyOrder')}</button>
+              <button type="button" disabled={!isOwner} onClick={() => setShowReferral(true)} className={`${BTN_SECONDARY} w-full`}>{t('referrals.referPatient')}</button>
             </div>
 
             <h3 className={SECTION_DIVIDER}>{t('encounters.linkedPrescriptions')}</h3>

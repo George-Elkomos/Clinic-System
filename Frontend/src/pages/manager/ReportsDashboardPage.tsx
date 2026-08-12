@@ -17,7 +17,7 @@ import { errorMessage } from '../../services/apiClient'
 import { reportsApi } from '../../services/reports.api'
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
-const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488]'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all'
 const TH = 'patient-text-overline px-3 py-2 text-left'
 const TD = 'px-3 py-2.5 patient-text-body'
 

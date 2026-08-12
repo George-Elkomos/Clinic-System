@@ -80,7 +80,7 @@ function InvoiceRow({ inv, onView, onPay }: { inv: Invoice; onView: () => void; 
           <button
             type="button"
             onClick={onPay}
-            className="rounded-xl border-none bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 sm:text-sm"
+            className="rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all sm:text-sm"
           >
             {t('billing.recordPayment')}
           </button>
@@ -140,7 +140,7 @@ function InvoiceModal({ invoice, onClose }: { invoice: Invoice; onClose: () => v
           <button
             type="button"
             onClick={printInvoice}
-            className="rounded-xl border-none bg-[#0D9488] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70]"
+            className="rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70]"
           >
             {t('billing.printReceipt')}
           </button>
@@ -192,7 +192,7 @@ export function BillingDeskPage() {
             onClick={() => switchTab(key)}
             className={
               tab === key
-                ? 'rounded-xl border border-[#0D9488] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
+                ? 'rounded-xl border border-[#0B7A70] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
                 : 'rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 sm:text-sm'
             }
           >

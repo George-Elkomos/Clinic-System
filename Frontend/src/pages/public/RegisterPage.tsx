@@ -7,7 +7,7 @@ import { AUTH_INPUT_CLASS } from '../../components/layout/authFormStyles'
 import { PublicLayout } from '../../components/layout/PublicLayout'
 import { FormField } from '../../components/primitives/FormField'
 import { useAuth } from '../../hooks/useAuth'
-import { roleHome } from '../../routes/roleHome'
+import { resolvePostAuthRedirect } from '../../routes/roleHome'
 import { authApi } from '../../services/auth.api'
 import { errorMessage } from '../../services/apiClient'
 
@@ -41,7 +41,7 @@ export function RegisterPage() {
         password_confirm: form.password,
       })
       const user = await login(form.email, form.password)
-      navigate(params.get('next') || roleHome(user.role), { replace: true })
+      navigate(resolvePostAuthRedirect(params.get('next'), user.role), { replace: true })
     } catch (err) {
       setError(errorMessage(err, t('auth.registerFailed')))
     } finally {

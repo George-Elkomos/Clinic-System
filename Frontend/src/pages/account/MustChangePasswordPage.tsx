@@ -132,7 +132,7 @@ export function MustChangePasswordPage() {
 
       <button
         type="button"
-        onClick={() => void logout()}
+        onClick={() => void logout().then(() => navigate('/login', { replace: true }))}
         className={`${AUTH_LINK_CLASS} public-btn--responsive-text mt-6 w-full bg-transparent p-0`}
       >
         {t('nav.signOut')}

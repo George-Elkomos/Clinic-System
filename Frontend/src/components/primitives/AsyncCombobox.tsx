@@ -1,3 +1,4 @@
+import { Check, ChevronDown, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -18,8 +19,8 @@ interface AsyncComboboxProps {
 }
 
 /**
- * Debounced async-search combobox. Reuses the `.select__*` styling so it matches
- * the static Select, but loads options remotely as the user types.
+ * Debounced async-search combobox. Shares the same floating-menu visual
+ * language as the static `Select`, but loads options remotely as the user types.
  */
 export function AsyncCombobox({
   value,
@@ -34,8 +35,10 @@ export function AsyncCombobox({
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<ComboOption[]>([])
   const [loading, setLoading] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const optionRefs = useRef<Array<HTMLDivElement | null>>([])
 
   // Debounced remote search whenever the menu is open and the query changes.
   useEffect(() => {
@@ -45,7 +48,7 @@ export function AsyncCombobox({
     const handle = window.setTimeout(async () => {
       try {
         const result = await fetcher(query)
-        if (!cancelled) setOptions(result)
+        if (!cancelled) { setOptions(result); setActiveIndex(0) }
       } catch {
         if (!cancelled) setOptions([])
       } finally {
@@ -61,6 +64,10 @@ export function AsyncCombobox({
   useEffect(() => {
     if (open) setTimeout(() => searchRef.current?.focus(), 50)
   }, [open])
+
+  useEffect(() => {
+    optionRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -84,57 +91,104 @@ export function AsyncCombobox({
     onChange(null)
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return
+    if (e.key === 'Escape') {
+      setOpen(false)
+      setQuery('')
+      return
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (!open) setOpen(true)
+      else setActiveIndex((i) => Math.min(i + 1, options.length - 1))
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (open) setActiveIndex((i) => Math.max(i - 1, 0))
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (!open) { setOpen(true); return }
+      const opt = options[activeIndex]
+      if (opt) pick(opt)
+    }
+  }
+
   return (
-    <div className="select" ref={containerRef}>
+    <div className="relative" ref={containerRef} onKeyDown={handleKeyDown}>
       <div
         id={id}
-        className={`select__control${open ? ' select__control--open' : ''}`}
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
         tabIndex={disabled ? -1 : 0}
         onClick={() => !disabled && setOpen((o) => !o)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!disabled) setOpen((o) => !o) }
-          if (e.key === 'Escape') { setOpen(false); setQuery('') }
-        }}
+        className={`flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm transition-colors ${
+          disabled ? 'cursor-not-allowed bg-slate-50 opacity-60' : 'cursor-pointer'
+        } ${open ? 'border-teal-500 ring-2 ring-teal-500/15' : 'border-slate-200 hover:border-slate-300'}`}
       >
-        <div className="select__value">
-          {value ? <span>{value.label}</span> : <span className="select__placeholder">{placeholder ?? t('common.select')}</span>}
+        <div className="min-w-0 flex-1">
+          {value ? <span className="truncate text-slate-800">{value.label}</span> : <span className="text-slate-400">{placeholder ?? t('common.select')}</span>}
         </div>
         {value && !disabled && (
-          <button className="select__clear" onClick={clear} aria-label={t('common.clear')}>×</button>
+          <button
+            type="button"
+            onClick={clear}
+            className="shrink-0 rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            aria-label={t('common.clear')}
+          ><X size={14} /></button>
         )}
-        <span className="select__arrow">{open ? '▲' : '▼'}</span>
+        <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </div>
 
       {open && (
-        <div className="select__menu" role="listbox">
-          <input
-            ref={searchRef}
-            className="select__search"
-            placeholder={t('common.search')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-          />
-          {loading ? (
-            <div className="select__empty"><Spinner size={20} /></div>
-          ) : options.length === 0 ? (
-            <div className="select__empty">{t('common.noOptions')}</div>
-          ) : (
-            options.map((o) => (
-              <div
-                key={o.value}
-                className={`select__option${value?.value === o.value ? ' select__option--selected' : ''}`}
-                role="option"
-                aria-selected={value?.value === o.value}
-                onClick={(e) => { e.stopPropagation(); pick(o) }}
-              >
-                {o.label}
-              </div>
-            ))
-          )}
+        <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl" role="listbox">
+          <div className="relative flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-2">
+            <Search size={15} className="shrink-0 text-slate-400" />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              placeholder={t('common.search')}
+              className="w-full border-none bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto p-1.5">
+            {loading ? (
+              <div className="flex justify-center p-3"><Spinner size={20} /></div>
+            ) : options.length === 0 ? (
+              <div className="px-3 py-3 text-sm italic text-slate-400">{t('common.noOptions')}</div>
+            ) : (
+              options.map((o, i) => {
+                const selected = value?.value === o.value
+                const active = i === activeIndex
+                return (
+                  <div
+                    key={o.value}
+                    ref={(el) => { optionRefs.current[i] = el }}
+                    role="option"
+                    aria-selected={selected}
+                    onMouseEnter={() => setActiveIndex(i)}
+                    onClick={(e) => { e.stopPropagation(); pick(o) }}
+                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg p-3 text-sm transition-colors duration-150 ${
+                      selected
+                        ? 'bg-teal-50 font-medium text-teal-800'
+                        : active
+                          ? 'bg-teal-50/60 text-teal-900'
+                          : 'text-slate-700 hover:bg-teal-50/60 hover:text-teal-900'
+                    }`}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    {selected && <Check size={16} className="shrink-0 text-teal-600" />}
+                  </div>
+                )
+              })
+            )}
+          </div>
         </div>
       )}
     </div>

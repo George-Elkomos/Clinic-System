@@ -126,7 +126,7 @@ function BackgroundForm({ initial }: { initial: PatientProfile }) {
           type="button"
           onClick={() => save.mutate()}
           disabled={save.isPending}
-          className="rounded-xl border-none bg-[#0D9488] px-6 py-2.5 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60"
+          className="rounded-xl bg-[#0D9488] border border-[#0B7A70] px-6 py-2.5 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60"
         >
           {t('medical.saveBackground')}
         </button>

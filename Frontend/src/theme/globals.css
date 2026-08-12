@@ -4,6 +4,23 @@
 
 html { font-size: 100%; }
 
+/* Horizontal-overflow safety net lives here, not on PortalShell's <main> —
+   that element only has a min-height (it grows to fit content, never scrolls
+   internally), so giving IT overflow-x:hidden flips its overflow-y to 'auto'
+   too (CSS's visible/non-visible axis-coupling rule) and turns it into a
+   phantom "scroll container" that never actually scrolls but still hijacks
+   position:sticky's reference frame for any sticky descendant (e.g. the
+   Clinical Encounter page's sticky sidebar) — it stops tracking real window
+   scroll and behaves like `static`.
+   Deliberately `html` ONLY, not `html, body`: the root element is special-
+   cased by the CSS spec to propagate its overflow to the viewport itself
+   rather than becoming a nested scrolling box, so it's exempt from the
+   coupling trap above. `body` is not exempted — it's just a normal box, so
+   adding the same rule there recreates the exact same phantom-container bug
+   one level down (confirmed by hitting it firsthand: `html, body` broke the
+   sticky sidebar again after this was believed fixed). */
+html { overflow-x: hidden; }
+
 body {
   margin: 0;
   font-family: var(--font-family);

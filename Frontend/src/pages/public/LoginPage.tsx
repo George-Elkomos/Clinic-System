@@ -8,7 +8,7 @@ import { PublicLayout } from '../../components/layout/PublicLayout'
 import { FormField } from '../../components/primitives/FormField'
 import { useAuth } from '../../hooks/useAuth'
 import { errorMessage, isConnectivityError } from '../../services/apiClient'
-import { roleHome } from '../../routes/roleHome'
+import { resolvePostAuthRedirect } from '../../routes/roleHome'
 
 export function LoginPage() {
   const { t } = useTranslation()
@@ -26,8 +26,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       const user = await login(email, password)
-      const next = params.get('next')
-      navigate(next || roleHome(user.role), { replace: true })
+      navigate(resolvePostAuthRedirect(params.get('next'), user.role), { replace: true })
     } catch (err) {
       // Distinguish "backend unreachable" from a real credential rejection so we
       // don't tell the user to check a password that was never actually checked.

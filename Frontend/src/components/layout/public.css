@@ -4,7 +4,7 @@
    regardless of specificity. globals.css's elder-friendly defaults on bare
    h1-h3/a/button/input/select/textarea elements (including its app-wide
    yellow `:focus-visible` outline), and primitives.css's
-   .field__label/.search-input/.select__control, are all unlayered — so
+   .field__label/.search-input, are all unlayered — so
    Tailwind classes on those elements are otherwise inert here. This sheet
    supplies the real final values for just the blocked properties; everything
    else is styled directly with Tailwind utilities in the JSX. Same pattern as
@@ -218,18 +218,3 @@
   color: #94a3b8;
 }
 
-/* Specialty select (shared Select primitive) — matched height/border to sit
-   flush with the search input in the same filter row. */
-.public-shell .select__control {
-  min-height: 0;
-  height: 2.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  background: #ffffff;
-}
-.public-shell .select__control:focus-within {
-  border-color: #0d9488;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 201, 203, 0.5);
-}

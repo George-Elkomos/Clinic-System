@@ -287,7 +287,7 @@ export function MyAppointmentsPage() {
               onClick={() => setFilter(f.key)}
               className={
                 filter === f.key
-                  ? 'rounded-xl border border-[#0D9488] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
+                  ? 'rounded-xl border border-[#0B7A70] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
                   : 'rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 sm:text-sm'
               }
             >
@@ -350,7 +350,7 @@ export function MyAppointmentsPage() {
                     <button
                       type="button"
                       onClick={() => setReviewingId(a.id)}
-                      className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488]"
+                      className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all"
                     >
                       {t('reviews.leaveReview')}
                     </button>

@@ -127,33 +127,12 @@
   font-size: 0.875rem;
   color: #1E293B;
   outline: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
-.patient-field:focus { border-color: #3BC9CB; background: #FFFFFF; }
+.patient-field:focus { border-color: #0D9488; background: #FFFFFF; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }
 /* Variant for fields that want a plain white background + smaller text
    instead of the tinted default above (e.g. the review-comment box). */
 .patient-field--compact { background: #FFFFFF; font-size: 0.75rem; }
-
-/* The shared Select combobox (primitives.css) defaults to the elder-friendly
-   --primary blue + a yellow focus outline on every open/focus, not just
-   keyboard nav. Native <option> elements can't be recolored by CSS at all —
-   this component exists specifically so dropdowns CAN carry brand color. */
-.patient-shell .select__control:focus-within {
-  border-color: #0D9488;
-  outline: 2px solid #0D9488;
-  outline-offset: 2px;
-}
-.patient-shell .select__control--open {
-  border-color: #0D9488;
-}
-.patient-shell .select__option:hover,
-.patient-shell .select__option--focused {
-  background: rgba(13, 148, 136, 0.08);
-}
-.patient-shell .select__option--selected {
-  background: rgba(13, 148, 136, 0.12);
-  color: #0D9488;
-}
 
 .patient-text-h2 { margin: 0; font-size: 1.25rem; font-weight: 700; line-height: 1.4; }
 

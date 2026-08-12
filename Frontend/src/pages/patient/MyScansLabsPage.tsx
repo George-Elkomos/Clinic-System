@@ -268,7 +268,7 @@ export function MyScansLabsPage() {
           type="button"
           disabled={!file || upload.isPending}
           onClick={() => upload.mutate()}
-          className="inline-flex items-center gap-2 rounded-xl border-none bg-[#0D9488] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60"
         >
           <UploadCloud size={16} aria-hidden="true" />
           {t('medical.uploadScan')}

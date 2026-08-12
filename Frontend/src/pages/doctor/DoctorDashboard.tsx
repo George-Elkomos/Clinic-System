@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Calendar, FlaskConical } from 'lucide-react'
+import { AlertCircle, Calendar, ChevronRight, FlaskConical } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
@@ -7,7 +7,7 @@ import { Spinner, CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatTime } from '../../lib/format'
+import { formatDateTime, formatTime } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
 import { labOrdersApi } from '../../services/labOrders.api'
@@ -56,8 +56,8 @@ function KpiTile({
   return (
     <div className="flex items-center justify-between rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm">
       <div className="min-w-0">
-        <div className="patient-text-body-secondary text-[#94A3B8]">{label}</div>
-        <div className="mt-1 text-2xl font-extrabold" style={{ color: iconColor }}>{value}</div>
+        <div className="font-medium text-slate-600">{label}</div>
+        <div className="mt-1 text-3xl font-bold text-slate-900">{value}</div>
       </div>
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: iconBg }}>
         <Icon className="h-6 w-6" style={{ color: iconColor }} />
@@ -149,19 +149,32 @@ export function DoctorDashboard() {
           <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('lab.noOrders')}</p>
         ) : (
           <div className="flex flex-col divide-y divide-slate-100">
-            {(recentLabs?.results ?? []).map((order) => (
-              <div key={order.id} className="flex items-center justify-between gap-3 py-2.5">
-                <div className="min-w-0">
-                  <Link to={`/doctor/lab-orders/${order.id}`} className="patient-text-body font-semibold hover:underline" style={{ color: 'var(--brand-blue-start)' }}>
-                    {order.order_number}
+            {(recentLabs?.results ?? []).map((order) => {
+              const testType = order.item_count > 0 ? t('lab.testCount', { count: order.item_count }) : ''
+              return (
+                <div key={order.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link to={`/doctor/lab-orders/${order.id}`} className="font-semibold text-slate-900 hover:underline">
+                        {order.order_number}
+                      </Link>
+                      <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${LAB_STATUS_BADGE[order.status] ?? LAB_STATUS_BADGE.DRAFT}`}>
+                        {t(`status.${order.status}`)}
+                      </span>
+                    </div>
+                    <div className="mt-1 truncate text-sm text-slate-600">{order.patient_name}{testType && ` · ${testType}`}</div>
+                    <div className="mt-0.5 text-xs text-slate-400">{formatDateTime(order.created_at, language)}</div>
+                  </div>
+                  <Link
+                    to={`/doctor/lab-orders/${order.id}`}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 sm:self-center"
+                  >
+                    {t('lab.viewDetails')}
+                    <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
-                  <div className="patient-text-body-secondary truncate" style={{ color: 'var(--text-secondary)' }}>{order.patient_name}</div>
                 </div>
-                <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${LAB_STATUS_BADGE[order.status] ?? LAB_STATUS_BADGE.DRAFT}`}>
-                  {t(`status.${order.status}`)}
-                </span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -198,7 +211,7 @@ export function DoctorDashboard() {
                         type="button"
                         disabled={pending}
                         onClick={() => transition.mutate({ id: a.id, action: action.action })}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60"
                       >
                         {pending && <Spinner size={14} />}
                         {action.label}

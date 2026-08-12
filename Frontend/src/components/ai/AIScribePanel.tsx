@@ -1,11 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Mic, Square, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { aiApi, type AIDraft, type AISession } from '../../services/ai.api'
 import { errorMessage } from '../../services/apiClient'
-import { Button } from '../primitives/Button'
-import { Card } from '../primitives/Card'
 import { FormField } from '../primitives/FormField'
 import { Spinner } from '../primitives/Spinner'
 import { useToast } from '../primitives/Toast'
@@ -14,10 +13,25 @@ const PROCESSING: AISession['status'][] = ['PENDING', 'TRANSCRIBING', 'EXTRACTIN
 
 const EMPTY_RX = { drug_name: '', dosage: '', frequency: '', duration: '', instructions: '' }
 
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-teal-700 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
+const SECTION_DIVIDER = 'patient-text-card-title mb-3 mt-5 border-t border-slate-100 pt-4 first:mt-0 first:border-t-0 first:pt-0'
+
 function mmss(total: number) {
   const m = Math.floor(total / 60)
   const s = total % 60
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+// Small pulsing dot used on the record/stop controls to signal a live, active state.
+function PulseDot() {
+  return (
+    <span className="relative flex h-2 w-2">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" aria-hidden="true" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-white" aria-hidden="true" />
+    </span>
+  )
 }
 
 export function AIScribePanel({ patientId }: { patientId: number }) {
@@ -145,25 +159,40 @@ export function AIScribePanel({ patientId }: { patientId: number }) {
   const committed = status === 'COMMITTED'
 
   return (
-    <Card title={t('ai.title')}>
-      <p className="ai-intro">{t('ai.intro')}</p>
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('ai.title')}</h2>
+      <p className="mt-1 text-sm font-normal leading-relaxed text-slate-600">{t('ai.intro')}</p>
 
       {/* ---- Capture controls (hidden once a session is in flight) ---- */}
       {!sessionId && (
-        <div className="ai-capture">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           {!recording ? (
-            <Button onClick={startRecording} disabled={upload.isPending}>
-              ● {t('ai.record')}
-            </Button>
+            <button
+              type="button"
+              onClick={startRecording}
+              disabled={upload.isPending}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
+            >
+              <PulseDot />
+              <Mic className="h-4 w-4" aria-hidden="true" />
+              {t('ai.record')}
+            </button>
           ) : (
-            <Button variant="danger" onClick={stopRecording}>
-              ■ {t('ai.stop')} · {mmss(elapsed)}
-            </Button>
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-rose-700"
+            >
+              <PulseDot />
+              <Square className="h-4 w-4" aria-hidden="true" />
+              {t('ai.stop')} · {mmss(elapsed)}
+            </button>
           )}
 
-          <span className="ai-or">{t('ai.or')}</span>
+          <span className="text-xs font-medium text-slate-400">{t('ai.or')}</span>
 
-          <label className="btn btn--secondary ai-file-btn">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
+            <Upload className="h-4 w-4" aria-hidden="true" />
             {t('ai.upload')}
             <input
               type="file"
@@ -182,9 +211,9 @@ export function AIScribePanel({ patientId }: { patientId: number }) {
 
       {/* ---- Processing state ---- */}
       {busy && (
-        <div className="ai-processing">
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-4">
           <Spinner size={22} />
-          <span>
+          <span className="text-sm font-medium text-slate-600">
             {upload.isPending
               ? t('ai.uploading')
               : status === 'TRANSCRIBING'
@@ -198,117 +227,134 @@ export function AIScribePanel({ patientId }: { patientId: number }) {
 
       {/* ---- Failure ---- */}
       {status === 'FAILED' && (
-        <div className="ai-error">
-          <p>{t('ai.failed')}</p>
-          {session?.error && <pre className="ai-error-detail">{session.error}</pre>}
-          <div className="ai-actions">
-            <Button onClick={() => retry.mutate()} loading={retry.isPending}>{t('ai.retry')}</Button>
-            <Button variant="secondary" onClick={reset}>{t('ai.discard')}</Button>
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+          <p className="text-sm font-semibold text-rose-700">{t('ai.failed')}</p>
+          {session?.error && (
+            <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-white/70 p-2.5 text-xs whitespace-pre-wrap text-rose-600">{session.error}</pre>
+          )}
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button type="button" onClick={() => retry.mutate()} disabled={retry.isPending} className={BTN_PRIMARY}>
+              {retry.isPending && <Spinner size={14} />}{t('ai.retry')}
+            </button>
+            <button type="button" onClick={reset} className={BTN_SECONDARY}>{t('ai.discard')}</button>
           </div>
         </div>
       )}
 
       {/* ---- Committed ---- */}
       {committed && (
-        <div className="ai-committed">
-          <p>✓ {t('ai.committedDetail')}</p>
-          <Button onClick={reset}>{t('ai.newRecording')}</Button>
+        <div className="mt-4 flex flex-col items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-semibold text-emerald-700">✓ {t('ai.committedDetail')}</p>
+          <button type="button" onClick={reset} className={BTN_PRIMARY}>{t('ai.newRecording')}</button>
         </div>
       )}
 
       {/* ---- Review + edit draft ---- */}
       {status === 'READY' && draft && (
-        <div className="ai-review">
-          <div className="ai-disclaimer">{t('ai.reviewWarning')}</div>
+        <div className="mt-4">
+          <div className="rounded-xl border-s-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {t('ai.reviewWarning')}
+          </div>
 
           {session?.transcript && (
-            <div className="ai-transcript">
-              <button type="button" className="ai-transcript-toggle" onClick={() => setShowTranscript((s) => !s)}>
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setShowTranscript((s) => !s)}
+                className="text-sm font-semibold text-[#0D9488] hover:underline"
+              >
                 {showTranscript ? '▾' : '▸'} {t('ai.transcript')}
               </button>
-              {showTranscript && <p className="ai-transcript-body" dir="auto">{session.transcript}</p>}
+              {showTranscript && (
+                <p className="mt-2 max-h-56 overflow-auto rounded-xl bg-slate-50 p-4 text-sm whitespace-pre-wrap text-slate-700" dir="auto">
+                  {session.transcript}
+                </p>
+              )}
             </div>
           )}
 
-          <h3 className="medical-section-divider">{t('ai.draftHeading')}</h3>
+          <h3 className={SECTION_DIVIDER}>{t('ai.draftHeading')}</h3>
 
           <FormField label={t('medical.chiefComplaint')}>
-            {(p) => <input {...p} dir="auto" value={draft.chief_complaint} onChange={(e) => setField('chief_complaint', e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" dir="auto" value={draft.chief_complaint} onChange={(e) => setField('chief_complaint', e.target.value)} />}
           </FormField>
           <FormField label={t('medical.diagnosis')}>
-            {(p) => <textarea {...p} dir="auto" rows={2} value={draft.diagnosis} onChange={(e) => setField('diagnosis', e.target.value)} />}
+            {(p) => <textarea {...p} className="patient-field" dir="auto" rows={2} value={draft.diagnosis} onChange={(e) => setField('diagnosis', e.target.value)} />}
           </FormField>
           <FormField label={t('medical.treatmentPlan')}>
-            {(p) => <textarea {...p} dir="auto" rows={2} value={draft.treatment_plan} onChange={(e) => setField('treatment_plan', e.target.value)} />}
+            {(p) => <textarea {...p} className="patient-field" dir="auto" rows={2} value={draft.treatment_plan} onChange={(e) => setField('treatment_plan', e.target.value)} />}
           </FormField>
 
           {/* Vitals */}
-          <h3 className="medical-section-divider">{t('medical.vitals')}</h3>
-          <div className="ai-vitals-grid">
+          <h3 className={SECTION_DIVIDER}>{t('medical.vitals')}</h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
             <FormField label={t('ai.vitals.blood_pressure')}>
-              {(p) => <input {...p} value={draft.vitals.blood_pressure} onChange={(e) => setVital('blood_pressure', e.target.value)} />}
+              {(p) => <input {...p} className="patient-field" value={draft.vitals.blood_pressure} onChange={(e) => setVital('blood_pressure', e.target.value)} />}
             </FormField>
             <FormField label={t('ai.vitals.heart_rate')}>
-              {(p) => <input {...p} value={draft.vitals.heart_rate} onChange={(e) => setVital('heart_rate', e.target.value)} />}
+              {(p) => <input {...p} className="patient-field" value={draft.vitals.heart_rate} onChange={(e) => setVital('heart_rate', e.target.value)} />}
             </FormField>
             <FormField label={t('ai.vitals.temperature')}>
-              {(p) => <input {...p} value={draft.vitals.temperature} onChange={(e) => setVital('temperature', e.target.value)} />}
+              {(p) => <input {...p} className="patient-field" value={draft.vitals.temperature} onChange={(e) => setVital('temperature', e.target.value)} />}
             </FormField>
             <FormField label={t('ai.vitals.respiratory_rate')}>
-              {(p) => <input {...p} value={draft.vitals.respiratory_rate} onChange={(e) => setVital('respiratory_rate', e.target.value)} />}
+              {(p) => <input {...p} className="patient-field" value={draft.vitals.respiratory_rate} onChange={(e) => setVital('respiratory_rate', e.target.value)} />}
             </FormField>
             <FormField label={t('ai.vitals.oxygen_saturation')}>
-              {(p) => <input {...p} value={draft.vitals.oxygen_saturation} onChange={(e) => setVital('oxygen_saturation', e.target.value)} />}
+              {(p) => <input {...p} className="patient-field" value={draft.vitals.oxygen_saturation} onChange={(e) => setVital('oxygen_saturation', e.target.value)} />}
             </FormField>
             <FormField label={t('ai.vitals.weight')}>
-              {(p) => <input {...p} value={draft.vitals.weight} onChange={(e) => setVital('weight', e.target.value)} />}
+              {(p) => <input {...p} className="patient-field" value={draft.vitals.weight} onChange={(e) => setVital('weight', e.target.value)} />}
             </FormField>
           </div>
 
           {/* Prescriptions */}
-          <h3 className="medical-section-divider">{t('medical.prescriptions')}</h3>
-          {draft.prescriptions.length === 0 && <p className="ai-muted">{t('ai.noMeds')}</p>}
+          <h3 className={SECTION_DIVIDER}>{t('medical.prescriptions')}</h3>
+          {draft.prescriptions.length === 0 && <p className="mb-3 text-sm text-slate-500">{t('ai.noMeds')}</p>}
           {draft.prescriptions.map((rx, idx) => (
-            <div key={idx} className="medical-rx-item">
-              <div className="medical-rx-field--wide">
+            <div key={idx} className="mb-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]">
                 <FormField label={t('medical.medication')}>
-                  {(p) => <input {...p} dir="auto" value={rx.drug_name} onChange={(e) => setRx(idx, 'drug_name', e.target.value)} />}
+                  {(p) => <input {...p} className="patient-field" dir="auto" value={rx.drug_name} onChange={(e) => setRx(idx, 'drug_name', e.target.value)} />}
                 </FormField>
-              </div>
-              <div className="medical-rx-field">
                 <FormField label={t('medical.dosage')}>
-                  {(p) => <input {...p} value={rx.dosage} onChange={(e) => setRx(idx, 'dosage', e.target.value)} />}
+                  {(p) => <input {...p} className="patient-field" value={rx.dosage} onChange={(e) => setRx(idx, 'dosage', e.target.value)} />}
                 </FormField>
-              </div>
-              <div className="medical-rx-field--mid">
                 <FormField label={t('medical.frequency')}>
-                  {(p) => <input {...p} dir="auto" value={rx.frequency} onChange={(e) => setRx(idx, 'frequency', e.target.value)} />}
+                  {(p) => <input {...p} className="patient-field" dir="auto" value={rx.frequency} onChange={(e) => setRx(idx, 'frequency', e.target.value)} />}
                 </FormField>
-              </div>
-              <div className="medical-rx-field">
                 <FormField label={t('medical.duration')}>
-                  {(p) => <input {...p} dir="auto" value={rx.duration} onChange={(e) => setRx(idx, 'duration', e.target.value)} />}
+                  {(p) => <input {...p} className="patient-field" dir="auto" value={rx.duration} onChange={(e) => setRx(idx, 'duration', e.target.value)} />}
                 </FormField>
+                <div className="flex flex-col">
+                  <span className="mb-2 block text-sm font-semibold text-transparent select-none" aria-hidden="true">·</span>
+                  <button
+                    type="button"
+                    onClick={() => removeRx(idx)}
+                    className="inline-flex h-[42px] items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100"
+                  >
+                    {t('medical.removeItem')}
+                  </button>
+                </div>
               </div>
-              <button type="button" className="ai-rx-remove" onClick={() => removeRx(idx)}>
-                {t('medical.removeItem')}
-              </button>
             </div>
           ))}
-          <Button variant="secondary" onClick={addRx}>{t('medical.addItem')}</Button>
+          <button type="button" onClick={addRx} className={BTN_SECONDARY}>{t('medical.addItem')}</button>
 
           {(draft.follow_up || draft.clinical_summary) && (
             <FormField label={t('ai.followUp')}>
-              {(p) => <textarea {...p} dir="auto" rows={2} value={draft.follow_up} onChange={(e) => setField('follow_up', e.target.value)} />}
+              {(p) => <textarea {...p} className="patient-field" dir="auto" rows={2} value={draft.follow_up} onChange={(e) => setField('follow_up', e.target.value)} />}
             </FormField>
           )}
 
-          <div className="ai-actions ai-commit-row">
-            <Button onClick={() => commit.mutate()} loading={commit.isPending}>{t('ai.commit')}</Button>
-            <Button variant="secondary" onClick={reset} disabled={commit.isPending}>{t('ai.discard')}</Button>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button type="button" onClick={() => commit.mutate()} disabled={commit.isPending} className={BTN_PRIMARY}>
+              {commit.isPending && <Spinner size={14} />}{t('ai.commit')}
+            </button>
+            <button type="button" onClick={reset} disabled={commit.isPending} className={BTN_SECONDARY}>{t('ai.discard')}</button>
           </div>
         </div>
       )}
-    </Card>
+    </div>
   )
 }

@@ -276,7 +276,7 @@ export function PatientTimelinePage() {
             onClick={() => setActiveChip(c.key)}
             className={
               activeChip === c.key
-                ? 'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0D9488] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all sm:text-sm'
+                ? 'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#0B7A70] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all sm:text-sm'
                 : 'cursor-pointer shrink-0 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 sm:text-sm'
             }
           >

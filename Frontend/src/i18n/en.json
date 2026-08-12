@@ -35,7 +35,7 @@
     "ar": "العربية"
   },
   "nav": {
-    "dashboard": "Home",
+    "dashboard": "Dashboard",
     "bookAppointment": "Book Appointment",
     "myAppointments": "My Appointments",
     "schedule": "My Schedule",
@@ -427,6 +427,7 @@
     "noCurrent": "No patient in progress — call the next patient when ready.",
     "callNext": "Call Next Patient",
     "noNext": "No patients waiting",
+    "noPrevious": "No completed visits yet today.",
     "complete": "Complete Visit",
     "completeNoEncounterTitle": "Complete without a submitted clinical note?",
     "completeNoEncounterMessage": "This visit doesn't have a submitted clinical encounter yet. You can still complete it now and finish documentation later — continue?",
@@ -688,6 +689,8 @@
     "pendingCount": "Pending Orders",
     "criticalCount": "Critical Results",
     "recentLabs": "Recent Lab Orders",
+    "viewDetails": "View Details",
+    "testCount": "{{count}} test(s)",
     "page": "Page",
     "of": "of",
     "filterStatus": "Filter by status",
@@ -793,10 +796,10 @@
     "forbiddenBody": "You don't have permission to view this page.",
     "notFoundTitle": "Page not found",
     "notFoundBody": "The page you are looking for doesn't exist.",
-    "goHome": "Go to home"
+    "goHome": "Go to dashboard"
   },
   "breadcrumbs": {
-    "home": "Home"
+    "home": "Dashboard"
   },
   "ai": {
     "title": "AI Scribe — record this visit",

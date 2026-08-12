@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Phone } from 'lucide-react'
-import { useState } from 'react'
+import { CalendarCheck, Phone, UserRound, Users } from 'lucide-react'
+import { useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
@@ -17,8 +17,8 @@ import { appointmentsApi } from '../../services/appointments.api'
 import type { AppointmentBilling, QueueAppointment } from '../../services/types'
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
-const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
-const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
 const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60 sm:text-sm'
 
 function ageFromDob(dob: string | null): string {
@@ -29,9 +29,19 @@ function ageFromDob(dob: string | null): string {
 
 function PanelShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className={CARD}>
+    <div className={`${CARD} flex h-full flex-col`}>
       <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{title}</h2>
       {children}
+    </div>
+  )
+}
+
+// Consistent icon + message placeholder for the three queue panels' empty states.
+function QueuePanelEmptyState({ icon: Icon, text }: { icon: ComponentType<{ className?: string }>; text: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-slate-400">
+      <Icon className="h-8 w-8" />
+      <p className="text-sm font-medium">{text}</p>
     </div>
   )
 }
@@ -72,9 +82,7 @@ function CurrentPanel({
   if (!appt) {
     return (
       <PanelShell title={t('queue.current')}>
-        <div className="patient-text-body-secondary py-8 text-center" style={{ color: 'var(--text-muted)' }}>
-          {t('queue.noCurrent')}
-        </div>
+        <QueuePanelEmptyState icon={UserRound} text={t('queue.noCurrent')} />
       </PanelShell>
     )
   }
@@ -86,7 +94,7 @@ function CurrentPanel({
   ].filter(Boolean)
 
   return (
-    <div className="rounded-2xl border-2 border-[#A4DDD1] bg-white p-5 shadow-md sm:p-6">
+    <div className="flex h-full flex-col rounded-2xl border-2 border-[#A4DDD1] bg-white p-5 shadow-md sm:p-6">
       <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('queue.current')}</h2>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h3 className="patient-text-h2" style={{ color: 'var(--text-primary)' }}>{appt.patient_name}</h3>
@@ -155,7 +163,7 @@ function NextPanel({
   if (!appt) {
     return (
       <PanelShell title={t('queue.next')}>
-        <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{t('queue.noNext')}</p>
+        <QueuePanelEmptyState icon={Users} text={t('queue.noNext')} />
       </PanelShell>
     )
   }
@@ -190,7 +198,7 @@ function PreviousPanel({
   if (!appt) {
     return (
       <PanelShell title={t('queue.previous')}>
-        <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>—</p>
+        <QueuePanelEmptyState icon={CalendarCheck} text={t('queue.noPrevious')} />
       </PanelShell>
     )
   }
@@ -337,9 +345,9 @@ export function DoctorQueuePage() {
         </div>
       ))}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="order-2 lg:order-1"><PreviousPanel appt={previous ?? null} onViewInvoice={setViewInvoiceId} /></div>
-        <div className="order-1 lg:order-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="order-2 md:order-1"><PreviousPanel appt={previous ?? null} onViewInvoice={setViewInvoiceId} /></div>
+        <div className="order-1 md:order-2">
           <CurrentPanel
             appt={current ?? null}
             onComplete={handleComplete}
@@ -347,7 +355,7 @@ export function DoctorQueuePage() {
             isPending={complete.isPending || noShow.isPending}
           />
         </div>
-        <div className="order-3 lg:order-3">
+        <div className="order-3 md:order-3">
           <NextPanel
             appt={next ?? null}
             onCallNext={(id) => callNext.mutate(id)}

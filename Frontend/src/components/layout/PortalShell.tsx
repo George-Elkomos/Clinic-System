@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
@@ -258,6 +258,13 @@ const HOME_BY_ROLE: Record<Role, string> = {
   MANAGER: '/manager',
 }
 
+// Detail/sub-pages reached via links rather than a persistent sidebar entry —
+// so they'd otherwise fall through to the generic "Dashboard" header title.
+// Checked only when no sidebar NavItem prefix-matches the current path.
+const EXTRA_HEADER_TITLES: { pattern: RegExp; labelKey: string }[] = [
+  { pattern: /^\/doctor\/encounters\//, labelKey: 'nav.encounter' },
+]
+
 // Route prefixes whose page content has been redesigned onto the teal
 // Tailwind system (patient-tokens.css) and is safe to wrap in
 // `.patient-shell`. Checked by path rather than role because a few page
@@ -337,15 +344,27 @@ export function PortalShell() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   if (!user) return null
 
   const displayName = user.full_name || user.email
   const navGroups = NAV_BY_ROLE[user.role]
   const allItems = navGroups.flatMap((g) => g.items)
+
+  // Navigate explicitly (no `next=`) instead of letting ProtectedRoute's
+  // reactive anon-redirect stamp this page's path onto /login — that path
+  // could belong to a role different from whoever logs in next.
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
+  }
   const currentItem = allItems.find((item) =>
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   )
+  const extraTitleKey = !currentItem
+    ? EXTRA_HEADER_TITLES.find((e) => e.pattern.test(location.pathname))?.labelKey
+    : undefined
   const homeTo = HOME_BY_ROLE[user.role]
 
   return (
@@ -430,7 +449,7 @@ export function PortalShell() {
           </div>
           <button
             type="button"
-            onClick={() => void logout()}
+            onClick={() => void handleLogout()}
             className="patient-text-body flex w-full items-center justify-center gap-2 rounded-xl border py-[10px] font-semibold"
             style={{ borderColor: '#FEE2E2', color: '#EF4444', background: '#FFFFFF' }}
           >
@@ -455,7 +474,7 @@ export function PortalShell() {
               <Logo className="h-8 w-auto object-contain" />
             </Link>
             <h1 className="hidden text-3xl font-bold leading-8 lg:block" style={{ color: '#1C4879' }}>
-              {t(currentItem?.labelKey ?? 'nav.dashboard')}
+              {t(currentItem?.labelKey ?? extraTitleKey ?? 'nav.dashboard')}
             </h1>
           </div>
           <div className="flex h-[44px] items-center gap-4 sm:gap-6">
@@ -472,7 +491,7 @@ export function PortalShell() {
           </div>
         </header>
         <main
-          className={`min-h-screen flex-1 overflow-x-hidden bg-slate-50/50 p-4 transition-all sm:p-6 lg:p-8 ${
+          className={`min-h-screen flex-1 bg-slate-50/50 p-4 transition-all sm:p-6 lg:p-8 ${
             isRedesignedPath(location.pathname) ? 'patient-shell' : ''
           }`}
         >
