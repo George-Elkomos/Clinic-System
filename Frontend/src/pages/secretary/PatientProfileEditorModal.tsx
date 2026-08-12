@@ -2,15 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Button } from '../../components/primitives/Button'
 import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { errorMessage } from '../../services/apiClient'
 import { staffApi } from '../../services/staff.api'
 import type { PatientProfile } from '../../services/types'
+
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
 
 interface PatientProfileEditorModalProps {
   profileId: number
@@ -72,7 +74,7 @@ function ProfileForm({
         save.mutate()
       }}
     >
-      <div className="form-grid">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('patients.dateOfBirth')}>
           {(p) => (
             <CustomDatePicker
@@ -107,6 +109,7 @@ function ProfileForm({
           {(p) => (
             <input
               {...p}
+              className="patient-field"
               value={draft.national_id ?? ''}
               onChange={(e) => update('national_id', e.target.value)}
             />
@@ -116,15 +119,16 @@ function ProfileForm({
 
       <FormField label={t('patients.address')}>
         {(p) => (
-          <textarea {...p} rows={2} value={draft.address ?? ''} onChange={(e) => update('address', e.target.value)} />
+          <textarea {...p} className="patient-field" rows={2} value={draft.address ?? ''} onChange={(e) => update('address', e.target.value)} />
         )}
       </FormField>
 
-      <div className="form-grid">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('patients.emergencyContactName')}>
           {(p) => (
             <input
               {...p}
+              className="patient-field"
               value={draft.emergency_contact_name ?? ''}
               onChange={(e) => update('emergency_contact_name', e.target.value)}
             />
@@ -134,6 +138,7 @@ function ProfileForm({
           {(p) => (
             <input
               {...p}
+              className="patient-field"
               value={draft.emergency_contact_phone ?? ''}
               onChange={(e) => update('emergency_contact_phone', e.target.value)}
             />
@@ -145,6 +150,7 @@ function ProfileForm({
         {(p) => (
           <textarea
             {...p}
+            className="patient-field"
             rows={2}
             value={draft.allergies_summary ?? ''}
             onChange={(e) => update('allergies_summary', e.target.value)}
@@ -155,6 +161,7 @@ function ProfileForm({
         {(p) => (
           <textarea
             {...p}
+            className="patient-field"
             rows={2}
             value={draft.chronic_conditions ?? ''}
             onChange={(e) => update('chronic_conditions', e.target.value)}
@@ -165,6 +172,7 @@ function ProfileForm({
         {(p) => (
           <textarea
             {...p}
+            className="patient-field"
             rows={2}
             value={draft.previous_surgeries ?? ''}
             onChange={(e) => update('previous_surgeries', e.target.value)}
@@ -175,6 +183,7 @@ function ProfileForm({
         {(p) => (
           <textarea
             {...p}
+            className="patient-field"
             rows={2}
             value={draft.current_medications ?? ''}
             onChange={(e) => update('current_medications', e.target.value)}
@@ -182,9 +191,11 @@ function ProfileForm({
         )}
       </FormField>
 
-      <div className="modal__actions">
-        <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
-        <Button type="submit" loading={save.isPending}>{t('common.save')}</Button>
+      <div className="mt-4 flex flex-wrap justify-end gap-3">
+        <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('common.cancel')}</button>
+        <button type="submit" disabled={save.isPending} className={BTN_PRIMARY}>
+          {save.isPending && <Spinner size={14} />}{t('common.save')}
+        </button>
       </div>
     </form>
   )
@@ -199,9 +210,17 @@ export function PatientProfileEditorModal({ profileId, onClose, onSaved }: Patie
   })
 
   return (
-    <div className="modal__backdrop" role="dialog" aria-modal="true" aria-labelledby="patient-profile-title">
-      <div className="modal modal--wide">
-        <h2 className="modal__title" id="patient-profile-title">{t('patients.editProfile')}</h2>
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/55 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="patient-profile-title"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="patient-text-card-title mb-4" id="patient-profile-title" style={{ color: 'var(--text-primary)' }}>
+          {t('patients.editProfile')}
+        </h2>
         {isLoading || !data ? (
           <CenteredSpinner />
         ) : (

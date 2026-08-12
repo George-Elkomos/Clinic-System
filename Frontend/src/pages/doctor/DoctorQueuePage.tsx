@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Phone } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { InvoiceGeneratedModal } from '../../components/billing/InvoiceGeneratedModal'
 import { InvoiceViewModal } from '../../components/billing/InvoiceViewModal'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { useDoctorQueueSocket } from '../../hooks/useDoctorQueueSocket'
 import { useLanguage } from '../../hooks/useLanguage'
@@ -17,18 +16,32 @@ import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
 import type { AppointmentBilling, QueueAppointment } from '../../services/types'
 
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60 sm:text-sm'
+
 function ageFromDob(dob: string | null): string {
   if (!dob) return ''
   const years = Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 24 * 3600 * 1000))
   return `${years}y`
 }
 
+function PanelShell({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className={CARD}>
+      <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+      {children}
+    </div>
+  )
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   if (!value) return null
   return (
-    <div style={{ marginBottom: 'var(--space-2)' }}>
-      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
-      <div style={{ fontSize: '0.95rem' }}>{value}</div>
+    <div className="mb-2">
+      <span className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{label}</span>
+      <div className="patient-text-body" style={{ color: 'var(--text-primary)' }}>{value}</div>
     </div>
   )
 }
@@ -36,15 +49,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function AllergyBanner({ allergies }: { allergies: string }) {
   if (!allergies) return null
   return (
-    <div style={{
-      background: 'var(--color-error-bg, #fff0f0)',
-      border: '1px solid var(--color-error, #e53e3e)',
-      borderRadius: 'var(--radius-md)',
-      padding: 'var(--space-2) var(--space-3)',
-      marginBottom: 'var(--space-3)',
-      fontSize: '0.9rem',
-    }}>
-      <strong>⚠ Allergies:</strong> {allergies}
+    <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      <strong>⚠ {allergies}</strong>
     </div>
   )
 }
@@ -65,11 +71,11 @@ function CurrentPanel({
 
   if (!appt) {
     return (
-      <Card title={t('queue.current')}>
-        <div style={{ textAlign: 'center', padding: 'var(--space-6) 0', color: 'var(--text-muted)' }}>
+      <PanelShell title={t('queue.current')}>
+        <div className="patient-text-body-secondary py-8 text-center" style={{ color: 'var(--text-muted)' }}>
           {t('queue.noCurrent')}
         </div>
-      </Card>
+      </PanelShell>
     )
   }
 
@@ -80,55 +86,56 @@ function CurrentPanel({
   ].filter(Boolean)
 
   return (
-    <div className="queue-card--current">
-      <Card title={t('queue.current')}>
-        <div className="queue-patient-header">
-          <h2 className="queue-patient-name">{appt.patient_name}</h2>
-          {chips.map((c) => (
-            <span key={c} className="queue-chip">{c}</span>
-          ))}
-          <span className={`badge badge--${appt.appointment_type}`}>{appt.type_display}</span>
+    <div className="rounded-2xl border-2 border-[#A4DDD1] bg-white p-5 shadow-md sm:p-6">
+      <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('queue.current')}</h2>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h3 className="patient-text-h2" style={{ color: 'var(--text-primary)' }}>{appt.patient_name}</h3>
+        {chips.map((c) => (
+          <span key={c} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">{c}</span>
+        ))}
+        <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{appt.type_display}</span>
+      </div>
+
+      {appt.patient_phone && (
+        <div className="mb-2 flex items-center gap-1.5 patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>
+          <Phone size={13} />{appt.patient_phone}
         </div>
+      )}
 
-        {appt.patient_phone && (
-          <div className="queue-panel-meta">{appt.patient_phone}</div>
-        )}
-
-        {appt.started_at && (
-          <div className="queue-panel-meta">
-            {t('queue.startedAt', { time: formatTime(appt.started_at, language) })}
-          </div>
-        )}
-
-        {appt.reason && <InfoRow label={t('appointments.reason')} value={appt.reason} />}
-
-        <AllergyBanner allergies={appt.patient_allergies} />
-
-        {appt.patient_chronic_conditions && (
-          <InfoRow label={t('queue.chronicConditions')} value={appt.patient_chronic_conditions} />
-        )}
-        {appt.patient_current_medications && (
-          <InfoRow label={t('queue.currentMedications')} value={appt.patient_current_medications} />
-        )}
-
-        {appt.status === 'IN_PROGRESS' && (
-          <Link to={`/doctor/encounters/${appt.id}`} className="queue-encounter-cta">
-            <Button block>🩻 {t('encounters.open')}</Button>
-          </Link>
-        )}
-
-        <div className="queue-actions">
-          <Button loading={isPending} onClick={() => onComplete(appt)}>
-            {t('queue.complete')}
-          </Button>
-          <Link to={`/doctor/patients?patient=${appt.patient_profile_id}`}>
-            <Button variant="secondary">{t('queue.openRecord')}</Button>
-          </Link>
-          <Button variant="danger" loading={isPending} onClick={() => onNoShow(appt.id)}>
-            {t('queue.noShow')}
-          </Button>
+      {appt.started_at && (
+        <div className="mb-2 patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>
+          {t('queue.startedAt', { time: formatTime(appt.started_at, language) })}
         </div>
-      </Card>
+      )}
+
+      {appt.reason && <InfoRow label={t('appointments.reason')} value={appt.reason} />}
+
+      <AllergyBanner allergies={appt.patient_allergies} />
+
+      {appt.patient_chronic_conditions && (
+        <InfoRow label={t('queue.chronicConditions')} value={appt.patient_chronic_conditions} />
+      )}
+      {appt.patient_current_medications && (
+        <InfoRow label={t('queue.currentMedications')} value={appt.patient_current_medications} />
+      )}
+
+      {appt.status === 'IN_PROGRESS' && (
+        <Link to={`/doctor/encounters/${appt.id}`} className="mb-3 block">
+          <button type="button" className={`${BTN_PRIMARY} w-full`}>🩻 {t('encounters.open')}</button>
+        </Link>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={isPending} onClick={() => onComplete(appt)} className={BTN_PRIMARY}>
+          {isPending && <Spinner size={14} />}{t('queue.complete')}
+        </button>
+        <Link to={`/doctor/patients?patient=${appt.patient_profile_id}`}>
+          <button type="button" className={BTN_SECONDARY}>{t('queue.openRecord')}</button>
+        </Link>
+        <button type="button" disabled={isPending} onClick={() => onNoShow(appt.id)} className={BTN_DANGER}>
+          {t('queue.noShow')}
+        </button>
+      </div>
     </div>
   )
 }
@@ -147,26 +154,26 @@ function NextPanel({
 
   if (!appt) {
     return (
-      <Card title={t('queue.next')}>
-        <p style={{ color: 'var(--text-muted)' }}>{t('queue.noNext')}</p>
-      </Card>
+      <PanelShell title={t('queue.next')}>
+        <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{t('queue.noNext')}</p>
+      </PanelShell>
     )
   }
 
   return (
-    <Card title={t('queue.next')}>
-      <h3 className="queue-patient-name">{appt.patient_name}</h3>
-      <div className="queue-panel-meta">{formatTime(appt.scheduled_start, language)}</div>
+    <PanelShell title={t('queue.next')}>
+      <h3 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{appt.patient_name}</h3>
+      <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{formatTime(appt.scheduled_start, language)}</div>
       {appt.reason && (
-        <div className="queue-panel-reason">{appt.reason}</div>
+        <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{appt.reason}</div>
       )}
-      <span className={`badge badge--${appt.appointment_type}`}>{appt.type_display}</span>
-      <div className="queue-next-action">
-        <Button loading={isPending} onClick={() => onCallNext(appt.id)}>
-          {t('queue.callNext')}
-        </Button>
+      <div className="mt-1 patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{appt.type_display}</div>
+      <div className="mt-4">
+        <button type="button" disabled={isPending} onClick={() => onCallNext(appt.id)} className={BTN_PRIMARY}>
+          {isPending && <Spinner size={14} />}{t('queue.callNext')}
+        </button>
       </div>
-    </Card>
+    </PanelShell>
   )
 }
 
@@ -182,37 +189,37 @@ function PreviousPanel({
 
   if (!appt) {
     return (
-      <Card title={t('queue.previous')}>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>—</p>
-      </Card>
+      <PanelShell title={t('queue.previous')}>
+        <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>—</p>
+      </PanelShell>
     )
   }
 
   return (
-    <Card title={t('queue.previous')}>
-      <h3 className="queue-patient-name queue-patient-name--muted">{appt.patient_name}</h3>
+    <PanelShell title={t('queue.previous')}>
+      <h3 className="patient-text-card-title" style={{ color: 'var(--text-secondary)' }}>{appt.patient_name}</h3>
       {appt.completed_at && (
-        <div className="queue-panel-meta">
+        <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>
           {t('queue.completedAt', { time: formatTime(appt.completed_at, language) })}
         </div>
       )}
       {appt.reason && (
-        <div className="queue-panel-meta">{appt.reason}</div>
+        <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{appt.reason}</div>
       )}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+      <div className="mt-4 flex flex-wrap gap-2">
         {/* Keeps the invoice reachable even after the post-completion pop-up is dismissed. */}
         {appt.invoice_id != null && (
-          <Button variant="secondary" onClick={() => onViewInvoice(appt.invoice_id!)}>
+          <button type="button" onClick={() => onViewInvoice(appt.invoice_id!)} className={BTN_SECONDARY}>
             {t('billing.viewInvoice')}
-          </Button>
+          </button>
         )}
         {appt.encounter_id != null && (
           <Link to={`/doctor/encounters/${appt.id}`}>
-            <Button variant="secondary">🩻 {t('encounters.view')}</Button>
+            <button type="button" className={BTN_SECONDARY}>🩻 {t('encounters.view')}</button>
           </Link>
         )}
       </div>
-    </Card>
+    </PanelShell>
   )
 }
 
@@ -302,46 +309,54 @@ export function DoctorQueuePage() {
   const fallbackRows = (!current ? inProgressFallbackData?.results : null) ?? []
 
   return (
-    <div>
-      <div className="page-heading-row">
-        <h1>{t('queue.liveTitle')}</h1>
-        <span className={`queue-waiting-badge${waiting_count > 0 ? ' queue-waiting-badge--active' : ''}`}>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('queue.liveTitle')}</h1>
+        <span
+          className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold sm:text-sm ${
+            waiting_count > 0 ? 'border-amber-200/60 bg-amber-50 text-amber-700' : 'border-slate-200/60 bg-slate-50 text-slate-500'
+          }`}
+        >
           {t('queue.waiting', { count: waiting_count })}
         </span>
       </div>
 
       {fallbackRows.map((a) => (
-        <div key={a.id} style={{ borderInlineStart: '3px solid var(--primary)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: 'var(--space-4)' }}>
-          <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div key={a.id} className="overflow-hidden rounded-2xl border-l-4 border-[#1AB5B3]">
+          <div className={CARD}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="queue-patient-name" style={{ margin: 0 }}>{a.patient_name}</h2>
-                <div className="queue-panel-meta">{formatTime(a.scheduled_start, language)}</div>
+                <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{a.patient_name}</h2>
+                <div className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{formatTime(a.scheduled_start, language)}</div>
               </div>
-              <Link to={`/doctor/encounters/${a.id}`} className="queue-encounter-cta">
-                <Button>🩻 {t('encounters.open')}</Button>
+              <Link to={`/doctor/encounters/${a.id}`}>
+                <button type="button" className={BTN_PRIMARY}>🩻 {t('encounters.open')}</button>
               </Link>
             </div>
-          </Card>
+          </div>
         </div>
       ))}
 
-      <div className="queue-grid">
-        <PreviousPanel appt={previous ?? null} onViewInvoice={setViewInvoiceId} />
-        <CurrentPanel
-          appt={current ?? null}
-          onComplete={handleComplete}
-          onNoShow={handleNoShow}
-          isPending={complete.isPending || noShow.isPending}
-        />
-        <NextPanel
-          appt={next ?? null}
-          onCallNext={(id) => callNext.mutate(id)}
-          isPending={callNext.isPending}
-        />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="order-2 lg:order-1"><PreviousPanel appt={previous ?? null} onViewInvoice={setViewInvoiceId} /></div>
+        <div className="order-1 lg:order-2">
+          <CurrentPanel
+            appt={current ?? null}
+            onComplete={handleComplete}
+            onNoShow={handleNoShow}
+            isPending={complete.isPending || noShow.isPending}
+          />
+        </div>
+        <div className="order-3 lg:order-3">
+          <NextPanel
+            appt={next ?? null}
+            onCallNext={(id) => callNext.mutate(id)}
+            isPending={callNext.isPending}
+          />
+        </div>
       </div>
 
-      <p className="queue-footer">
+      <p className="patient-text-body-secondary text-center" style={{ color: 'var(--text-muted)' }}>
         {t('queue.autoRefresh')}
       </p>
 

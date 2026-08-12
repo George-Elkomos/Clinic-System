@@ -258,6 +258,21 @@ const HOME_BY_ROLE: Record<Role, string> = {
   MANAGER: '/manager',
 }
 
+// Route prefixes whose page content has been redesigned onto the teal
+// Tailwind system (patient-tokens.css) and is safe to wrap in
+// `.patient-shell`. Checked by path rather than role because a few page
+// components are mounted under more than one role's route tree — e.g.
+// LabOrderDetailsPage renders at both /doctor/lab-orders/:id and
+// /secretary/lab/:id. /secretary now covers every Secretary page (including
+// that shared one), redesigned as its own phase after Doctor.
+const REDESIGNED_PATH_PREFIXES = ['/patient', '/doctor', '/secretary', '/manager', '/account']
+
+function isRedesignedPath(pathname: string) {
+  return REDESIGNED_PATH_PREFIXES.some((prefix) =>
+    prefix.endsWith('/') ? pathname.startsWith(prefix) : pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
 function avatarUrl(name: string, size: number) {
   return `https://ui-avatars.com/api/?background=1AB5B3&color=fff&size=${size}&name=${encodeURIComponent(name)}`
 }
@@ -310,13 +325,13 @@ function ShellLanguageToggle() {
  * change per role. Replaces the old patient-only PatientShell and the
  * separate CSS-driven AppShell used by the other three roles.
  *
- * Only Patient's own page content (<main>/<Outlet>) opts into the
- * `.patient-shell` Tailwind-enabling scope — Doctor/Secretary/Manager pages
- * haven't been redesigned onto this system yet, so wrapping their existing
- * content in that scope would silently reset button/input tap-target sizes
- * and font scale across pages this task never touched. The sidebar and
- * header are always inside the scope regardless of role, since those are
- * brand new for every role here.
+ * Page content (<main>/<Outlet>) opts into the `.patient-shell`
+ * Tailwind-enabling scope per-route, via `isRedesignedPath` above — not
+ * every role's pages have been redesigned onto this system yet, and wrapping
+ * not-yet-redesigned content in that scope would silently reset button/input
+ * tap-target sizes and font scale on pages this task never touched. The
+ * sidebar and header are always inside the scope regardless of role, since
+ * those are brand new for every role here.
  */
 export function PortalShell() {
   const { t } = useTranslation()
@@ -332,7 +347,6 @@ export function PortalShell() {
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   )
   const homeTo = HOME_BY_ROLE[user.role]
-  const isPatient = user.role === 'PATIENT'
 
   return (
     <div className="flex min-h-screen">
@@ -459,7 +473,7 @@ export function PortalShell() {
         </header>
         <main
           className={`min-h-screen flex-1 overflow-x-hidden bg-slate-50/50 p-4 transition-all sm:p-6 lg:p-8 ${
-            isPatient ? 'patient-shell' : ''
+            isRedesignedPath(location.pathname) ? 'patient-shell' : ''
           }`}
         >
           <Outlet />

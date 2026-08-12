@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { SearchInput } from '../../components/primitives/SearchInput'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
@@ -23,6 +22,11 @@ const TABS: Array<{ role: Role; key: string }> = [
   { role: 'SECRETARY', key: 'staff.secretaries' },
   { role: 'PATIENT', key: 'staff.patients' },
 ]
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 sm:text-sm'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488]'
+const BTN_DANGER_SM = 'inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100'
 
 export function UserManagementPage() {
   const { t } = useTranslation()
@@ -95,96 +99,109 @@ export function UserManagementPage() {
   }
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('staff.users') }]} />
-      <div className="page-heading-row">
-        <div>
-          <h1>{t('staff.users')}</h1>
-          <p style={{ color: 'var(--text-muted)' }}>{t('staff.usersIntro')}</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('staff.users') }]} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('staff.users')}</h1>
+            <p className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{t('staff.usersIntro')}</p>
+          </div>
+          <button type="button" onClick={addNew} className={BTN_PRIMARY}>{t('staff.addNew')}</button>
         </div>
-        <Button onClick={addNew}>{t('staff.addNew')}</Button>
       </div>
 
-      <div className="tabs" role="tablist" aria-label={t('staff.users')}>
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={t('staff.users')}>
         {TABS.map((tab) => (
           <button
             key={tab.role}
             type="button"
             role="tab"
-            className={`tab${role === tab.role ? ' tab--active' : ''}`}
             aria-selected={role === tab.role}
             onClick={() => setRole(tab.role)}
+            className={
+              role === tab.role
+                ? 'rounded-xl border border-[#0D9488] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
+                : 'rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 sm:text-sm'
+            }
           >
             {t(tab.key)}
           </button>
         ))}
       </div>
 
-      <section className="card">
+      <div className={CARD}>
         <SearchInput onSearch={onSearch} placeholder={t('staff.searchUsers')} />
-      </section>
+      </div>
 
       {tempPassword && (
-        <section className="temp-password-box">
-          <p>{t('staff.tempPasswordNote')}</p>
-          <div className="temp-password-box__code">{tempPassword}</div>
-          <Button
-            variant="secondary"
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="patient-text-body" style={{ color: 'var(--text-primary)' }}>{t('staff.tempPasswordNote')}</p>
+          <div className="mt-2 rounded-lg bg-white px-3 py-2 text-center font-mono text-lg font-bold" style={{ color: 'var(--brand-teal-start)' }}>
+            {tempPassword}
+          </div>
+          <button
+            type="button"
             onClick={() => navigator.clipboard?.writeText(tempPassword)}
-            style={{ marginTop: 'var(--space-3)' }}
+            className={`${BTN_SECONDARY_SM} mt-3`}
           >
             {t('staff.copyPassword')}
-          </Button>
-        </section>
+          </button>
+        </div>
       )}
 
-      <section className="card">
+      <div className={CARD}>
         {isLoading ? (
           <CenteredSpinner />
         ) : data.length === 0 ? (
-          <p>{t('staff.noUsers')}</p>
+          <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('staff.noUsers')}</p>
         ) : (
-          <table className="user-table">
-            <thead>
-              <tr>
-                <th>{t('staff.fullName')}</th>
-                <th>{t('auth.email')}</th>
-                <th>{t('auth.phone')}</th>
-                <th>{t('staff.status')}</th>
-                <th className="col-hide-mobile">{t('staff.joined')}</th>
-                <th>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((user) => (
-                <tr key={user.id} className={user.is_active ? undefined : 'inactive-row'}>
-                  <td>{user.full_name}</td>
-                  <td>{user.email}</td>
-                  <td>{user.phone || t('common.none')}</td>
-                  <td>
-                    <span className={`badge ${user.is_active ? 'badge--active' : 'badge--inactive'}`}>
-                      {user.is_active ? t('staff.active') : t('staff.inactive')}
-                    </span>
-                  </td>
-                  <td className="col-hide-mobile">{formatDate(user.date_joined, language)}</td>
-                  <td>
-                    <div className="user-table__actions">
-                      <Button variant="secondary" onClick={() => setEditing(user)}>{t('common.edit')}</Button>
-                      <Button variant="secondary" onClick={() => requestReset(user)}>{t('staff.resetPassword')}</Button>
-                      <Button
-                        variant={user.is_active ? 'danger' : 'secondary'}
-                        onClick={() => requestToggle(user)}
-                      >
-                        {user.is_active ? t('staff.deactivate') : t('staff.reactivate')}
-                      </Button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b-2 border-slate-100">
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('staff.fullName')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('auth.email')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('auth.phone')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('staff.status')}</th>
+                  <th className="patient-text-overline hidden px-3 py-2 text-left sm:table-cell" style={{ color: 'var(--text-muted)' }}>{t('staff.joined')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('common.actions')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.map((user) => (
+                  <tr key={user.id} className={`border-b border-slate-100 ${user.is_active ? '' : 'opacity-60'}`}>
+                    <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--text-primary)' }}>{user.full_name}</td>
+                    <td className="px-3 py-2.5 patient-text-body" style={{ color: 'var(--text-secondary)' }}>{user.email}</td>
+                    <td className="px-3 py-2.5 patient-text-body" style={{ color: 'var(--text-secondary)' }}>{user.phone || t('common.none')}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                        user.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 'bg-slate-50 text-slate-500 border-slate-200/60'
+                      }`}>
+                        {user.is_active ? t('staff.active') : t('staff.inactive')}
+                      </span>
+                    </td>
+                    <td className="hidden px-3 py-2.5 patient-text-body-secondary sm:table-cell" style={{ color: 'var(--text-muted)' }}>{formatDate(user.date_joined, language)}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => setEditing(user)} className={BTN_SECONDARY_SM}>{t('common.edit')}</button>
+                        <button type="button" onClick={() => requestReset(user)} className={BTN_SECONDARY_SM}>{t('staff.resetPassword')}</button>
+                        <button
+                          type="button"
+                          onClick={() => requestToggle(user)}
+                          className={user.is_active ? BTN_DANGER_SM : BTN_SECONDARY_SM}
+                        >
+                          {user.is_active ? t('staff.deactivate') : t('staff.reactivate')}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </section>
+      </div>
 
       {editing && (
         <UserEditModal

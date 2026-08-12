@@ -4,13 +4,10 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
+import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
-import { StatusBadge } from '../../components/primitives/StatusBadge'
-import { useConfirm } from '../../components/primitives/ConfirmDialog'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatTime } from '../../lib/format'
@@ -20,6 +17,21 @@ import { doctorsApi } from '../../services/doctors.api'
 import type { Appointment } from '../../services/types'
 import { PatientProfileEditorModal } from './PatientProfileEditorModal'
 import { RegisterPatientModal } from './RegisterPatientModal'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
+
+const STATUS_BADGE: Record<string, string> = {
+  PENDING: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+  CHECKED_IN: 'bg-teal-50 text-teal-700 border-teal-200/60',
+  IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-200/60',
+  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+  CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200/60',
+  NO_SHOW: 'bg-slate-50 text-slate-500 border-slate-200/60',
+}
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -97,11 +109,13 @@ export function QueueBoardPage() {
   const pendingCount = (queue?.results ?? []).filter((a) => a.status === 'PENDING').length
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('queue.title') }]} />
-      <h1>{t('queue.title')}</h1>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('queue.title') }]} />
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('queue.title')}</h1>
+      </div>
 
-      <Card>
+      <div className={CARD}>
         <FormField label={t('queue.selectDoctor')}>
           {(p) => (
             <Select
@@ -113,13 +127,14 @@ export function QueueBoardPage() {
             />
           )}
         </FormField>
-      </Card>
+      </div>
 
       {doctorId !== '' && (
         <>
-          <Card title={t('queue.addWalkIn')}>
+          <div className={CARD}>
+            <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('queue.addWalkIn')}</h2>
             <FormField label={t('queue.searchPatient')}>
-              {(p) => <input {...p} value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} />}
+              {(p) => <input {...p} className="patient-field" value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} />}
             </FormField>
             <FormField label={t('appointments.patient')}>
               {(p) => (
@@ -133,56 +148,69 @@ export function QueueBoardPage() {
                 />
               )}
             </FormField>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-              <input type="checkbox" style={{ width: 'auto', minHeight: 'auto' }} checked={emergency} onChange={(e) => setEmergency(e.target.checked)} />
+            <label className="patient-text-body mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <input type="checkbox" checked={emergency} onChange={(e) => setEmergency(e.target.checked)} />
               {t('queue.emergency')}
             </label>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-              <Button loading={addWalkIn.isPending} disabled={!walkInPatient} onClick={() => addWalkIn.mutate()}>{t('queue.addWalkIn')}</Button>
-              <Button variant="secondary" onClick={() => setRegisteringPatient(true)}>{t('patients.register')}</Button>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" disabled={addWalkIn.isPending || !walkInPatient} onClick={() => addWalkIn.mutate()} className={BTN_PRIMARY}>
+                {addWalkIn.isPending && <Spinner size={14} />}{t('queue.addWalkIn')}
+              </button>
+              <button type="button" onClick={() => setRegisteringPatient(true)} className={BTN_SECONDARY}>{t('patients.register')}</button>
               {walkInPatient !== '' && (
-                <Button variant="secondary" onClick={() => setEditingProfile(Number(walkInPatient))}>{t('patients.editProfile')}</Button>
+                <button type="button" onClick={() => setEditingProfile(Number(walkInPatient))} className={BTN_SECONDARY}>{t('patients.editProfile')}</button>
               )}
             </div>
-          </Card>
+          </div>
 
           {pendingCount > 0 && (
-            <div className="callout callout--info" style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              flexWrap: 'wrap', gap: 'var(--space-3)',
-              background: 'var(--accent-soft, #eef4ff)', border: '1px solid var(--primary)',
-              borderRadius: 'var(--radius-md)', padding: 'var(--space-3) var(--space-4)',
-              marginBottom: 'var(--space-4)',
-            }}>
-              <span>{t('queue.pendingHint', { count: pendingCount })}</span>
-              <Link to="/secretary/desk"><Button variant="secondary">{t('nav.appointmentDesk')}</Button></Link>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+              <span className="patient-text-body" style={{ color: 'var(--text-primary)' }}>{t('queue.pendingHint', { count: pendingCount })}</span>
+              <Link to="/secretary/desk"><button type="button" className={BTN_SECONDARY_SM}>{t('nav.appointmentDesk')}</button></Link>
             </div>
           )}
 
-          <Card title={t('queue.title')}>
-            {isLoading ? <CenteredSpinner /> : rows.length === 0 ? <p>{t('queue.noQueue')}</p> : (
-              rows.map((a) => {
-                const action = nextAction(a)
-                return (
-                  <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-                    <div>
-                      <strong>{a.patient_name}</strong>
-                      {a.appointment_type === 'EMERGENCY' && <span className="badge badge--alert" style={{ marginInlineStart: 8 }}>{t('queue.emergency')}</span>}
-                      {a.appointment_type === 'WALK_IN' && <span className="badge" style={{ marginInlineStart: 8 }}>{t('kiosk.walkIn')}</span>}
-                      <div style={{ color: 'var(--text-muted)' }}>{formatTime(a.scheduled_start, language)}</div>
+          <div className={CARD}>
+            <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('queue.title')}</h2>
+            {isLoading ? <CenteredSpinner /> : rows.length === 0 ? (
+              <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('queue.noQueue')}</p>
+            ) : (
+              <div className="flex flex-col divide-y divide-slate-100">
+                {rows.map((a) => {
+                  const action = nextAction(a)
+                  return (
+                    <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                      <div>
+                        <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{a.patient_name}</span>
+                        {a.appointment_type === 'EMERGENCY' && (
+                          <span className="ms-2 rounded-full border border-rose-200/60 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">{t('queue.emergency')}</span>
+                        )}
+                        {a.appointment_type === 'WALK_IN' && (
+                          <span className="ms-2 rounded-full border border-slate-200/60 bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{t('kiosk.walkIn')}</span>
+                        )}
+                        <div className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{formatTime(a.scheduled_start, language)}</div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[a.status] ?? STATUS_BADGE.CANCELLED}`}>
+                          {t(`status.${a.status}`)}
+                        </span>
+                        {a.appointment_type !== 'EMERGENCY' && (
+                          <button type="button" onClick={() => transition.mutate({ id: a.id, action: 'markEmergency' })} className={BTN_SECONDARY_SM}>
+                            {t('queue.markEmergency')}
+                          </button>
+                        )}
+                        {action && (
+                          <button type="button" onClick={() => handleTransition(a, action.action)} className={BTN_PRIMARY}>
+                            {action.label}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <StatusBadge status={a.status} />
-                      {a.appointment_type !== 'EMERGENCY' && (
-                        <Button variant="secondary" onClick={() => transition.mutate({ id: a.id, action: 'markEmergency' })}>{t('queue.markEmergency')}</Button>
-                      )}
-                      {action && <Button onClick={() => handleTransition(a, action.action)}>{action.label}</Button>}
-                    </div>
-                  </div>
-                )
-              })
+                  )
+                })}
+              </div>
             )}
-          </Card>
+          </div>
         </>
       )}
 

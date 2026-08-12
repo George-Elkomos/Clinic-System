@@ -4,10 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
+import { Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { errorMessage } from '../../services/apiClient'
 import { labOrdersApi } from '../../services/labOrders.api'
@@ -19,6 +18,10 @@ import type { CreateLabOrderPayload, LabOrderItem, LabOrderPriority } from '../.
 type OrderFormItem = Omit<LabOrderItem, 'id'> & { _key: string }
 const EMPTY_ITEM = (): OrderFormItem => ({ test_name: '', test_code: '', notes: '', _key: crypto.randomUUID() })
 const PRIORITIES: LabOrderPriority[] = ['ROUTINE', 'URGENT', 'STAT']
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
 
 export function CreateLabOrderPage() {
   const { t } = useTranslation()
@@ -76,11 +79,13 @@ export function CreateLabOrderPage() {
   const canSubmit = patient !== '' && items.some((it) => it.test_name.trim())
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('lab.title'), to: '/doctor/lab-orders' }, { label: t('lab.newOrder') }]} />
-      <h1>{t('lab.newOrder')}</h1>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('lab.title'), to: '/doctor/lab-orders' }, { label: t('lab.newOrder') }]} />
+        <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>{t('lab.newOrder')}</h1>
+      </div>
 
-      <Card>
+      <div className={CARD}>
         <FormField label={t('lab.patient')}>
           {(p) => (
             <Select
@@ -109,6 +114,7 @@ export function CreateLabOrderPage() {
           {(p) => (
             <textarea
               {...p}
+              className="patient-field"
               rows={2}
               value={clinicalNotes}
               onChange={(e) => setClinicalNotes(e.target.value)}
@@ -117,44 +123,46 @@ export function CreateLabOrderPage() {
           )}
         </FormField>
 
-        <h3 style={{ marginBottom: 'var(--space-3)' }}>{t('lab.tests')}</h3>
-        {items.map((item, idx) => (
-          <div key={item._key} className="lab-item-row">
-            <div className="lab-item-row__name">
-              <FormField label={t('lab.testName')}>
-                {(p) => <input {...p} value={item.test_name} onChange={(e) => setItem(idx, 'test_name', e.target.value)} />}
-              </FormField>
+        <h3 className="patient-text-card-title mb-3 mt-4" style={{ color: 'var(--text-primary)' }}>{t('lab.tests')}</h3>
+        <div className="flex flex-col gap-3">
+          {items.map((item, idx) => (
+            <div key={item._key} className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/40 p-4 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <FormField label={t('lab.testName')}>
+                  {(p) => <input {...p} className="patient-field" value={item.test_name} onChange={(e) => setItem(idx, 'test_name', e.target.value)} />}
+                </FormField>
+              </div>
+              <div className="flex-1">
+                <FormField label={t('lab.testCode')}>
+                  {(p) => <input {...p} className="patient-field" value={item.test_code} onChange={(e) => setItem(idx, 'test_code', e.target.value)} />}
+                </FormField>
+              </div>
+              <div className="flex-1">
+                <FormField label={t('lab.testNotes')}>
+                  {(p) => <input {...p} className="patient-field" value={item.notes} onChange={(e) => setItem(idx, 'notes', e.target.value)} />}
+                </FormField>
+              </div>
+              {items.length > 1 && (
+                <button type="button" onClick={() => setItems((arr) => arr.filter((it) => it._key !== item._key))} className={BTN_SECONDARY}>
+                  {t('lab.removeTest')}
+                </button>
+              )}
             </div>
-            <div className="lab-item-row__code">
-              <FormField label={t('lab.testCode')}>
-                {(p) => <input {...p} value={item.test_code} onChange={(e) => setItem(idx, 'test_code', e.target.value)} />}
-              </FormField>
-            </div>
-            <div className="lab-item-row__notes">
-              <FormField label={t('lab.testNotes')}>
-                {(p) => <input {...p} value={item.notes} onChange={(e) => setItem(idx, 'notes', e.target.value)} />}
-              </FormField>
-            </div>
-            {items.length > 1 && (
-              <Button variant="secondary" onClick={() => setItems((arr) => arr.filter((it) => it._key !== item._key))}>
-                {t('lab.removeTest')}
-              </Button>
-            )}
-          </div>
-        ))}
-        <Button variant="secondary" onClick={() => setItems((arr) => [...arr, EMPTY_ITEM()])} style={{ marginBottom: 'var(--space-4)' }}>
-          {t('lab.addTest')}
-        </Button>
-
-        <div className="lab-form-actions">
-          <Button variant="secondary" loading={create.isPending} disabled={!canSubmit || pending} onClick={() => create.mutate()}>
-            {t('lab.saveAsDraft')}
-          </Button>
-          <Button loading={createAndSubmit.isPending} disabled={!canSubmit || pending} onClick={() => createAndSubmit.mutate()}>
-            {t('lab.submitOrder')}
-          </Button>
+          ))}
         </div>
-      </Card>
+        <button type="button" onClick={() => setItems((arr) => [...arr, EMPTY_ITEM()])} className={`${BTN_SECONDARY} mt-3`}>
+          {t('lab.addTest')}
+        </button>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button type="button" disabled={!canSubmit || pending} onClick={() => create.mutate()} className={BTN_SECONDARY}>
+            {create.isPending && <Spinner size={14} />}{t('lab.saveAsDraft')}
+          </button>
+          <button type="button" disabled={!canSubmit || pending} onClick={() => createAndSubmit.mutate()} className={BTN_PRIMARY}>
+            {createAndSubmit.isPending && <Spinner size={14} />}{t('lab.submitOrder')}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

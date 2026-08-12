@@ -4,14 +4,11 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { FormField } from '../../components/primitives/FormField'
 import { Modal } from '../../components/primitives/Modal'
 import { Select } from '../../components/primitives/Select'
 import { AsyncCombobox, type ComboOption } from '../../components/primitives/AsyncCombobox'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
-import { StatusBadge } from '../../components/primitives/StatusBadge'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { useToast } from '../../components/primitives/Toast'
 import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
@@ -29,7 +26,24 @@ import { radiologyApi } from '../../services/radiology.api'
 import { ProcedureDetailModal } from '../../components/medical/ProcedureDetailModal'
 import { RadiologyOrderDetailModal } from '../../components/medical/RadiologyOrderDetailModal'
 import { localizedName } from '../../lib/format'
-import type { Complaint, Encounter, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
+import type { Complaint, Encounter, EncounterStatus, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
+const SECTION_DIVIDER = 'patient-text-card-title mb-3 mt-5 border-t border-slate-100 pt-4 first:mt-0 first:border-t-0 first:pt-0'
+
+const ENCOUNTER_STATUS_BADGE: Record<EncounterStatus, string> = {
+  DRAFT: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  SUBMITTED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+  AMENDED: 'bg-sky-50 text-sky-700 border-sky-200/60',
+}
+
+function StatusPill({ text, className }: { text: string; className: string }) {
+  return <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}>{text}</span>
+}
 
 // Show the ICD-10 code inline so doctors can confirm the coded diagnosis.
 const diagnosisLabel = (d: { name: string; icd10_code?: string | null }) =>
@@ -104,13 +118,15 @@ function PrescriptionModal({ encounter, onClose, onSaved }: { encounter: Encount
           canRemove={items.length > 1}
         />
       ))}
-      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, newEncounterRxItem()])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
+      <button type="button" onClick={() => setItems((arr) => [...arr, newEncounterRxItem()])} className={`${BTN_SECONDARY} mt-2`}>{t('medical.addItem')}</button>
       <FormField label={t('medical.instructions')}>
-        {(p) => <textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
+        {(p) => <textarea {...p} className="patient-field" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </FormField>
-      <div className="modal__actions">
-        <Button variant="secondary" onClick={onClose}>{t('encounters.cancel')}</Button>
-        <Button loading={save.isPending || checking} disabled={!items.some(hasContent)} onClick={handleSave}>{t('encounters.save')}</Button>
+      <div className="mt-4 flex justify-end gap-3">
+        <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('encounters.cancel')}</button>
+        <button type="button" disabled={save.isPending || checking || !items.some(hasContent)} onClick={handleSave} className={BTN_PRIMARY}>
+          {(save.isPending || checking) && <Spinner size={14} />}{t('encounters.save')}
+        </button>
       </div>
       {modal}
     </Modal>
@@ -154,16 +170,18 @@ function LabOrderModal({ encounter, onClose, onSaved }: { encounter: Encounter; 
         )}
       </FormField>
       {tests.map((tst, idx) => (
-        <div key={idx} className="lab-item-row">
-          <div className="lab-item-row__name"><FormField label={t('lab.testName')}>{(p) => <input {...p} value={tst.test_name} onChange={(e) => setTest(idx, 'test_name', e.target.value)} />}</FormField></div>
-          <div className="lab-item-row__code"><FormField label={t('lab.testCode')}>{(p) => <input {...p} value={tst.test_code} onChange={(e) => setTest(idx, 'test_code', e.target.value)} />}</FormField></div>
-          {tests.length > 1 && <Button variant="secondary" onClick={() => setTests((arr) => arr.filter((_, i) => i !== idx))}>{t('medical.removeItem')}</Button>}
+        <div key={idx} className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/40 p-4 sm:flex-row sm:items-end">
+          <div className="flex-1"><FormField label={t('lab.testName')}>{(p) => <input {...p} className="patient-field" value={tst.test_name} onChange={(e) => setTest(idx, 'test_name', e.target.value)} />}</FormField></div>
+          <div className="flex-1"><FormField label={t('lab.testCode')}>{(p) => <input {...p} className="patient-field" value={tst.test_code} onChange={(e) => setTest(idx, 'test_code', e.target.value)} />}</FormField></div>
+          {tests.length > 1 && <button type="button" onClick={() => setTests((arr) => arr.filter((_, i) => i !== idx))} className={BTN_SECONDARY}>{t('medical.removeItem')}</button>}
         </div>
       ))}
-      <Button variant="secondary" onClick={() => setTests((arr) => [...arr, { test_name: '', test_code: '', notes: '' }])} className="medical-add-item-btn">{t('encounters.addTest')}</Button>
-      <div className="modal__actions">
-        <Button variant="secondary" onClick={onClose}>{t('encounters.cancel')}</Button>
-        <Button loading={save.isPending} disabled={!tests.some((tst) => tst.test_name)} onClick={() => save.mutate()}>{t('encounters.save')}</Button>
+      <button type="button" onClick={() => setTests((arr) => [...arr, { test_name: '', test_code: '', notes: '' }])} className={`${BTN_SECONDARY} mt-2`}>{t('encounters.addTest')}</button>
+      <div className="mt-4 flex justify-end gap-3">
+        <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('encounters.cancel')}</button>
+        <button type="button" disabled={save.isPending || !tests.some((tst) => tst.test_name)} onClick={() => save.mutate()} className={BTN_PRIMARY}>
+          {save.isPending && <Spinner size={14} />}{t('encounters.save')}
+        </button>
       </div>
     </Modal>
   )
@@ -225,21 +243,23 @@ function ProcedureModal({ encounter, onClose, onSaved }: { encounter: Encounter;
       {isCustom && (
         <>
           <FormField label={t('procedures.customName')}>
-            {(p) => <input {...p} value={customName} onChange={(e) => setCustomName(e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" value={customName} onChange={(e) => setCustomName(e.target.value)} />}
           </FormField>
           <FormField label={t('procedures.customNameAr')}>
-            {(p) => <input {...p} dir="rtl" value={customNameAr} onChange={(e) => setCustomNameAr(e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" dir="rtl" value={customNameAr} onChange={(e) => setCustomNameAr(e.target.value)} />}
           </FormField>
         </>
       )}
 
       <FormField label={t('procedures.preProcedureNotes')} hint={t('procedures.preProcedureNotesHint')}>
-        {(p) => <textarea {...p} rows={2} value={preNotes} onChange={(e) => setPreNotes(e.target.value)} />}
+        {(p) => <textarea {...p} className="patient-field" rows={2} value={preNotes} onChange={(e) => setPreNotes(e.target.value)} />}
       </FormField>
 
-      <div className="modal__actions">
-        <Button variant="secondary" onClick={onClose}>{t('encounters.cancel')}</Button>
-        <Button loading={save.isPending} disabled={!canSave} onClick={() => save.mutate()}>{t('encounters.save')}</Button>
+      <div className="mt-4 flex justify-end gap-3">
+        <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('encounters.cancel')}</button>
+        <button type="button" disabled={save.isPending || !canSave} onClick={() => save.mutate()} className={BTN_PRIMARY}>
+          {save.isPending && <Spinner size={14} />}{t('encounters.save')}
+        </button>
       </div>
     </Modal>
   )
@@ -301,10 +321,10 @@ function RadiologyOrderModal({ encounter, onClose, onSaved }: { encounter: Encou
       {isCustom && (
         <>
           <FormField label={t('radiology.customName')}>
-            {(p) => <input {...p} value={customName} onChange={(e) => setCustomName(e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" value={customName} onChange={(e) => setCustomName(e.target.value)} />}
           </FormField>
           <FormField label={t('radiology.customNameAr')}>
-            {(p) => <input {...p} dir="rtl" value={customNameAr} onChange={(e) => setCustomNameAr(e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" dir="rtl" value={customNameAr} onChange={(e) => setCustomNameAr(e.target.value)} />}
           </FormField>
         </>
       )}
@@ -321,12 +341,14 @@ function RadiologyOrderModal({ encounter, onClose, onSaved }: { encounter: Encou
       </FormField>
 
       <FormField label={t('radiology.clinicalReason')} hint={t('radiology.clinicalReasonHint')}>
-        {(p) => <textarea {...p} rows={2} value={clinicalReason} onChange={(e) => setClinicalReason(e.target.value)} />}
+        {(p) => <textarea {...p} className="patient-field" rows={2} value={clinicalReason} onChange={(e) => setClinicalReason(e.target.value)} />}
       </FormField>
 
-      <div className="modal__actions">
-        <Button variant="secondary" onClick={onClose}>{t('encounters.cancel')}</Button>
-        <Button loading={save.isPending} disabled={!canSave} onClick={() => save.mutate()}>{t('encounters.save')}</Button>
+      <div className="mt-4 flex justify-end gap-3">
+        <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('encounters.cancel')}</button>
+        <button type="button" disabled={save.isPending || !canSave} onClick={() => save.mutate()} className={BTN_PRIMARY}>
+          {save.isPending && <Spinner size={14} />}{t('encounters.save')}
+        </button>
       </div>
     </Modal>
   )
@@ -361,17 +383,17 @@ function PrescriptionSidebarItem({
   const drugs = (p.items ?? []).map((i) => i.drug_name).join(', ') || `#${p.id}`
 
   return (
-    <li className={`encounter-rx-item${p.status === 'CANCELLED' ? ' encounter-rx-item--voided' : ''}`}>
-      <div className="encounter-rx-item__row">
-        <span className="encounter-rx-item__drugs">{drugs}</span>
+    <li className={`py-2 ${p.status === 'CANCELLED' ? 'opacity-60' : ''}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`patient-text-body truncate ${p.status === 'CANCELLED' ? 'line-through' : ''}`} style={{ color: 'var(--text-primary)' }}>{drugs}</span>
         {p.status === 'CANCELLED' ? (
-          <span className="badge badge--CANCELLED">{t('medical.voidedBadge')}</span>
+          <StatusPill text={t('medical.voidedBadge')} className="bg-slate-50 text-slate-500 border-slate-200/60" />
         ) : canVoid ? (
           <button
             type="button"
-            className="encounter-rx-void-btn"
             onClick={() => setVoiding((v) => !v)}
             title={t('medical.voidPrescription')}
+            className="shrink-0 rounded-lg border border-rose-200 bg-rose-50 p-1.5 text-xs hover:bg-rose-100"
           >
             🚫
           </button>
@@ -379,32 +401,32 @@ function PrescriptionSidebarItem({
       </div>
 
       {p.status === 'CANCELLED' && p.cancellation_reason && (
-        <p className="encounter-rx-item__reason">
+        <p className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-muted)' }}>
           {t('medical.voidReason', { reason: p.cancellation_reason })}
         </p>
       )}
 
       {voiding && (
-        <div className="encounter-rx-void-form">
+        <div className="mt-2 flex flex-col gap-2">
           <textarea
-            className="encounter-rx-void-reason"
+            className="patient-field"
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder={t('medical.voidReasonPlaceholder')}
           />
-          <div className="encounter-rx-void-actions">
-            <Button variant="secondary" onClick={() => { setVoiding(false); setReason('') }}>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setVoiding(false); setReason('') }} className={BTN_SECONDARY_SM}>
               {t('common.cancel')}
-            </Button>
-            <Button
-              variant="danger"
-              loading={cancel.isPending}
-              disabled={reason.trim().length < 5}
+            </button>
+            <button
+              type="button"
+              disabled={cancel.isPending || reason.trim().length < 5}
               onClick={() => cancel.mutate()}
+              className={BTN_DANGER}
             >
-              {t('medical.voidConfirmBtn')}
-            </Button>
+              {cancel.isPending && <Spinner size={14} />}{t('medical.voidConfirmBtn')}
+            </button>
           </div>
         </div>
       )}
@@ -600,27 +622,31 @@ export function EncounterPage() {
       Date.now() - new Date(encounter.vitals_detail.created_at).getTime() <= VITALS_EDIT_WINDOW_MS)
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('encounters.title') }]} />
-      <div className="encounter-head">
-        <h1>{t('encounters.title')} — {encounter.patient_name}</h1>
-        <StatusBadge status={encounter.status} ns="encounters.status" />
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('encounters.title') }]} />
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>{t('encounters.title')} — {encounter.patient_name}</h1>
+          <StatusPill text={t(`encounters.status.${encounter.status}`)} className={ENCOUNTER_STATUS_BADGE[encounter.status] ?? ENCOUNTER_STATUS_BADGE.DRAFT} />
+        </div>
       </div>
 
       {readOnly && (
-        <Card>
-          <p className="encounter-locked">{t('encounters.lockedHint')}</p>
+        <div className={CARD}>
+          <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('encounters.lockedHint')}</p>
           {isOwner && encounter.status !== 'DRAFT' && (
-            <Button loading={amend.isPending} onClick={() => amend.mutate()}>{t('encounters.amend')}</Button>
+            <button type="button" disabled={amend.isPending} onClick={() => amend.mutate()} className={`${BTN_PRIMARY} mt-3`}>
+              {amend.isPending && <Spinner size={14} />}{t('encounters.amend')}
+            </button>
           )}
-        </Card>
+        </div>
       )}
 
-      <div className="encounter-layout">
-        <div className="encounter-main-col">
-        <div className="encounter-main">
-          <Card title={t('encounters.blockComplaint')}>
-            <div className="form-grid">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <div className={CARD}>
+            <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.blockComplaint')}</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField label={t('encounters.chiefComplaint')}>
                 {(p) => (
                   <AsyncCombobox
@@ -634,12 +660,13 @@ export function EncounterPage() {
                 )}
               </FormField>
               <FormField label={t('encounters.chiefComplaintAr')} hint={t('encounters.complaintArHint')}>
-                {(p) => <input {...p} dir="rtl" readOnly value={form.chief_complaint_ar} disabled={readOnly} />}
+                {(p) => <input {...p} className="patient-field" dir="rtl" readOnly value={form.chief_complaint_ar} disabled={readOnly} />}
               </FormField>
             </div>
-          </Card>
+          </div>
 
-          <Card title={t('encounters.blockSymptomsVitals')}>
+          <div className={CARD}>
+            <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.blockSymptomsVitals')}</h2>
             <FormField label={t('encounters.symptoms')} hint={t('encounters.symptomsHint')}>
               {(p) => (
                 <Select
@@ -654,22 +681,22 @@ export function EncounterPage() {
               )}
             </FormField>
 
-            <h3 className="medical-section-divider">{t('encounters.captureVitals')}</h3>
+            <h3 className={SECTION_DIVIDER}>{t('encounters.captureVitals')}</h3>
             {encounter.vitals_detail && !replacingVitals && !editingVitals ? (
               <>
-                <p className="encounter-vitals-linked">
+                <p className="patient-text-body" style={{ color: 'var(--text-primary)' }}>
                   ✓ {t('encounters.vitalsLinked')} — BP {encounter.vitals_detail.bp_systolic}/{encounter.vitals_detail.bp_diastolic}, HR {encounter.vitals_detail.heart_rate}
                 </p>
                 {!readOnly && (
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {canEditVitals && (
-                      <Button variant="secondary" onClick={() => setEditingVitals(true)}>
+                      <button type="button" onClick={() => setEditingVitals(true)} className={BTN_SECONDARY}>
                         {t('common.edit')}
-                      </Button>
+                      </button>
                     )}
-                    <Button variant="secondary" onClick={() => setReplacingVitals(true)}>
+                    <button type="button" onClick={() => setReplacingVitals(true)} className={BTN_SECONDARY}>
                       {t('encounters.recordNewVitals')}
-                    </Button>
+                    </button>
                   </div>
                 )}
               </>
@@ -691,22 +718,24 @@ export function EncounterPage() {
                 }}
               />
             ) : (
-              <p className="encounter-vitals-linked">—</p>
+              <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>—</p>
             )}
-          </Card>
+          </div>
 
-          <Card title={t('encounters.blockExamination')}>
-            <div className="form-grid">
+          <div className={CARD}>
+            <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.blockExamination')}</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField label={t('encounters.examinationFindings')}>
-                {(p) => <textarea {...p} rows={3} value={form.examination_findings} onChange={(e) => set('examination_findings', e.target.value)} disabled={readOnly} />}
+                {(p) => <textarea {...p} className="patient-field" rows={3} value={form.examination_findings} onChange={(e) => set('examination_findings', e.target.value)} disabled={readOnly} />}
               </FormField>
               <FormField label={t('encounters.examinationFindingsAr')}>
-                {(p) => <textarea {...p} dir="rtl" rows={3} value={form.examination_findings_ar} onChange={(e) => set('examination_findings_ar', e.target.value)} disabled={readOnly} />}
+                {(p) => <textarea {...p} className="patient-field" dir="rtl" rows={3} value={form.examination_findings_ar} onChange={(e) => set('examination_findings_ar', e.target.value)} disabled={readOnly} />}
               </FormField>
             </div>
-          </Card>
+          </div>
 
-          <Card title={t('encounters.blockDiagnosis')}>
+          <div className={CARD}>
+            <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.blockDiagnosis')}</h2>
             <FormField label={t('encounters.diagnosis')}>
               {(p) => (
                 <AsyncCombobox
@@ -720,42 +749,44 @@ export function EncounterPage() {
               )}
             </FormField>
             <FormField label={t('encounters.diagnosisNotes')}>
-              {(p) => <textarea {...p} rows={2} value={form.diagnosis_notes} onChange={(e) => set('diagnosis_notes', e.target.value)} disabled={readOnly} />}
+              {(p) => <textarea {...p} className="patient-field" rows={2} value={form.diagnosis_notes} onChange={(e) => set('diagnosis_notes', e.target.value)} disabled={readOnly} />}
             </FormField>
-            <div className="form-grid">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField label={t('encounters.treatmentPlan')}>
-                {(p) => <textarea {...p} rows={3} value={form.treatment_plan} onChange={(e) => set('treatment_plan', e.target.value)} disabled={readOnly} />}
+                {(p) => <textarea {...p} className="patient-field" rows={3} value={form.treatment_plan} onChange={(e) => set('treatment_plan', e.target.value)} disabled={readOnly} />}
               </FormField>
               <FormField label={t('encounters.treatmentPlanAr')}>
-                {(p) => <textarea {...p} dir="rtl" rows={3} value={form.treatment_plan_ar} onChange={(e) => set('treatment_plan_ar', e.target.value)} disabled={readOnly} />}
+                {(p) => <textarea {...p} className="patient-field" dir="rtl" rows={3} value={form.treatment_plan_ar} onChange={(e) => set('treatment_plan_ar', e.target.value)} disabled={readOnly} />}
               </FormField>
             </div>
-          </Card>
-        </div>
-
-        {!readOnly && (
-          <div className="encounter-submit-row">
-            <span className="encounter-autosave-hint">{t('encounters.savedDraftHint')}</span>
-            <Button loading={submit.isPending} onClick={handleSubmit}>{t('encounters.submit')}</Button>
           </div>
-        )}
+
+          {!readOnly && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+              <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('encounters.savedDraftHint')}</span>
+              <button type="button" disabled={submit.isPending} onClick={handleSubmit} className={BTN_PRIMARY}>
+                {submit.isPending && <Spinner size={14} />}{t('encounters.submit')}
+              </button>
+            </div>
+          )}
         </div>
 
-        <aside className="encounter-sidebar">
-          <Card title={t('encounters.sidebarTitle')}>
-            <div className="encounter-sidebar-actions">
-              <Button variant="secondary" disabled={readOnly} onClick={() => setShowRx(true)}>{t('encounters.addPrescription')}</Button>
-              <Button variant="secondary" disabled={readOnly} onClick={() => setShowLab(true)}>{t('encounters.orderLab')}</Button>
-              <Button variant="secondary" disabled={readOnly} onClick={() => setShowProcedure(true)}>{t('encounters.addProcedure')}</Button>
-              <Button variant="secondary" disabled={readOnly} onClick={() => setShowRadiologyOrder(true)}>{t('encounters.addRadiologyOrder')}</Button>
-              <Button variant="secondary" disabled={!isOwner} onClick={() => setShowReferral(true)}>{t('referrals.referPatient')}</Button>
+        <aside className="flex flex-col gap-4 lg:col-span-1">
+          <div className={CARD}>
+            <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.sidebarTitle')}</h2>
+            <div className="flex flex-col gap-2">
+              <button type="button" disabled={readOnly} onClick={() => setShowRx(true)} className={BTN_SECONDARY}>{t('encounters.addPrescription')}</button>
+              <button type="button" disabled={readOnly} onClick={() => setShowLab(true)} className={BTN_SECONDARY}>{t('encounters.orderLab')}</button>
+              <button type="button" disabled={readOnly} onClick={() => setShowProcedure(true)} className={BTN_SECONDARY}>{t('encounters.addProcedure')}</button>
+              <button type="button" disabled={readOnly} onClick={() => setShowRadiologyOrder(true)} className={BTN_SECONDARY}>{t('encounters.addRadiologyOrder')}</button>
+              <button type="button" disabled={!isOwner} onClick={() => setShowReferral(true)} className={BTN_SECONDARY}>{t('referrals.referPatient')}</button>
             </div>
 
-            <h3 className="medical-section-divider">{t('encounters.linkedPrescriptions')}</h3>
+            <h3 className={SECTION_DIVIDER}>{t('encounters.linkedPrescriptions')}</h3>
             {(encounter.prescriptions ?? []).length === 0 ? (
-              <p className="encounter-none">{t('encounters.noneLinked')}</p>
+              <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{t('encounters.noneLinked')}</p>
             ) : (
-              <ul className="encounter-linked-list">
+              <ul className="flex flex-col divide-y divide-slate-100">
                 {(encounter.prescriptions ?? []).map((p) => (
                   <PrescriptionSidebarItem
                     key={p.id}
@@ -767,52 +798,52 @@ export function EncounterPage() {
               </ul>
             )}
 
-            <h3 className="medical-section-divider">{t('encounters.linkedLabs')}</h3>
+            <h3 className={SECTION_DIVIDER}>{t('encounters.linkedLabs')}</h3>
             {(encounter.lab_orders ?? []).length === 0 ? (
-              <p className="encounter-none">{t('encounters.noneLinked')}</p>
+              <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{t('encounters.noneLinked')}</p>
             ) : (
-              <ul className="encounter-linked-list">
+              <ul className="flex flex-col divide-y divide-slate-100">
                 {(encounter.lab_orders ?? []).map((o) => (
-                  <li key={o.id} className="encounter-linked-row encounter-linked-row--static">
-                    <span className="encounter-linked-row__name">{o.order_number}</span>
-                    <StatusBadge status={o.status} ns="status" />
+                  <li key={o.id} className="flex items-center justify-between gap-2 py-2">
+                    <span className="patient-text-body truncate" style={{ color: 'var(--text-primary)' }}>{o.order_number}</span>
+                    <StatusPill text={t(`status.${o.status}`)} className="bg-sky-50 text-sky-700 border-sky-200/60" />
                   </li>
                 ))}
               </ul>
             )}
 
-            <h3 className="medical-section-divider">{t('encounters.linkedProcedures')}</h3>
+            <h3 className={SECTION_DIVIDER}>{t('encounters.linkedProcedures')}</h3>
             {(encounter.procedures ?? []).length === 0 ? (
-              <p className="encounter-none">{t('encounters.noneLinked')}</p>
+              <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{t('encounters.noneLinked')}</p>
             ) : (
-              <ul className="encounter-linked-list">
+              <ul className="flex flex-col divide-y divide-slate-100">
                 {(encounter.procedures ?? []).map((proc) => (
                   <li key={proc.id}>
-                    <button type="button" className="encounter-linked-row" onClick={() => setOpenProcedureId(proc.id)}>
-                      <span className="encounter-linked-row__name">{proc.procedure_name}</span>
-                      <StatusBadge status={proc.status} ns="procedures.status" />
+                    <button type="button" onClick={() => setOpenProcedureId(proc.id)} className="flex w-full items-center justify-between gap-2 py-2 text-left hover:bg-slate-50/60">
+                      <span className="patient-text-body truncate" style={{ color: 'var(--text-primary)' }}>{proc.procedure_name}</span>
+                      <StatusPill text={t(`procedures.status.${proc.status}`)} className="bg-sky-50 text-sky-700 border-sky-200/60" />
                     </button>
                   </li>
                 ))}
               </ul>
             )}
 
-            <h3 className="medical-section-divider">{t('encounters.linkedRadiologyOrders')}</h3>
+            <h3 className={SECTION_DIVIDER}>{t('encounters.linkedRadiologyOrders')}</h3>
             {(encounter.radiology_orders ?? []).length === 0 ? (
-              <p className="encounter-none">{t('encounters.noneLinked')}</p>
+              <p className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{t('encounters.noneLinked')}</p>
             ) : (
-              <ul className="encounter-linked-list">
+              <ul className="flex flex-col divide-y divide-slate-100">
                 {(encounter.radiology_orders ?? []).map((order) => (
                   <li key={order.id}>
-                    <button type="button" className="encounter-linked-row" onClick={() => setOpenRadiologyOrderId(order.id)}>
-                      <span className="encounter-linked-row__name">{order.study_name}</span>
-                      <StatusBadge status={order.status} ns="radiology.status" />
+                    <button type="button" onClick={() => setOpenRadiologyOrderId(order.id)} className="flex w-full items-center justify-between gap-2 py-2 text-left hover:bg-slate-50/60">
+                      <span className="patient-text-body truncate" style={{ color: 'var(--text-primary)' }}>{order.study_name}</span>
+                      <StatusPill text={t(`radiology.status.${order.status}`)} className="bg-sky-50 text-sky-700 border-sky-200/60" />
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
+          </div>
         </aside>
       </div>
 

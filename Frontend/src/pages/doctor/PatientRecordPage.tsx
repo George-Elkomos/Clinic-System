@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Activity, ClipboardList, FileText } from 'lucide-react'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -10,13 +11,10 @@ import { useInteractionCheck } from '../../hooks/useInteractionCheck'
 
 import { AIScribePanel } from '../../components/ai/AIScribePanel'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
-import { StatusBadge } from '../../components/primitives/StatusBadge'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
 import { VitalSignsHistory } from '../../components/vitals/VitalSignsHistory'
@@ -32,7 +30,31 @@ import { vitalsApi } from '../../services/vitals.api'
 import { encountersApi } from '../../services/encounters.api'
 import { proceduresApi } from '../../services/procedures.api'
 import { radiologyApi } from '../../services/radiology.api'
-import type { Diagnosis, Prescription, PrescriptionItem } from '../../services/types'
+import type { Diagnosis, Prescription, PrescriptionItem, ProcedureStatus, RadiologyOrderStatus } from '../../services/types'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
+const SECTION_DIVIDER = 'patient-text-card-title mb-3 mt-5 border-t border-slate-100 pt-4 first:mt-0 first:border-t-0 first:pt-0'
+
+const PROCEDURE_STATUS_BADGE: Record<ProcedureStatus, string> = {
+  SCHEDULED: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-200/60',
+  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+  CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200/60',
+}
+const RADIOLOGY_STATUS_BADGE: Record<RadiologyOrderStatus, string> = {
+  ORDERED: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+  REPORTED: 'bg-sky-50 text-sky-700 border-sky-200/60',
+  CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200/60',
+}
+
+function StatusPill({ text, className }: { text: string; className: string }) {
+  return <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}>{text}</span>
+}
 
 // ---- Vital Signs -----------------------------------------------------------
 function VitalsSection({ patientId }: { patientId: number }) {
@@ -47,23 +69,26 @@ function VitalsSection({ patientId }: { patientId: number }) {
   })
 
   return (
-    <Card title={t('vitals.title')}>
+    <div>
+      <h2 className="patient-text-h2 mb-4" style={{ color: 'var(--text-primary)' }}>{t('vitals.title')}</h2>
       {trend.length >= 2 && <VitalSignsTrendChart data={trend} />}
 
-      {showForm ? (
-        <>
-          <h3 className="medical-section-divider">{t('vitals.record')}</h3>
-          <VitalSignsForm patientId={patientId} onSuccess={() => setShowForm(false)} />
-        </>
-      ) : (
-        <div style={{ marginBottom: 'var(--space-3)', textAlign: 'right' }}>
-          <Button variant="secondary" onClick={() => setShowForm(true)}>{t('vitals.record')}</Button>
-        </div>
-      )}
+      <div className="mb-5 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
+        {showForm ? (
+          <>
+            <h3 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('vitals.record')}</h3>
+            <VitalSignsForm patientId={patientId} onSuccess={() => setShowForm(false)} />
+          </>
+        ) : (
+          <div className="text-right">
+            <button type="button" onClick={() => setShowForm(true)} className={BTN_SECONDARY}>{t('vitals.record')}</button>
+          </div>
+        )}
+      </div>
 
-      <h3 className="medical-section-divider">{t('vitals.history')}</h3>
+      <h3 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('vitals.history')}</h3>
       <VitalSignsHistory patientId={patientId} />
-    </Card>
+    </div>
   )
 }
 
@@ -91,30 +116,84 @@ function RecordsSection({ patientId }: { patientId: number }) {
   })
 
   return (
-    <Card title={t('medical.records')}>
-      {records.length === 0 ? <p>{t('medical.noRecords')}</p> : records.map((r) => (
-        <div key={r.id} className="medical-version-row">
-          <div className="medical-version-header">
-            <strong className="medical-version-label">{t('medical.version', { n: r.version })}</strong>
-            {r.is_current && <span className="badge badge--active">{t('medical.current')}</span>}
-            <span className="medical-version-date">{formatDate(r.created_at, language)}</span>
-          </div>
-          {r.diagnosis && <div className="medical-version-detail">{t('medical.diagnosis')}: {r.diagnosis}</div>}
-          {r.treatment_plan && <div className="medical-version-detail">{t('medical.treatmentPlan')}: {r.treatment_plan}</div>}
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.records')}</h2>
+      {records.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <FileText className="mb-2 h-10 w-10 text-slate-300" />
+          <p className="text-xs font-medium text-slate-400">{t('medical.noRecords')}</p>
         </div>
-      ))}
-      <h3 className="medical-section-divider">{t('medical.addRecord')}</h3>
+      ) : (
+        <div className="relative mt-4">
+          {/* Continuous rail behind the version dots — a single absolutely
+              positioned line, not per-row flex-stretch, so it stays
+              unbroken across the gaps between cards. */}
+          <div className="absolute bottom-5 left-[5px] top-5 w-px bg-slate-200" aria-hidden="true" />
+          <div className="flex flex-col gap-3">
+            {records.map((r) => (
+              <div key={r.id} className="relative flex gap-4">
+                <span
+                  className={`relative z-10 mt-4 h-2.5 w-2.5 shrink-0 rounded-full ${r.is_current ? 'bg-[#3BC9CB]' : 'bg-slate-300'}`}
+                  aria-hidden="true"
+                />
+                <div
+                  className={`flex-1 space-y-2 rounded-xl border p-4 shadow-sm ${
+                    r.is_current
+                      ? 'border-slate-100 border-l-4 border-l-[#3BC9CB] bg-sky-50/30'
+                      : 'border-slate-100 bg-white'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+                        {t('medical.version', { n: r.version })}
+                      </span>
+                      {r.is_current && (
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                          {t('medical.current')}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-slate-400">{formatDate(r.created_at, language)}</span>
+                  </div>
+                  {r.diagnosis && (
+                    <div className="flex items-start gap-1.5">
+                      <Activity size={13} className="mt-0.5 shrink-0 text-slate-400" />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-700">{t('medical.diagnosis')}</div>
+                        <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{r.diagnosis}</p>
+                      </div>
+                    </div>
+                  )}
+                  {r.treatment_plan && (
+                    <div className="flex items-start gap-1.5">
+                      <ClipboardList size={13} className="mt-0.5 shrink-0 text-slate-400" />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-700">{t('medical.treatmentPlan')}</div>
+                        <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{r.treatment_plan}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <h3 className={SECTION_DIVIDER}>{t('medical.addRecord')}</h3>
       <FormField label={t('medical.chiefComplaint')}>
-        {(p) => <input {...p} value={form.chief_complaint} onChange={(e) => setForm((f) => ({ ...f, chief_complaint: e.target.value }))} />}
+        {(p) => <input {...p} className="patient-field" value={form.chief_complaint} onChange={(e) => setForm((f) => ({ ...f, chief_complaint: e.target.value }))} />}
       </FormField>
       <FormField label={t('medical.diagnosis')}>
-        {(p) => <textarea {...p} rows={2} value={form.diagnosis} onChange={(e) => setForm((f) => ({ ...f, diagnosis: e.target.value }))} />}
+        {(p) => <textarea {...p} className="patient-field" rows={2} value={form.diagnosis} onChange={(e) => setForm((f) => ({ ...f, diagnosis: e.target.value }))} />}
       </FormField>
       <FormField label={t('medical.treatmentPlan')}>
-        {(p) => <textarea {...p} rows={2} value={form.treatment_plan} onChange={(e) => setForm((f) => ({ ...f, treatment_plan: e.target.value }))} />}
+        {(p) => <textarea {...p} className="patient-field" rows={2} value={form.treatment_plan} onChange={(e) => setForm((f) => ({ ...f, treatment_plan: e.target.value }))} />}
       </FormField>
-      <Button loading={add.isPending} onClick={() => add.mutate()} className="medical-form-submit">{t('medical.addRecord')}</Button>
-    </Card>
+      <button type="button" disabled={add.isPending} onClick={() => add.mutate()} className={`${BTN_PRIMARY} mt-2`}>
+        {add.isPending && <Spinner size={14} />}{t('medical.addRecord')}
+      </button>
+    </div>
   )
 }
 
@@ -143,14 +222,24 @@ function NotesSection({ patientId, categories }: { patientId: number; categories
   })
 
   return (
-    <Card title={t('medical.notes')}>
-      {notes.length === 0 ? <p>{t('medical.noNotes')}</p> : notes.map((n) => (
-        <div key={n.id} className="medical-note-row">
-          <div className="medical-note-meta">{n.specialty_category_name} · {n.doctor_name} · {formatDate(n.created_at, language)}</div>
-          <div>{n.body}</div>
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.notes')}</h2>
+      {notes.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <FileText className="mb-2 h-10 w-10 text-slate-300" />
+          <p className="text-xs font-medium text-slate-400">{t('medical.noNotes')}</p>
         </div>
-      ))}
-      <h3 className="medical-section-divider">{t('medical.addNote')}</h3>
+      ) : (
+        <div className="mt-4 flex flex-col gap-3">
+          {notes.map((n) => (
+            <div key={n.id} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="text-xs font-medium text-slate-400">{n.specialty_category_name} · {n.doctor_name} · {formatDate(n.created_at, language)}</div>
+              <div className="mt-1 text-xs leading-relaxed text-slate-600">{n.body}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <h3 className={SECTION_DIVIDER}>{t('medical.addNote')}</h3>
       <FormField label={t('medical.specialtyCategory')} hint={t('medical.noteSpecialtyHint')}>
         {(p) => (
           <Select
@@ -162,10 +251,12 @@ function NotesSection({ patientId, categories }: { patientId: number; categories
         )}
       </FormField>
       <FormField label={t('medical.noteBody')}>
-        {(p) => <textarea {...p} rows={3} value={body} onChange={(e) => setBody(e.target.value)} />}
+        {(p) => <textarea {...p} className="patient-field" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />}
       </FormField>
-      <Button loading={add.isPending} disabled={!category || !body} onClick={() => add.mutate()} className="medical-form-submit">{t('medical.addNote')}</Button>
-    </Card>
+      <button type="button" disabled={add.isPending || !category || !body} onClick={() => add.mutate()} className={`${BTN_PRIMARY} mt-2`}>
+        {add.isPending && <Spinner size={14} />}{t('medical.addNote')}
+      </button>
+    </div>
   )
 }
 
@@ -260,93 +351,131 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
     checkBeforeSubmit(patientId, items.filter(hasContent), () => issue.mutate())
 
   return (
-    <Card title={t('medical.prescriptions')}>
-      {prescriptions.length === 0 ? <p>{t('medical.noPrescriptions')}</p> : prescriptions.map((p) => {
-        const isCancelled = p.status === 'CANCELLED'
-        const isVoiding = voidingId === p.id
-        const canVoid = p.status === 'ACTIVE' && (
-          user?.role === 'MANAGER' ||
-          (user?.doctor_profile?.id != null && p.doctor === user.doctor_profile.id)
-        )
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.prescriptions')}</h2>
+      {prescriptions.length === 0 ? <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('medical.noPrescriptions')}</p> : (
+        <div className="mt-4 flex flex-col gap-4">
+          {prescriptions.map((p) => {
+            const isCancelled = p.status === 'CANCELLED'
+            const isVoiding = voidingId === p.id
+            const canVoid = p.status === 'ACTIVE' && (
+              user?.role === 'MANAGER' ||
+              (user?.doctor_profile?.id != null && p.doctor === user.doctor_profile.id)
+            )
 
-        return (
-          <div key={p.id} className={`medical-prescription-row${isCancelled ? ' encounter-rx-item--voided' : ''}`}>
-            <div style={{ flex: 1 }}>
-              <div className="encounter-rx-item__row">
-                <strong>{t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}</strong>
-                {isCancelled && <span className="badge badge--CANCELLED">{t('medical.voidedBadge')}</span>}
-              </div>
-              <div className={`medical-list-meta${isCancelled ? ' rx-items--voided' : ''}`}>
-                {p.items.map((i) => i.drug_name).join(', ')}
-              </div>
-              {isCancelled && p.cancelled_at && (
-                <div className="rx-voided-banner">
-                  <span className="rx-voided-meta">
-                    {t('medical.voidedOn', { date: formatDate(p.cancelled_at, language) })}
-                    {p.cancelled_by_name && ` · ${t('medical.voidedBy', { name: p.cancelled_by_name })}`}
-                  </span>
-                  {p.cancellation_reason && (
-                    <span className="rx-voided-reason">{t('medical.voidReason', { reason: p.cancellation_reason })}</span>
-                  )}
-                </div>
-              )}
-              {isVoiding && (
-                <div className="encounter-rx-void-form">
-                  <textarea
-                    className="encounter-rx-void-reason"
-                    rows={2}
-                    placeholder={t('medical.voidReasonPlaceholder')}
-                    value={voidReason}
-                    onChange={(e) => setVoidReason(e.target.value)}
-                  />
-                  <div className="encounter-rx-void-actions">
-                    <Button
-                      variant="danger"
-                      loading={cancelRx.isPending}
-                      disabled={voidReason.trim().length < 5}
-                      onClick={() => cancelRx.mutate(p.id)}
-                    >
-                      {t('medical.voidConfirmBtn')}
-                    </Button>
-                    <Button variant="secondary" onClick={() => { setVoidingId(null); setVoidReason('') }}>
-                      {t('common.cancel')}
-                    </Button>
+            return (
+              <div key={p.id} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
+                {isCancelled && (
+                  <div className="mb-3 flex items-start gap-3 rounded-xl border border-rose-200/80 bg-rose-50/80 p-3.5">
+                    <span aria-hidden="true" className="mt-0.5 shrink-0 text-rose-500">⚠</span>
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <span className="inline-block rounded-md bg-rose-100 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-rose-700">
+                        {t('medical.voidedBadge')}
+                      </span>
+                      <div className="text-xs font-medium text-rose-700">
+                        {p.cancelled_at && t('medical.voidedOn', { date: formatDate(p.cancelled_at, language) })}
+                        {p.cancelled_by_name && ` ${t('medical.voidedBy', { name: p.cancelled_by_name })}`}
+                        {p.cancellation_reason && ` — ${t('medical.voidReason', { reason: p.cancellation_reason })}`}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <strong className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {t('medical.issuedOn', { date: formatDate(p.issued_date, language) })}
+                  </strong>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!isCancelled && (
+                      <button type="button" onClick={() => openPdf(p.id)} className={BTN_SECONDARY_SM}>{t('medical.openPdf')}</button>
+                    )}
+                    {canVoid && !isVoiding && (
+                      <>
+                        <button
+                          type="button"
+                          title={t('medical.reissuePrescription')}
+                          onClick={() => handleReissue(p)}
+                          disabled={reissueMut.isPending}
+                          className="rounded-lg border border-slate-200 bg-white p-2 text-sm hover:border-[#0D9488]"
+                        >✏️</button>
+                        <button
+                          type="button"
+                          title={t('medical.voidPrescription')}
+                          onClick={() => { setVoidingId(p.id); setVoidReason('') }}
+                          className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm hover:bg-rose-100"
+                        >🚫</button>
+                      </>
+                    )}
+                    {isVoiding && (
+                      <button
+                        type="button"
+                        title={t('common.cancel')}
+                        onClick={() => { setVoidingId(null); setVoidReason('') }}
+                        className="rounded-lg border border-slate-200 bg-white p-2 text-sm"
+                      >✕</button>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0, alignItems: 'flex-start' }}>
-              {!isCancelled && (
-                <Button variant="secondary" onClick={() => openPdf(p.id)}>{t('medical.openPdf')}</Button>
-              )}
-              {canVoid && !isVoiding && (
-                <>
-                  <button
-                    className="encounter-rx-void-btn"
-                    title={t('medical.reissuePrescription')}
-                    onClick={() => handleReissue(p)}
-                    disabled={reissueMut.isPending}
-                  >✏️</button>
-                  <button
-                    className="encounter-rx-void-btn"
-                    title={t('medical.voidPrescription')}
-                    onClick={() => { setVoidingId(p.id); setVoidReason('') }}
-                  >🚫</button>
-                </>
-              )}
-              {isVoiding && (
-                <button
-                  className="encounter-rx-void-btn"
-                  title={t('common.cancel')}
-                  onClick={() => { setVoidingId(null); setVoidReason('') }}
-                >✕</button>
-              )}
-            </div>
-          </div>
-        )
-      })}
 
-      <h3 ref={newRxRef} className="medical-section-divider">{t('medical.newPrescription')}</h3>
+                <div className="mt-3 flex flex-col">
+                  {p.items.map((it, i) => (
+                    <div key={i} className="mb-2 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 last:mb-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-sm font-bold ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                          {it.drug_name}
+                        </span>
+                        {it.dosage && (
+                          <span className="rounded-md bg-[#0D9488]/10 px-2.5 py-1 text-xs font-semibold text-[#0D9488]">{it.dosage}</span>
+                        )}
+                      </div>
+                      {(it.frequency || it.duration) && (
+                        <div className="mt-1.5 text-xs font-medium text-slate-600">
+                          {[it.frequency, it.duration].filter(Boolean).join(' — ')}
+                        </div>
+                      )}
+                      {it.instructions && (
+                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-100/60 bg-amber-50/50 p-2.5">
+                          <span aria-hidden="true" className="mt-0.5 shrink-0 text-amber-500 text-xs">ℹ</span>
+                          <span className="text-xs italic text-slate-500">{it.instructions}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {isVoiding && (
+                  <div className="mt-3 flex flex-col gap-2">
+                    <textarea
+                      className="patient-field"
+                      rows={2}
+                      placeholder={t('medical.voidReasonPlaceholder')}
+                      value={voidReason}
+                      onChange={(e) => setVoidReason(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={cancelRx.isPending || voidReason.trim().length < 5}
+                        onClick={() => cancelRx.mutate(p.id)}
+                        className={BTN_DANGER}
+                      >
+                        {cancelRx.isPending && <Spinner size={14} />}{t('medical.voidConfirmBtn')}
+                      </button>
+                      <button type="button" onClick={() => { setVoidingId(null); setVoidReason('') }} className={BTN_SECONDARY}>
+                        {t('common.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {p.notes && <div className="mt-3 text-xs text-slate-500">{p.notes}</div>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <h3 ref={newRxRef} className={SECTION_DIVIDER}>{t('medical.newPrescription')}</h3>
       {items.map((it, idx) => (
         <MedicationItemRow
           key={it._key}
@@ -356,13 +485,15 @@ function PrescriptionsSection({ patientId }: { patientId: number }) {
           canRemove={items.length > 1}
         />
       ))}
-      <Button variant="secondary" onClick={() => setItems((arr) => [...arr, newRxItem()])} className="medical-add-item-btn">{t('medical.addItem')}</Button>
+      <button type="button" onClick={() => setItems((arr) => [...arr, newRxItem()])} className={`${BTN_SECONDARY} mt-2`}>{t('medical.addItem')}</button>
       <FormField label={t('medical.instructions')}>
-        {(p) => <textarea {...p} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
+        {(p) => <textarea {...p} className="patient-field" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />}
       </FormField>
-      <Button loading={issue.isPending || checking} disabled={!items.some(hasContent)} onClick={handleIssue} className="medical-form-submit">{t('medical.issuePrescription')}</Button>
+      <button type="button" disabled={issue.isPending || checking || !items.some(hasContent)} onClick={handleIssue} className={`${BTN_PRIMARY} mt-2`}>
+        {(issue.isPending || checking) && <Spinner size={14} />}{t('medical.issuePrescription')}
+      </button>
       {modal}
-    </Card>
+    </div>
   )
 }
 
@@ -381,23 +512,28 @@ function ProceduresSection({ patientId }: { patientId: number }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ['procedures', patientId] })
 
   return (
-    <Card title={t('procedures.title')}>
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('procedures.title')}</h2>
       {procedures.length === 0 ? (
-        <p>{t('procedures.none')}</p>
+        <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('procedures.none')}</p>
       ) : (
-        <ul className="procedure-list">
+        <ul className="mt-2 flex flex-col divide-y divide-slate-100">
           {procedures.map((proc) => (
             <li key={proc.id}>
-              <button type="button" className="procedure-row" onClick={() => setOpenProcedureId(proc.id)}>
-                <div className="procedure-row__main">
-                  <span className="procedure-row__name">
+              <button
+                type="button"
+                onClick={() => setOpenProcedureId(proc.id)}
+                className="flex w-full items-center justify-between gap-3 py-3 text-left hover:bg-slate-50/60"
+              >
+                <div className="min-w-0">
+                  <div className="patient-text-body truncate font-medium" style={{ color: 'var(--text-primary)' }}>
                     {language === 'ar' && proc.procedure_name_ar ? proc.procedure_name_ar : proc.procedure_name}
-                  </span>
-                  <span className="procedure-row__meta">
+                  </div>
+                  <div className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>
                     {proc.doctor_name} · {formatDate(proc.created_at, language)}
-                  </span>
+                  </div>
                 </div>
-                <StatusBadge status={proc.status} ns="procedures.status" />
+                <StatusPill text={t(`procedures.status.${proc.status}`)} className={PROCEDURE_STATUS_BADGE[proc.status] ?? PROCEDURE_STATUS_BADGE.CANCELLED} />
               </button>
             </li>
           ))}
@@ -411,7 +547,7 @@ function ProceduresSection({ patientId }: { patientId: number }) {
           onChanged={refresh}
         />
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -430,23 +566,28 @@ function RadiologySection({ patientId }: { patientId: number }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ['radiology-orders', patientId] })
 
   return (
-    <Card title={t('radiology.title')}>
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('radiology.title')}</h2>
       {orders.length === 0 ? (
-        <p>{t('radiology.none')}</p>
+        <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('radiology.none')}</p>
       ) : (
-        <ul className="procedure-list">
+        <ul className="mt-2 flex flex-col divide-y divide-slate-100">
           {orders.map((order) => (
             <li key={order.id}>
-              <button type="button" className="procedure-row" onClick={() => setOpenOrderId(order.id)}>
-                <div className="procedure-row__main">
-                  <span className="procedure-row__name">
+              <button
+                type="button"
+                onClick={() => setOpenOrderId(order.id)}
+                className="flex w-full items-center justify-between gap-3 py-3 text-left hover:bg-slate-50/60"
+              >
+                <div className="min-w-0">
+                  <div className="patient-text-body truncate font-medium" style={{ color: 'var(--text-primary)' }}>
                     {language === 'ar' && order.study_name_ar ? order.study_name_ar : order.study_name}
-                  </span>
-                  <span className="procedure-row__meta">
+                  </div>
+                  <div className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>
                     {order.doctor_name} · {formatDate(order.created_at, language)}
-                  </span>
+                  </div>
                 </div>
-                <StatusBadge status={order.status} ns="radiology.status" />
+                <StatusPill text={t(`radiology.status.${order.status}`)} className={RADIOLOGY_STATUS_BADGE[order.status] ?? RADIOLOGY_STATUS_BADGE.CANCELLED} />
               </button>
             </li>
           ))}
@@ -460,7 +601,7 @@ function RadiologySection({ patientId }: { patientId: number }) {
           onChanged={refresh}
         />
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -516,25 +657,60 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
   }
 
   return (
-    <Card title={`${t('medical.scans')} / ${t('medical.labs')}`}>
-      {scans.map((s) => (
-        <div key={s.id} className="medical-scan-row">
-          <div>
-            <span><strong>{s.category}</strong> · {s.original_filename} · {formatDate(s.created_at, language)}</span>
-            {s.description && <div className="medical-list-meta">{s.description}</div>}
-          </div>
-          <div className="medical-scan-actions">
-            <Button variant="secondary" onClick={() => download(s.id, s.original_filename)}>{t('medical.download')}</Button>
-            <Button variant="danger" onClick={() => handleDelete(s.id, s.original_filename)}>🗑 {t('medical.delete')}</Button>
-          </div>
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{`${t('medical.scans')} / ${t('medical.labs')}`}</h2>
+
+      <h3 className={SECTION_DIVIDER}>{t('medical.uploadedScans')}</h3>
+      {scans.length === 0 ? (
+        <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('medical.noScans')}</p>
+      ) : (
+        <div>
+          {scans.map((s) => (
+            <div key={s.id} className="mb-3 flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 last:mb-0 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-[#0D9488]/10 px-2.5 py-1 text-xs font-semibold text-[#0D9488]">{s.category}</span>
+                  <span className="truncate text-sm font-bold text-slate-800">{s.original_filename}</span>
+                </div>
+                {s.description && <div className="mt-1.5 text-xs text-slate-500">{s.description}</div>}
+                <div className="mt-1.5 text-xs text-slate-400">{formatDate(s.created_at, language)}</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button type="button" onClick={() => download(s.id, s.original_filename)} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#0D9488]/30 bg-[#0D9488]/5 px-3.5 text-xs font-semibold text-[#0D9488] transition-colors hover:bg-[#0D9488]/10">
+                  {t('medical.download')}
+                </button>
+                <button type="button" onClick={() => handleDelete(s.id, s.original_filename)} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/50 px-3.5 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-100">
+                  🗑 {t('medical.delete')}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
-      {labs.map((l) => (
-        <div key={`l${l.id}`} className="medical-lab-row">
-          <strong>{l.test_name}</strong>: {l.result_value} {l.unit}
+      )}
+
+      <h3 className={SECTION_DIVIDER}>{t('medical.labDocuments')}</h3>
+      {labs.length === 0 ? (
+        <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('medical.noLabs')}</p>
+      ) : (
+        <div>
+          {labs.map((l) => (
+            <div key={l.id} className="mb-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 last:mb-0 sm:p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold text-slate-800">{l.test_name}</span>
+                {l.is_abnormal && (
+                  <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">{t('lab.isAbnormal')}</span>
+                )}
+              </div>
+              <div className="mt-1.5 text-xs font-medium text-slate-600">
+                {[l.result_value, l.unit].filter(Boolean).join(' ')}
+                {l.result_date ? ` · ${formatDate(l.result_date, language)}` : ''}
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
-      <h3 className="medical-section-divider">{t('medical.uploadScan')}</h3>
+      )}
+
+      <h3 className={SECTION_DIVIDER}>{t('medical.uploadScan')}</h3>
       <FormField label={t('medical.category')}>
         {(p) => (
           <Select
@@ -547,13 +723,13 @@ function ScansLabsSection({ patientId }: { patientId: number }) {
       </FormField>
       <FormField label={t('medical.file')} hint={t('medical.fileHint')}>
         {(p) => (
-          <div className="file-input-wrap">
-            <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          </div>
+          <input {...p} type="file" accept=".jpg,.jpeg,.png,.pdf,.dcm,.dicom" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         )}
       </FormField>
-      <Button loading={upload.isPending} disabled={!file} onClick={() => upload.mutate()} className="medical-form-submit medical-upload-submit">{t('medical.uploadScan')}</Button>
-    </Card>
+      <button type="button" disabled={upload.isPending || !file} onClick={() => upload.mutate()} className={`${BTN_PRIMARY} mt-2`}>
+        {upload.isPending && <Spinner size={14} />}{t('medical.uploadScan')}
+      </button>
+    </div>
   )
 }
 
@@ -579,22 +755,23 @@ function ChronicDiagnosesSection({ patientId }: { patientId: number }) {
   }, [encounters])
 
   return (
-    <Card title={t('medical.chronicDiagnoses')}>
+    <div className={CARD}>
+      <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{t('medical.chronicDiagnoses')}</h2>
       {chronic.length === 0 ? (
-        <p>{t('medical.noChronicDiagnoses')}</p>
+        <p className="patient-text-body-secondary mt-2" style={{ color: 'var(--text-secondary)' }}>{t('medical.noChronicDiagnoses')}</p>
       ) : (
-        <ul className="chronic-dx-list">
+        <ul className="mt-2 list-disc space-y-1.5 ps-5 patient-text-body" style={{ color: 'var(--text-primary)' }}>
           {chronic.map(({ d, count }) => (
             <li key={d.id} dir="auto">
               <strong>{language === 'ar' && d.name_ar ? d.name_ar : d.name}</strong>
-              {d.icd10_code && <span className="medical-list-meta"> ({d.icd10_code})</span>}
+              {d.icd10_code && <span className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}> ({d.icd10_code})</span>}
               {' — '}
               {t('medical.encounterCount', { count })}
             </li>
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -640,14 +817,16 @@ export function PatientRecordPage() {
   if (isLoading) return <CenteredSpinner />
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('nav.patients') }]} />
-      <h1>{t('nav.patients')}</h1>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('nav.patients') }]} />
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('nav.patients')}</h1>
+      </div>
 
       {(patients ?? []).length === 0 ? (
-        <Card><p>{t('medical.noPatients')}</p></Card>
+        <div className={CARD}><p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('medical.noPatients')}</p></div>
       ) : (
-        <Card>
+        <div className={CARD}>
           <FormField label={t('medical.selectPatient')}>
             {(p) => (
               <Select
@@ -663,20 +842,24 @@ export function PatientRecordPage() {
               />
             )}
           </FormField>
-        </Card>
+        </div>
       )}
 
       {patientId !== '' && (
         <>
-          <div className="tabs" role="tablist" aria-label={t('nav.patients')}>
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label={t('nav.patients')}>
             {RECORD_TABS.map((tb) => (
               <button
                 key={tb.key}
                 type="button"
                 role="tab"
-                className={`tab${tab === tb.key ? ' tab--active' : ''}`}
                 aria-selected={tab === tb.key}
                 onClick={() => setTab(tb.key)}
+                className={
+                  tab === tb.key
+                    ? 'shrink-0 whitespace-nowrap rounded-xl border border-[#0D9488] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm'
+                    : 'shrink-0 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50'
+                }
               >
                 {tb.key === 'scans' ? `${t('medical.scans')} / ${t('medical.labs')}` : t(tb.labelKey)}
               </button>
@@ -693,9 +876,10 @@ export function PatientRecordPage() {
           <TabPanel active={tab === 'radiology'}><RadiologySection patientId={patientId} /></TabPanel>
           <TabPanel active={tab === 'scans'}><ScansLabsSection patientId={patientId} /></TabPanel>
           <TabPanel active={tab === 'timeline'}>
-            <Card title={t('timeline.title')}>
+            <div className={CARD}>
+              <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('timeline.title')}</h2>
               <PatientTimeline patientId={patientId} />
-            </Card>
+            </div>
           </TabPanel>
         </>
       )}

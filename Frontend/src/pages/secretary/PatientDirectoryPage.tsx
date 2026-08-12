@@ -3,13 +3,16 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
 import { SearchInput } from '../../components/primitives/SearchInput'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { appointmentsApi } from '../../services/appointments.api'
 import type { PatientSummary } from '../../services/types'
 import { PatientProfileEditorModal } from './PatientProfileEditorModal'
 import { RegisterPatientModal } from './RegisterPatientModal'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 sm:text-sm'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488]'
 
 export function PatientDirectoryPage() {
   const { t } = useTranslation()
@@ -24,54 +27,58 @@ export function PatientDirectoryPage() {
   })
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('patients.title') }]} />
-      <div className="page-heading-row">
-        <div>
-          <h1>{t('patients.title')}</h1>
-          <p style={{ color: 'var(--text-muted)' }}>{t('patients.directoryIntro')}</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('patients.title') }]} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('patients.title')}</h1>
+            <p className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{t('patients.directoryIntro')}</p>
+          </div>
+          <button type="button" onClick={() => setRegistering(true)} className={BTN_PRIMARY}>{t('patients.register')}</button>
         </div>
-        <Button onClick={() => setRegistering(true)}>{t('patients.register')}</Button>
       </div>
 
-      <section className="card">
+      <div className={CARD}>
         <SearchInput onSearch={onSearch} placeholder={t('patients.searchPlaceholder')} />
-      </section>
+      </div>
 
-      <section className="card">
+      <div className={CARD}>
         {isLoading ? (
           <CenteredSpinner />
         ) : data.length === 0 ? (
-          <p>{t('patients.none')}</p>
+          <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('patients.none')}</p>
         ) : (
-          <table className="user-table">
-            <thead>
-              <tr>
-                <th>{t('appointments.patient')}</th>
-                <th>{t('auth.phone')}</th>
-                <th>{t('auth.email')}</th>
-                <th>{t('patients.dateOfBirth')}</th>
-                <th>{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((patient) => (
-                <tr key={patient.id}>
-                  <td>{patient.full_name}</td>
-                  <td>{patient.phone || t('common.none')}</td>
-                  <td>{patient.email || t('patients.noEmailShort')}</td>
-                  <td>{patient.date_of_birth || t('common.none')}</td>
-                  <td>
-                    <Button variant="secondary" onClick={() => setEditing(patient)}>
-                      {t('patients.editProfile')}
-                    </Button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b-2 border-slate-100">
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('appointments.patient')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('auth.phone')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('auth.email')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('patients.dateOfBirth')}</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.map((patient) => (
+                  <tr key={patient.id} className="border-b border-slate-100">
+                    <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--text-primary)' }}>{patient.full_name}</td>
+                    <td className="px-3 py-2.5 patient-text-body" style={{ color: 'var(--text-secondary)' }}>{patient.phone || t('common.none')}</td>
+                    <td className="px-3 py-2.5 patient-text-body" style={{ color: 'var(--text-secondary)' }}>{patient.email || t('patients.noEmailShort')}</td>
+                    <td className="px-3 py-2.5 patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{patient.date_of_birth || t('common.none')}</td>
+                    <td className="px-3 py-2.5">
+                      <button type="button" onClick={() => setEditing(patient)} className={BTN_SECONDARY_SM}>
+                        {t('patients.editProfile')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </section>
+      </div>
 
       {editing && (
         <PatientProfileEditorModal

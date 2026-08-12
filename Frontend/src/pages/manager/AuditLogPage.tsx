@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Card } from '../../components/primitives/Card'
 import { FormField } from '../../components/primitives/FormField'
 import { SearchInput } from '../../components/primitives/SearchInput'
 import { Select } from '../../components/primitives/Select'
@@ -26,6 +25,14 @@ interface AuditEntry {
 }
 
 const ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'ACCESS']
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+
+const CHECKLIST_LINE_STYLE: Record<string, string> = {
+  added: 'text-sky-600',
+  removed: 'text-rose-500 line-through',
+  completed: 'text-emerald-600',
+  unchecked: 'text-amber-600',
+}
 
 // "room_number" -> "Room Number" — the backend diff stores raw Python field names.
 function humanizeField(field: string): string {
@@ -110,11 +117,11 @@ export function AuditLogPage() {
   // different rendering.
   const renderComplexSide = (value: unknown) => {
     if (Array.isArray(value)) {
-      if (value.length === 0) return <span className="audit-diff-item__old">{t('common.none')}</span>
-      return <ul>{value.map((v, i) => <li key={i}>{formatGenericItem(v)}</li>)}</ul>
+      if (value.length === 0) return <span className="text-slate-400">{t('common.none')}</span>
+      return <ul className="list-disc space-y-0.5 ps-4">{value.map((v, i) => <li key={i}>{formatGenericItem(v)}</li>)}</ul>
     }
     if (typeof value === 'object' && value !== null) {
-      return <ul><li>{formatGenericItem(value)}</li></ul>
+      return <ul className="list-disc space-y-0.5 ps-4"><li>{formatGenericItem(value)}</li></ul>
     }
     return <span>{formatDiffValue(value)}</span>
   }
@@ -132,16 +139,18 @@ export function AuditLogPage() {
   const rows = data?.results ?? []
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('audit.title') }]} />
-      <h1>{t('audit.title')}</h1>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('audit.title') }]} />
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('audit.title')}</h1>
+      </div>
 
-      <Card>
-        <div className="filter-bar">
-          <div className="filter-bar__field audit-filter__search">
+      <div className={CARD}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="flex-1">
             <SearchInput onSearch={setSearch} placeholder={t('audit.searchPlaceholder')} />
           </div>
-          <div className="filter-bar__field">
+          <div className="w-full sm:w-56">
             <FormField label={t('audit.filterAction')}>
               {(p) => (
                 <Select
@@ -157,84 +166,86 @@ export function AuditLogPage() {
             </FormField>
           </div>
         </div>
-      </Card>
+      </div>
 
       {isLoading ? (
         <CenteredSpinner />
       ) : rows.length === 0 ? (
-        <Card><p>{t('audit.none')}</p></Card>
+        <div className={CARD}><p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('audit.none')}</p></div>
       ) : (
-        rows.map((e) => (
-          <Card key={e.id}>
-            <div className="audit-card__header">
-              <strong className="audit-card__title">{e.action_display} · {e.model_name}</strong>
-              <span className="audit-card__time">{formatDateTime(e.timestamp, language)}</span>
-            </div>
-            <div className="audit-card__meta">
-              {t('audit.actor')}: <span className="audit-card__meta-value">{e.actor_email ?? t('common.none')}</span>
-              {' · '}
-              {t('audit.object')}: <span className="audit-card__meta-value">{e.object_repr}</span>
-            </div>
-            {Object.keys(e.changes || {}).length > 0 && (
-              <div className="audit-changes">
-                <h4 className="audit-changes__heading">{t('audit.changes')}</h4>
-                {Object.entries(e.changes).map(([field, diff]) => {
-                  if (isChecklistArray(diff.old) || isChecklistArray(diff.new)) {
-                    const lines = diffChecklist(
-                      Array.isArray(diff.old) ? (diff.old as ChecklistStep[]) : [],
-                      Array.isArray(diff.new) ? (diff.new as ChecklistStep[]) : [],
-                    )
-                    return (
-                      <div key={field} className="audit-diff-item audit-diff-item--list">
-                        <span className="audit-diff-item__field">{humanizeField(field)}</span>
-                        {lines.length === 0 ? (
-                          <span className="audit-diff-item__note">{t('audit.checklistNoStepChange')}</span>
-                        ) : (
-                          <ul className="audit-diff-checklist">
-                            {lines.map((line, i) => (
-                              <li key={i} className={`audit-diff-checklist__line audit-diff-checklist__line--${line.type}`}>
-                                {t(`audit.checklist${line.type.charAt(0).toUpperCase()}${line.type.slice(1)}`, { step: line.step })}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )
-                  }
+        <div className="flex flex-col gap-3">
+          {rows.map((e) => (
+            <div key={e.id} className={CARD}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <strong className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{e.action_display} · {e.model_name}</strong>
+                <span className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{formatDateTime(e.timestamp, language)}</span>
+              </div>
+              <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>
+                {t('audit.actor')}: <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{e.actor_email ?? t('common.none')}</span>
+                {' · '}
+                {t('audit.object')}: <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{e.object_repr}</span>
+              </div>
+              {Object.keys(e.changes || {}).length > 0 && (
+                <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3">
+                  <h4 className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{t('audit.changes')}</h4>
+                  {Object.entries(e.changes).map(([field, diff]) => {
+                    if (isChecklistArray(diff.old) || isChecklistArray(diff.new)) {
+                      const lines = diffChecklist(
+                        Array.isArray(diff.old) ? (diff.old as ChecklistStep[]) : [],
+                        Array.isArray(diff.new) ? (diff.new as ChecklistStep[]) : [],
+                      )
+                      return (
+                        <div key={field} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                          <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{humanizeField(field)}</span>
+                          {lines.length === 0 ? (
+                            <span className="patient-text-body-secondary ms-2" style={{ color: 'var(--text-muted)' }}>{t('audit.checklistNoStepChange')}</span>
+                          ) : (
+                            <ul className="mt-1.5 flex flex-col gap-1">
+                              {lines.map((line, i) => (
+                                <li key={i} className={`patient-text-body-secondary text-xs ${CHECKLIST_LINE_STYLE[line.type]}`}>
+                                  {t(`audit.checklist${line.type.charAt(0).toUpperCase()}${line.type.slice(1)}`, { step: line.step })}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )
+                    }
 
-                  const isComplex = Array.isArray(diff.old) || Array.isArray(diff.new)
-                    || (typeof diff.old === 'object' && diff.old !== null) || (typeof diff.new === 'object' && diff.new !== null)
-                  if (isComplex) {
-                    return (
-                      <div key={field} className="audit-diff-item audit-diff-item--list">
-                        <span className="audit-diff-item__field">{humanizeField(field)}</span>
-                        <div className="audit-diff-generic">
-                          <div className="audit-diff-generic__col">
-                            <span className="audit-diff-generic__label">{t('audit.before')}</span>
-                            {renderComplexSide(diff.old)}
-                          </div>
-                          <div className="audit-diff-generic__col">
-                            <span className="audit-diff-generic__label">{t('audit.after')}</span>
-                            {renderComplexSide(diff.new)}
+                    const isComplex = Array.isArray(diff.old) || Array.isArray(diff.new)
+                      || (typeof diff.old === 'object' && diff.old !== null) || (typeof diff.new === 'object' && diff.new !== null)
+                    if (isComplex) {
+                      return (
+                        <div key={field} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                          <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{humanizeField(field)}</span>
+                          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                              <span className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{t('audit.before')}</span>
+                              <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{renderComplexSide(diff.old)}</div>
+                            </div>
+                            <div>
+                              <span className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{t('audit.after')}</span>
+                              <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{renderComplexSide(diff.new)}</div>
+                            </div>
                           </div>
                         </div>
+                      )
+                    }
+
+                    return (
+                      <div key={field} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3 patient-text-body-secondary">
+                        <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{humanizeField(field)}</span>
+                        <span className="text-slate-400 line-through">{formatDiffValue(diff.old)}</span>
+                        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>→</span>
+                        <span className="font-semibold" style={{ color: 'var(--brand-teal-start)' }}>{formatDiffValue(diff.new)}</span>
                       </div>
                     )
-                  }
-
-                  return (
-                    <div key={field} className="audit-diff-item">
-                      <span className="audit-diff-item__field">{humanizeField(field)}</span>
-                      <span className="audit-diff-item__old">{formatDiffValue(diff.old)}</span>
-                      <span className="audit-diff-item__arrow">→</span>
-                      <span className="audit-diff-item__new">{formatDiffValue(diff.new)}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </Card>
-        ))
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { billingApi } from '../../services/billing.api'
-import { Button } from '../primitives/Button'
 import { Modal } from '../primitives/Modal'
 import { CenteredSpinner } from '../primitives/Spinner'
 import { InvoiceViewer } from './InvoiceViewer'
+
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] sm:text-sm'
 
 interface InvoiceViewModalProps {
   invoiceId: number
@@ -24,8 +25,8 @@ export function InvoiceViewModal({ invoiceId, onClose }: InvoiceViewModalProps) 
   return (
     <Modal title={t('billing.invoiceTitle')} onClose={onClose} wide>
       {invoice ? <InvoiceViewer invoice={invoice} /> : <CenteredSpinner />}
-      <div className="modal__actions">
-        <Button variant="secondary" onClick={onClose}>{t('common.close')}</Button>
+      <div className="mt-4 flex justify-end gap-3">
+        <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('common.close')}</button>
       </div>
     </Modal>
   )

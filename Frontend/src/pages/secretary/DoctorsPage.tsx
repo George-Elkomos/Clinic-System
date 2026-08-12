@@ -4,14 +4,16 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { FormField } from '../../components/primitives/FormField'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { errorMessage } from '../../services/apiClient'
 import { doctorsApi } from '../../services/doctors.api'
 import type { Doctor } from '../../services/types'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
 
 function DoctorEditor({ doctor }: { doctor: Doctor }) {
   const { t } = useTranslation()
@@ -32,30 +34,33 @@ function DoctorEditor({ doctor }: { doctor: Doctor }) {
   })
 
   return (
-    <Card title={`${doctor.full_name} · ${doctor.specialties_detail.map((s) => s.name).join(', ')}`}>
-      <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 160 }}>
-          <FormField label={t('doctors.room')}>
-            {(p) => <input {...p} value={room} onChange={(e) => setRoom(e.target.value)} />}
-          </FormField>
-        </div>
-        <div style={{ flex: 2, minWidth: 220 }}>
+    <div className={CARD}>
+      <h2 className="patient-text-card-title mb-4" style={{ color: 'var(--text-primary)' }}>
+        {doctor.full_name} · {doctor.specialties_detail.map((s) => s.name).join(', ')}
+      </h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <FormField label={t('doctors.room')}>
+          {(p) => <input {...p} className="patient-field" value={room} onChange={(e) => setRoom(e.target.value)} />}
+        </FormField>
+        <div className="sm:col-span-2">
           <FormField label={t('doctors.bio')}>
-            {(p) => <input {...p} value={bio} onChange={(e) => setBio(e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" value={bio} onChange={(e) => setBio(e.target.value)} />}
           </FormField>
         </div>
       </div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-        <input type="checkbox" style={{ width: 'auto', minHeight: 'auto' }} checked={accepting} onChange={(e) => setAccepting(e.target.checked)} />
+      <label className="patient-text-body mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+        <input type="checkbox" checked={accepting} onChange={(e) => setAccepting(e.target.checked)} />
         {t('doctors.acceptingPatients')}
       </label>
-      <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
-        <Button loading={save.isPending} onClick={() => save.mutate()}>{t('common.save')}</Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" disabled={save.isPending} onClick={() => save.mutate()} className={BTN_PRIMARY}>
+          {save.isPending && <Spinner size={14} />}{t('common.save')}
+        </button>
         <Link to={`/kiosk/${doctor.id}`} target="_blank" rel="noopener noreferrer">
-          <Button variant="secondary" type="button">📺 {t('doctors.openKiosk')}</Button>
+          <button type="button" className={BTN_SECONDARY}>📺 {t('doctors.openKiosk')}</button>
         </Link>
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -67,13 +72,17 @@ export function DoctorsPage() {
   })
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('nav.doctors') }]} />
-      <h1>{t('nav.doctors')}</h1>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('nav.doctors') }]} />
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('nav.doctors')}</h1>
+      </div>
       {isLoading ? (
         <CenteredSpinner />
       ) : (
-        (data?.results ?? []).map((d) => <DoctorEditor key={d.id} doctor={d} />)
+        <div className="flex flex-col gap-4">
+          {(data?.results ?? []).map((d) => <DoctorEditor key={d.id} doctor={d} />)}
+        </div>
       )}
     </div>
   )

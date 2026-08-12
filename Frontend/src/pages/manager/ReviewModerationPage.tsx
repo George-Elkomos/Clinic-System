@@ -2,8 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { StarRating } from '../../components/primitives/StarRating'
@@ -12,6 +10,10 @@ import { useLanguage } from '../../hooks/useLanguage'
 import { formatDate } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { reviewsApi } from '../../services/reviews.api'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488]'
+const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100'
 
 export function ReviewModerationPage() {
   const { t } = useTranslation()
@@ -38,31 +40,35 @@ export function ReviewModerationPage() {
   }
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('reviews.moderation') }]} />
-      <h1>{t('reviews.moderation')}</h1>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('reviews.moderation') }]} />
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('reviews.moderation')}</h1>
+      </div>
       {isLoading ? (
         <CenteredSpinner />
       ) : reviews.length === 0 ? (
-        <Card><p>{t('reviews.none')}</p></Card>
+        <div className={CARD}><p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('reviews.none')}</p></div>
       ) : (
-        reviews.map((r) => (
-          <Card key={r.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-              <div>
-                <StarRating value={r.rating} readOnly />
-                <div style={{ color: 'var(--text-muted)' }}>
-                  {r.doctor_name} · {r.patient_name} · {formatDate(r.created_at, language)}
-                  {r.is_hidden ? ` · ${t('reviews.hidden')}` : ''}
+        <div className="flex flex-col gap-3">
+          {reviews.map((r) => (
+            <div key={r.id} className={CARD}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <StarRating value={r.rating} readOnly />
+                  <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    {r.doctor_name} · {r.patient_name} · {formatDate(r.created_at, language)}
+                    {r.is_hidden ? ` · ${t('reviews.hidden')}` : ''}
+                  </div>
                 </div>
+                {r.is_hidden
+                  ? <button type="button" onClick={() => unhide.mutate(r.id)} className={BTN_SECONDARY}>{t('reviews.unhide')}</button>
+                  : <button type="button" onClick={() => onHide(r.id)} className={BTN_DANGER}>{t('reviews.hide')}</button>}
               </div>
-              {r.is_hidden
-                ? <Button variant="secondary" onClick={() => unhide.mutate(r.id)}>{t('reviews.unhide')}</Button>
-                : <Button variant="danger" onClick={() => onHide(r.id)}>{t('reviews.hide')}</Button>}
+              {r.comment && <p className="patient-text-body mt-2" style={{ color: 'var(--text-primary)' }}>{r.comment}</p>}
             </div>
-            {r.comment && <p style={{ marginTop: 'var(--space-2)' }}>{r.comment}</p>}
-          </Card>
-        ))
+          ))}
+        </div>
       )}
     </div>
   )

@@ -2,12 +2,15 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
-import { Button } from '../primitives/Button'
 import { FormField } from '../primitives/FormField'
+import { Spinner } from '../primitives/Spinner'
 import { useToast } from '../primitives/Toast'
 import { errorMessage } from '../../services/apiClient'
 import { vitalsApi } from '../../services/vitals.api'
 import type { CreateVitalSignsPayload, VitalSigns } from '../../services/types'
+
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
 
 interface VitalSignsFormProps {
   patientId: number
@@ -139,78 +142,70 @@ export function VitalSignsForm({ patientId, appointmentId, initial, onSuccess, o
   return (
     <div>
       {Object.keys(errors).length > 0 && (
-        <div role="alert" style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-          marginBottom: 'var(--space-4)',
-          padding: 'var(--space-3) var(--space-4)',
-          background: 'color-mix(in srgb, var(--danger) 8%, var(--bg))',
-          border: '1px solid var(--danger)',
-          borderRadius: 'var(--radius)',
-          color: 'var(--danger)', fontSize: 'var(--font-small)',
-        }}>
+        <div role="alert" className="mb-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           <span aria-hidden="true">⚠</span>
           {t('vitals.formErrors')}
         </div>
       )}
-      <div className="vitals-form__row">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('vitals.bpSystolic')} error={errors.bp_systolic}>
-          {(p) => <input {...p} type="number" value={form.bp_systolic} onChange={set('bp_systolic')} min={60} max={250} />}
+          {(p) => <input {...p} className="patient-field" type="number" value={form.bp_systolic} onChange={set('bp_systolic')} min={60} max={250} />}
         </FormField>
         <FormField label={t('vitals.bpDiastolic')} error={errors.bp_diastolic}>
-          {(p) => <input {...p} type="number" value={form.bp_diastolic} onChange={set('bp_diastolic')} min={30} max={150} />}
+          {(p) => <input {...p} className="patient-field" type="number" value={form.bp_diastolic} onChange={set('bp_diastolic')} min={30} max={150} />}
         </FormField>
       </div>
 
-      <div className="vitals-form__row">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('vitals.heartRate')} error={errors.heart_rate}>
-          {(p) => <input {...p} type="number" value={form.heart_rate} onChange={set('heart_rate')} min={20} max={300} />}
+          {(p) => <input {...p} className="patient-field" type="number" value={form.heart_rate} onChange={set('heart_rate')} min={20} max={300} />}
         </FormField>
         <FormField label={t('vitals.temperature')} error={errors.temperature}>
-          {(p) => <input {...p} type="number" step="0.1" value={form.temperature} onChange={set('temperature')} min={30} max={45} />}
+          {(p) => <input {...p} className="patient-field" type="number" step="0.1" value={form.temperature} onChange={set('temperature')} min={30} max={45} />}
         </FormField>
       </div>
 
-      <div className="vitals-form__row">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('vitals.respiratoryRate')} error={errors.respiratory_rate}>
-          {(p) => <input {...p} type="number" value={form.respiratory_rate} onChange={set('respiratory_rate')} min={5} max={60} />}
+          {(p) => <input {...p} className="patient-field" type="number" value={form.respiratory_rate} onChange={set('respiratory_rate')} min={5} max={60} />}
         </FormField>
         <FormField label={t('vitals.oxygenSaturation')} error={errors.oxygen_saturation}>
-          {(p) => <input {...p} type="number" value={form.oxygen_saturation} onChange={set('oxygen_saturation')} min={70} max={100} />}
+          {(p) => <input {...p} className="patient-field" type="number" value={form.oxygen_saturation} onChange={set('oxygen_saturation')} min={70} max={100} />}
         </FormField>
       </div>
 
-      <div className="vitals-form__row">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('vitals.weight')} error={errors.weight}>
-          {(p) => <input {...p} type="number" step="0.1" value={form.weight} onChange={set('weight')} min={0.5} max={500} />}
+          {(p) => <input {...p} className="patient-field" type="number" step="0.1" value={form.weight} onChange={set('weight')} min={0.5} max={500} />}
         </FormField>
         <FormField label={t('vitals.height')} error={errors.height}>
-          {(p) => <input {...p} type="number" value={form.height} onChange={set('height')} min={20} max={300} />}
+          {(p) => <input {...p} className="patient-field" type="number" value={form.height} onChange={set('height')} min={20} max={300} />}
         </FormField>
       </div>
 
-      <div className="vitals-form__bmi">
-        <span className="vitals-form__bmi-label">{t('vitals.bmi')}:</span>
-        <span className="vitals-form__bmi-value">{bmi ?? '—'}</span>
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-small)' }}>({t('vitals.bmiAuto')})</span>
+      <div className="mb-4 flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-2.5">
+        <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{t('vitals.bmi')}:</span>
+        <span className="patient-text-body font-bold" style={{ color: 'var(--brand-teal-start)' }}>{bmi ?? '—'}</span>
+        <span className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>({t('vitals.bmiAuto')})</span>
       </div>
 
       <FormField label={t('vitals.bloodGlucoseOptional')} error={errors.blood_glucose}>
-        {(p) => <input {...p} type="number" value={form.blood_glucose} onChange={set('blood_glucose')} min={20} max={600} />}
+        {(p) => <input {...p} className="patient-field" type="number" value={form.blood_glucose} onChange={set('blood_glucose')} min={20} max={600} />}
       </FormField>
 
       <FormField label={t('vitals.notes')}>
-        {(p) => <textarea {...p} rows={2} value={form.notes} onChange={set('notes')} placeholder={t('vitals.notesPlaceholder')} />}
+        {(p) => <textarea {...p} className="patient-field" rows={2} value={form.notes} onChange={set('notes')} placeholder={t('vitals.notesPlaceholder')} />}
       </FormField>
 
-      <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 'var(--space-4)' }}>
+      <div className="mt-4 flex flex-wrap justify-end gap-3">
         {onCancel && (
-          <Button variant="secondary" onClick={onCancel} disabled={pending}>
+          <button type="button" disabled={pending} onClick={onCancel} className={BTN_SECONDARY}>
             {t('common.cancel')}
-          </Button>
+          </button>
         )}
-        <Button loading={pending} onClick={handleSubmit}>
-          {t('common.save')}
-        </Button>
+        <button type="button" disabled={pending} onClick={handleSubmit} className={BTN_PRIMARY}>
+          {pending && <Spinner size={14} />}{t('common.save')}
+        </button>
       </div>
     </div>
   )

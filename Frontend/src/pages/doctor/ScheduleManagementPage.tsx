@@ -3,15 +3,17 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { errorMessage } from '../../services/apiClient'
 import { doctorsApi } from '../../services/doctors.api'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -62,12 +64,15 @@ export function ScheduleManagementPage() {
   }
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('schedule.title') }]} />
-      <h1>{t('schedule.title')}</h1>
-      <p>{t('schedule.intro')}</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('schedule.title') }]} />
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('schedule.title')}</h1>
+        <p className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{t('schedule.intro')}</p>
+      </div>
 
-      <Card title={t('schedule.add')}>
+      <div className={CARD}>
+        <h2 className="patient-text-card-title mb-4" style={{ color: 'var(--text-primary)' }}>{t('schedule.add')}</h2>
         <FormField label={t('schedule.weekday')}>
           {(p) => (
             <Select
@@ -78,44 +83,42 @@ export function ScheduleManagementPage() {
             />
           )}
         </FormField>
-        <div className="schedule-time-row">
-          <div className="schedule-time-field">
-            <FormField label={t('schedule.startTime')}>
-              {(p) => <input {...p} type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />}
-            </FormField>
-          </div>
-          <div className="schedule-time-field">
-            <FormField label={t('schedule.endTime')}>
-              {(p) => <input {...p} type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />}
-            </FormField>
-          </div>
-          <div className="schedule-time-field">
-            <FormField label={t('schedule.slotDuration')}>
-              {(p) => <input {...p} type="number" min={5} step={5} value={slotDuration} onChange={(e) => setSlotDuration(Number(e.target.value))} />}
-            </FormField>
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <FormField label={t('schedule.startTime')}>
+            {(p) => <input {...p} className="patient-field" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />}
+          </FormField>
+          <FormField label={t('schedule.endTime')}>
+            {(p) => <input {...p} className="patient-field" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />}
+          </FormField>
+          <FormField label={t('schedule.slotDuration')}>
+            {(p) => <input {...p} className="patient-field" type="number" min={5} step={5} value={slotDuration} onChange={(e) => setSlotDuration(Number(e.target.value))} />}
+          </FormField>
         </div>
-        <Button loading={create.isPending} onClick={() => create.mutate()} className="schedule-submit-btn">
+        <button type="button" disabled={create.isPending} onClick={() => create.mutate()} className={`${BTN_PRIMARY} mt-4`}>
+          {create.isPending && <Spinner size={14} />}
           {create.isPending ? t('schedule.adding') : t('schedule.add')}
-        </Button>
-      </Card>
+        </button>
+      </div>
 
-      <Card title={t('schedule.title')}>
+      <div className={CARD}>
+        <h2 className="patient-text-card-title mb-4" style={{ color: 'var(--text-primary)' }}>{t('schedule.title')}</h2>
         {isLoading ? (
           <CenteredSpinner />
         ) : (schedules ?? []).length === 0 ? (
-          <p>{t('schedule.none')}</p>
+          <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('schedule.none')}</p>
         ) : (
-          (schedules ?? []).map((s) => (
-            <div key={s.id} className="schedule-row">
-              <span>
-                <strong>{t(`schedule.days.${s.weekday}`)}</strong> · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
-              </span>
-              <Button variant="danger" onClick={() => onRemove(s.id)}>{t('schedule.remove')}</Button>
-            </div>
-          ))
+          <div className="flex flex-col divide-y divide-slate-100">
+            {(schedules ?? []).map((s) => (
+              <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <span className="patient-text-body" style={{ color: 'var(--text-primary)' }}>
+                  <strong>{t(`schedule.days.${s.weekday}`)}</strong> · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
+                </span>
+                <button type="button" onClick={() => onRemove(s.id)} className={BTN_DANGER}>{t('schedule.remove')}</button>
+              </div>
+            ))}
+          </div>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

@@ -6,11 +6,13 @@ import { useLanguage } from '../../hooks/useLanguage'
 import { formatMoney } from '../../lib/format'
 import { billingApi } from '../../services/billing.api'
 import type { AppointmentBilling } from '../../services/types'
-import { Button } from '../primitives/Button'
 import { Modal } from '../primitives/Modal'
 import { CenteredSpinner } from '../primitives/Spinner'
 import { InvoiceViewer } from './InvoiceViewer'
 import { printInvoice } from './print'
+
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] sm:text-sm'
 
 interface InvoiceGeneratedModalProps {
   billing: AppointmentBilling
@@ -45,8 +47,8 @@ export function InvoiceGeneratedModal({ billing, onClose }: InvoiceGeneratedModa
     return (
       <Modal title={t('billing.visitCompleted')} onClose={onClose}>
         <p>{t('billing.freeFollowupUsed')}</p>
-        <div className="modal__actions">
-          <Button onClick={onClose}>{t('common.done')}</Button>
+        <div className="mt-4 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className={BTN_PRIMARY}>{t('common.done')}</button>
         </div>
       </Modal>
     )
@@ -65,22 +67,24 @@ export function InvoiceGeneratedModal({ billing, onClose }: InvoiceGeneratedModa
 
       {showInvoice && (invoice ? <InvoiceViewer invoice={invoice} /> : <CenteredSpinner />)}
 
-      <div className="modal__actions">
-        <Button variant="secondary" onClick={onClose}>{t('common.close')}</Button>
+      <div className="mt-4 flex flex-wrap justify-end gap-3">
+        <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('common.close')}</button>
         {!showInvoice && (
-          <Button variant="secondary" onClick={() => setShowInvoice(true)}>
+          <button type="button" onClick={() => setShowInvoice(true)} className={BTN_SECONDARY}>
             {t('billing.viewInvoice')}
-          </Button>
+          </button>
         )}
-        <Button
+        <button
+          type="button"
           onClick={() => {
             setShowInvoice(true)
             if (invoice) printInvoice()
             else printPending.current = true
           }}
+          className={BTN_PRIMARY}
         >
           {t('billing.printReceipt')}
-        </Button>
+        </button>
       </div>
     </Modal>
   )

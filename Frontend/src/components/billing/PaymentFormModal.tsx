@@ -7,13 +7,15 @@ import { formatMoney } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { billingApi } from '../../services/billing.api'
 import type { Invoice, PaymentMethod } from '../../services/types'
-import { Button } from '../primitives/Button'
 import { FormField } from '../primitives/FormField'
 import { Modal } from '../primitives/Modal'
 import { Select } from '../primitives/Select'
+import { Spinner } from '../primitives/Spinner'
 import { useToast } from '../primitives/Toast'
 
 const METHODS: PaymentMethod[] = ['CASH', 'CARD', 'BANK_TRANSFER']
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
 
 interface PaymentFormModalProps {
   invoice: Invoice
@@ -52,7 +54,7 @@ export function PaymentFormModal({ invoice, onClose }: PaymentFormModalProps) {
 
   return (
     <Modal title={t('billing.recordPayment')} onClose={onClose}>
-      <p style={{ marginTop: 0 }}>
+      <p className="patient-text-body mt-0" style={{ color: 'var(--text-primary)' }}>
         {invoice.number} · {invoice.patient_name}
         <br />
         <span style={{ color: 'var(--text-muted)' }}>
@@ -69,6 +71,7 @@ export function PaymentFormModal({ invoice, onClose }: PaymentFormModalProps) {
           {(p) => (
             <input
               {...p}
+              className="patient-field"
               type="number"
               min="0.01"
               step="0.01"
@@ -89,11 +92,13 @@ export function PaymentFormModal({ invoice, onClose }: PaymentFormModalProps) {
           )}
         </FormField>
         <FormField label={t('billing.reference')} hint={t('billing.referenceHint')}>
-          {(p) => <input {...p} value={reference} onChange={(e) => setReference(e.target.value)} />}
+          {(p) => <input {...p} className="patient-field" value={reference} onChange={(e) => setReference(e.target.value)} />}
         </FormField>
-        <div className="modal__actions">
-          <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="submit" loading={record.isPending}>{t('billing.recordPayment')}</Button>
+        <div className="mt-4 flex flex-wrap justify-end gap-3">
+          <button type="button" onClick={onClose} className={BTN_SECONDARY}>{t('common.cancel')}</button>
+          <button type="submit" disabled={record.isPending} className={BTN_PRIMARY}>
+            {record.isPending && <Spinner size={14} />}{t('billing.recordPayment')}
+          </button>
         </div>
       </form>
     </Modal>

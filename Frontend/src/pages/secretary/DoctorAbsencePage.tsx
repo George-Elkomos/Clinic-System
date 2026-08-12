@@ -3,13 +3,11 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
-import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatDate } from '../../lib/format'
@@ -17,6 +15,9 @@ import { errorMessage } from '../../services/apiClient'
 import { doctorsApi } from '../../services/doctors.api'
 
 const TYPES = ['VACATION', 'SICK', 'CONFERENCE', 'BLOCKED_DATE', 'OTHER']
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -62,12 +63,15 @@ export function DoctorAbsencePage() {
   }
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('absence.title') }]} />
-      <h1>{t('absence.title')}</h1>
-      <p>{t('absence.intro')}</p>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('absence.title') }]} />
+        <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('absence.title')}</h1>
+        <p className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{t('absence.intro')}</p>
+      </div>
 
-      <Card title={t('absence.create')}>
+      <div className={CARD}>
+        <h2 className="patient-text-card-title mb-4" style={{ color: 'var(--text-primary)' }}>{t('absence.create')}</h2>
         <FormField label={t('absence.doctor')}>
           {(p) => (
             <Select
@@ -80,46 +84,48 @@ export function DoctorAbsencePage() {
             />
           )}
         </FormField>
-        <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 150 }}>
-            <FormField label={t('absence.startDate')}>
-              {(p) => <CustomDatePicker {...p} variant="field" allowClear={false} value={startDate} onChange={setStartDate} />}
-            </FormField>
-          </div>
-          <div style={{ flex: 1, minWidth: 150 }}>
-            <FormField label={t('absence.endDate')}>
-              {(p) => <CustomDatePicker {...p} variant="field" allowClear={false} value={endDate} onChange={setEndDate} />}
-            </FormField>
-          </div>
-          <div style={{ flex: 1, minWidth: 150 }}>
-            <FormField label={t('absence.type')}>
-              {(p) => (
-                <Select
-                  id={p.id}
-                  options={TYPES.map((ty) => ({ value: ty, label: t(`absence.types.${ty}`) }))}
-                  value={absenceType}
-                  onChange={(v) => setAbsenceType(Array.isArray(v) ? 'VACATION' : String(v))}
-                />
-              )}
-            </FormField>
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <FormField label={t('absence.startDate')}>
+            {(p) => <CustomDatePicker {...p} variant="field" allowClear={false} value={startDate} onChange={setStartDate} />}
+          </FormField>
+          <FormField label={t('absence.endDate')}>
+            {(p) => <CustomDatePicker {...p} variant="field" allowClear={false} value={endDate} onChange={setEndDate} />}
+          </FormField>
+          <FormField label={t('absence.type')}>
+            {(p) => (
+              <Select
+                id={p.id}
+                options={TYPES.map((ty) => ({ value: ty, label: t(`absence.types.${ty}`) }))}
+                value={absenceType}
+                onChange={(v) => setAbsenceType(Array.isArray(v) ? 'VACATION' : String(v))}
+              />
+            )}
+          </FormField>
         </div>
         <FormField label={t('absence.reason')}>
-          {(p) => <input {...p} value={reason} onChange={(e) => setReason(e.target.value)} />}
+          {(p) => <input {...p} className="patient-field" value={reason} onChange={(e) => setReason(e.target.value)} />}
         </FormField>
-        <Button loading={create.isPending} disabled={!doctorId} onClick={submit}>{t('absence.create')}</Button>
-      </Card>
+        <button type="button" disabled={create.isPending || !doctorId} onClick={submit} className={BTN_PRIMARY}>
+          {create.isPending && <Spinner size={14} />}{t('absence.create')}
+        </button>
+      </div>
 
-      <Card title={t('absence.title')}>
-        {isLoading ? <CenteredSpinner /> : absences.length === 0 ? <p>{t('absence.none')}</p> : (
-          absences.map((a) => (
-            <div key={a.id} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--surface-2)' }}>
-              <strong>{t(`absence.types.${a.absence_type}`)}</strong> · {formatDate(a.start_date, language)} – {formatDate(a.end_date, language)}
-              {a.reason && <div style={{ color: 'var(--text-muted)' }}>{a.reason}</div>}
-            </div>
-          ))
+      <div className={CARD}>
+        <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('absence.title')}</h2>
+        {isLoading ? <CenteredSpinner /> : absences.length === 0 ? (
+          <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('absence.none')}</p>
+        ) : (
+          <div className="flex flex-col divide-y divide-slate-100">
+            {absences.map((a) => (
+              <div key={a.id} className="py-3">
+                <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{t(`absence.types.${a.absence_type}`)}</span>
+                <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}> · {formatDate(a.start_date, language)} – {formatDate(a.end_date, language)}</span>
+                {a.reason && <div className="patient-text-body-secondary mt-0.5" style={{ color: 'var(--text-muted)' }}>{a.reason}</div>}
+              </div>
+            ))}
+          </div>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

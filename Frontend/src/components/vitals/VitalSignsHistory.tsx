@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { Activity } from 'lucide-react'
 
-import { Button } from '../primitives/Button'
 import { CenteredSpinner } from '../primitives/Spinner'
 import { useToast } from '../primitives/Toast'
 import { useConfirm } from '../primitives/ConfirmDialog'
@@ -12,6 +12,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { vitalsApi } from '../../services/vitals.api'
 import { errorMessage } from '../../services/apiClient'
 import type { VitalSigns } from '../../services/types'
+
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40'
 
 interface VitalSignsHistoryProps {
   patientId: number
@@ -63,13 +65,20 @@ export function VitalSignsHistory({ patientId, readOnly = false }: VitalSignsHis
   }
 
   if (isLoading) return <CenteredSpinner />
-  if (isError) return <p className="vitals-history__empty">{t('vitals.loadError')}</p>
+  if (isError) return <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('vitals.loadError')}</p>
 
   const records = data?.results ?? []
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1
 
   if (records.length === 0 && page === 1) {
-    return <p className="vitals-history__empty">{t('vitals.noHistory')}</p>
+    return (
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-slate-50/60 p-8 text-center">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0D9488]/10 text-[#0D9488]">
+          <Activity className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <span className="text-sm font-medium text-slate-500">{t('vitals.noHistory')}</span>
+      </div>
+    )
   }
 
   return (
@@ -77,7 +86,7 @@ export function VitalSignsHistory({ patientId, readOnly = false }: VitalSignsHis
       {records.map((record) => (
         <div key={record.id}>
           {editing?.id === record.id ? (
-            <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+            <div className="mb-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 sm:p-5">
               <VitalSignsForm
                 patientId={patientId}
                 initial={record}
@@ -97,14 +106,14 @@ export function VitalSignsHistory({ patientId, readOnly = false }: VitalSignsHis
       ))}
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', justifyContent: 'center', marginTop: 'var(--space-4)' }}>
-          <Button variant="secondary" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-            ‹
-          </Button>
-          <span>{t('vitals.page')} {page} {t('vitals.of')} {totalPages}</span>
-          <Button variant="secondary" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
-            ›
-          </Button>
+        <div className="mt-2 flex items-center justify-center gap-3">
+          <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={BTN_SECONDARY_SM}>
+            {t('vitals.prevPage')}
+          </button>
+          <span className="text-xs font-medium text-slate-500">{t('vitals.page')} {page} {t('vitals.of')} {totalPages}</span>
+          <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={BTN_SECONDARY_SM}>
+            {t('vitals.nextPage')}
+          </button>
         </div>
       )}
     </div>

@@ -1,26 +1,44 @@
 import { useQuery } from '@tanstack/react-query'
+import { AlertCircle, FlaskConical } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
-import { Card } from '../../components/primitives/Card'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
-import { StatusBadge } from '../../components/primitives/StatusBadge'
-import { CriticalResultsWidget } from '../../components/lab/CriticalResultsWidget'
-import { PendingOrdersWidget } from '../../components/lab/PendingOrdersWidget'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatDate } from '../../lib/format'
 import { labOrdersApi } from '../../services/labOrders.api'
-import type { LabOrderStatus } from '../../services/types'
+import type { LabOrderPriority, LabOrderStatus } from '../../services/types'
 
 const PAGE_SIZE = 20
 
 const STATUSES: (LabOrderStatus | '')[] = [
   '', 'DRAFT', 'ORDERED', 'SAMPLE_COLLECTED', 'PROCESSING', 'COMPLETED', 'REVIEWED',
 ]
+
+const LAB_STATUS_BADGE: Record<LabOrderStatus, string> = {
+  DRAFT: 'bg-slate-50 text-slate-500 border-slate-200/60',
+  ORDERED: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  SAMPLE_COLLECTED: 'bg-sky-50 text-sky-700 border-sky-200/60',
+  PROCESSING: 'bg-sky-50 text-sky-700 border-sky-200/60',
+  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+  REVIEWED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+}
+const LAB_PRIORITY_BADGE: Record<LabOrderPriority, string> = {
+  ROUTINE: 'bg-slate-50 text-slate-500 border-slate-200/60',
+  URGENT: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  STAT: 'bg-rose-50 text-rose-700 border-rose-200/60',
+}
+
+function Pill({ text, className }: { text: string; className: string }) {
+  return <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}>{text}</span>
+}
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60'
 
 export function LabOrdersListPage() {
   const { t } = useTranslation()
@@ -37,70 +55,99 @@ export function LabOrdersListPage() {
     retry: 1,
   })
 
+  const { data: pendingOrders } = useQuery({
+    queryKey: ['lab-orders', 'pending-count'],
+    queryFn: () => labOrdersApi.list({ status: 'ORDERED', page_size: 1 }),
+    staleTime: 30_000,
+    retry: 1,
+  })
+  const { data: completedOrders } = useQuery({
+    queryKey: ['lab-orders', 'critical-count'],
+    queryFn: () => labOrdersApi.list({ status: 'COMPLETED', page_size: 1 }),
+    staleTime: 30_000,
+    retry: 1,
+  })
+
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1
 
   return (
-    <div>
-      <Breadcrumbs trail={[{ label: t('lab.title') }]} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-        <h1 style={{ margin: 0 }}>{t('lab.title')}</h1>
-        {user?.role === 'DOCTOR' && (
-          <Button onClick={() => navigate('/doctor/lab-orders/new')}>{t('lab.newOrder')}</Button>
-        )}
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[{ label: t('lab.title') }]} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('lab.title')}</h1>
+          {user?.role === 'DOCTOR' && (
+            <button type="button" onClick={() => navigate('/doctor/lab-orders/new')} className={BTN_PRIMARY}>{t('lab.newOrder')}</button>
+          )}
+        </div>
       </div>
 
-      <div className="lab-kpi-row">
-        <PendingOrdersWidget />
-        <CriticalResultsWidget />
-      </div>
-
-      <Card>
-        <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex items-center justify-between rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm">
           <div>
-            <label style={{ fontWeight: 600, marginBottom: 'var(--space-1)', display: 'block' }}>{t('lab.filterStatus')}</label>
-            <select
-              value={status}
-              onChange={(e) => { setStatus(e.target.value as LabOrderStatus | ''); setPage(1) }}
-              style={{ minHeight: 'var(--tap-min)', padding: '0 var(--space-3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}
-            >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>{s ? t(`status.${s}`) : t('common.none')}</option>
-              ))}
-            </select>
+            <div className="patient-text-body-secondary text-[#94A3B8]">{t('lab.pendingCount')}</div>
+            <div className="mt-1 text-2xl font-extrabold" style={{ color: 'var(--brand-teal-start)' }}>{pendingOrders?.count ?? '—'}</div>
           </div>
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: '#E6F7F7' }}>
+            <FlaskConical className="h-6 w-6" style={{ color: 'var(--brand-teal-start)' }} />
+          </span>
+        </div>
+        <div className="flex items-center justify-between rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm">
+          <div>
+            <div className="patient-text-body-secondary text-[#94A3B8]">{t('lab.criticalCount')}</div>
+            <div className="mt-1 text-2xl font-extrabold" style={{ color: '#EF4444' }}>{completedOrders?.count ?? '—'}</div>
+          </div>
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: '#FEF2F2' }}>
+            <AlertCircle className="h-6 w-6" style={{ color: '#EF4444' }} />
+          </span>
+        </div>
+      </div>
+
+      <div className={CARD}>
+        <div className="mb-4">
+          <label className="patient-text-body mb-1.5 block font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.filterStatus')}</label>
+          <select
+            value={status}
+            onChange={(e) => { setStatus(e.target.value as LabOrderStatus | ''); setPage(1) }}
+            className="patient-field w-full sm:w-64"
+          >
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>{s ? t(`status.${s}`) : t('common.none')}</option>
+            ))}
+          </select>
         </div>
 
         {isLoading ? <CenteredSpinner /> : (data?.results ?? []).length === 0 ? (
-          <p style={{ color: 'var(--text-muted)' }}>{t('lab.noOrders')}</p>
+          <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('lab.noOrders')}</p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-body)' }}>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                  <th style={{ textAlign: 'left', padding: 'var(--space-2) var(--space-3)' }}>{t('lab.orderNumber')}</th>
-                  <th style={{ textAlign: 'left', padding: 'var(--space-2) var(--space-3)' }}>{t('lab.patient')}</th>
-                  <th style={{ textAlign: 'left', padding: 'var(--space-2) var(--space-3)' }}>{t('lab.status')}</th>
-                  <th style={{ textAlign: 'left', padding: 'var(--space-2) var(--space-3)' }}>{t('lab.priority')}</th>
-                  <th style={{ textAlign: 'left', padding: 'var(--space-2) var(--space-3)' }}>{t('appointments.when')}</th>
+                <tr className="border-b-2 border-slate-100">
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.orderNumber')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.status')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.priority')}</th>
+                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('appointments.when')}</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
                 {(data?.results ?? []).map((order) => (
-                  <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: 'var(--space-2) var(--space-3)', fontWeight: 600 }}>
-                      <Link to={`/doctor/lab-orders/${order.id}`} style={{ color: 'var(--primary)' }}>
+                  <tr key={order.id} className="border-b border-slate-100">
+                    <td className="px-3 py-2.5 font-semibold">
+                      <Link to={`/doctor/lab-orders/${order.id}`} className="hover:underline" style={{ color: 'var(--brand-blue-start)' }}>
                         {order.order_number}
                       </Link>
                     </td>
-                    <td style={{ padding: 'var(--space-2) var(--space-3)' }}>{order.patient_name}</td>
-                    <td style={{ padding: 'var(--space-2) var(--space-3)' }}><StatusBadge status={order.status} /></td>
-                    <td style={{ padding: 'var(--space-2) var(--space-3)' }}><StatusBadge status={order.priority} ns="status" /></td>
-                    <td style={{ padding: 'var(--space-2) var(--space-3)', color: 'var(--text-muted)' }}>
+                    <td className="px-3 py-2.5 patient-text-body" style={{ color: 'var(--text-primary)' }}>{order.patient_name}</td>
+                    <td className="px-3 py-2.5"><Pill text={t(`status.${order.status}`)} className={LAB_STATUS_BADGE[order.status] ?? LAB_STATUS_BADGE.DRAFT} /></td>
+                    <td className="px-3 py-2.5"><Pill text={t(`status.${order.priority}`)} className={LAB_PRIORITY_BADGE[order.priority] ?? LAB_PRIORITY_BADGE.ROUTINE} /></td>
+                    <td className="px-3 py-2.5 patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>
                       {formatDate(order.created_at, language)}
                     </td>
-                    <td style={{ padding: 'var(--space-2) var(--space-3)' }}>
-                      <Link to={`/doctor/lab-orders/${order.id}`} className="btn btn--secondary" style={{ minHeight: 'unset', padding: 'var(--space-1) var(--space-3)' }}>
+                    <td className="px-3 py-2.5">
+                      <Link to={`/doctor/lab-orders/${order.id}`} className={BTN_SECONDARY_SM}>
                         {t('common.actions')}
                       </Link>
                     </td>
@@ -112,13 +159,13 @@ export function LabOrdersListPage() {
         )}
 
         {totalPages > 1 && (
-          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', justifyContent: 'center', marginTop: 'var(--space-4)' }}>
-            <Button variant="secondary" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>‹</Button>
-            <span>{t('lab.page')} {page} {t('lab.of')} {totalPages}</span>
-            <Button variant="secondary" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>›</Button>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={BTN_SECONDARY_SM}>‹</button>
+            <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('lab.page')} {page} {t('lab.of')} {totalPages}</span>
+            <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={BTN_SECONDARY_SM}>›</button>
           </div>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

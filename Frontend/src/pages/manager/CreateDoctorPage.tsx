@@ -4,14 +4,19 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Button } from '../../components/primitives/Button'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
+import { Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { errorMessage } from '../../services/apiClient'
 import { doctorsApi } from '../../services/doctors.api'
 import { staffApi } from '../../services/staff.api'
 import type { CreateDoctorResponse } from '../../services/types'
+
+const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1AB5B3] to-[#38E4DD] px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488] disabled:opacity-60 sm:text-sm'
+const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-all hover:border-[#0D9488] hover:text-[#0D9488]'
 
 export function CreateDoctorPage() {
   const { t } = useTranslation()
@@ -51,71 +56,78 @@ export function CreateDoctorPage() {
 
   if (created) {
     return (
-      <div>
-        <Breadcrumbs trail={[
-          { label: t('staff.users'), to: '/manager/users' },
-          { label: t('staff.createDoctor') },
-        ]} />
-        <h1>{t('staff.createDoctor')}</h1>
-        <section className="card">
-          <h2>{created.user.full_name}</h2>
-          <p>{t('staff.doctorCreated')}</p>
+      <div className="flex flex-col gap-6">
+        <div>
+          <Breadcrumbs trail={[
+            { label: t('staff.users'), to: '/manager/users' },
+            { label: t('staff.createDoctor') },
+          ]} />
+          <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>{t('staff.createDoctor')}</h1>
+        </div>
+        <div className={CARD}>
+          <h2 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{created.user.full_name}</h2>
+          <p className="patient-text-body mt-1" style={{ color: 'var(--text-secondary)' }}>{t('staff.doctorCreated')}</p>
           {created.temp_password && (
-            <div className="temp-password-box">
-              <p>{t('staff.tempPasswordNote')}</p>
-              <div className="temp-password-box__code">{created.temp_password}</div>
-              <Button
-                variant="secondary"
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="patient-text-body" style={{ color: 'var(--text-primary)' }}>{t('staff.tempPasswordNote')}</p>
+              <div className="mt-2 rounded-lg bg-white px-3 py-2 text-center font-mono text-lg font-bold" style={{ color: 'var(--brand-teal-start)' }}>
+                {created.temp_password}
+              </div>
+              <button
+                type="button"
                 onClick={() => navigator.clipboard?.writeText(created.temp_password ?? '')}
-                style={{ marginTop: 'var(--space-3)' }}
+                className={`${BTN_SECONDARY_SM} mt-3`}
               >
                 {t('staff.copyPassword')}
-              </Button>
+              </button>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)', flexWrap: 'wrap' }}>
-            <Button onClick={() => navigate('/manager/users')}>{t('staff.backToUsers')}</Button>
-            <Button variant="secondary" onClick={() => setCreated(null)}>{t('staff.createAnotherDoctor')}</Button>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button type="button" onClick={() => navigate('/manager/users')} className={BTN_PRIMARY}>{t('staff.backToUsers')}</button>
+            <button type="button" onClick={() => setCreated(null)} className={BTN_SECONDARY}>{t('staff.createAnotherDoctor')}</button>
           </div>
-        </section>
+        </div>
       </div>
     )
   }
 
   return (
-    <div>
-      <Breadcrumbs trail={[
-        { label: t('staff.users'), to: '/manager/users' },
-        { label: t('staff.createDoctor') },
-      ]} />
-      <h1>{t('staff.createDoctor')}</h1>
+    <div className="flex flex-col gap-6">
+      <div>
+        <Breadcrumbs trail={[
+          { label: t('staff.users'), to: '/manager/users' },
+          { label: t('staff.createDoctor') },
+        ]} />
+        <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>{t('staff.createDoctor')}</h1>
+      </div>
 
       <form
-        className="card"
+        className={CARD}
         onSubmit={(e) => {
           e.preventDefault()
           createDoctor.mutate()
         }}
       >
-        <div className="form-grid">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label={t('auth.firstName')}>
-            {(p) => <input {...p} value={form.first_name} onChange={(e) => update('first_name', e.target.value)} required />}
+            {(p) => <input {...p} className="patient-field" value={form.first_name} onChange={(e) => update('first_name', e.target.value)} required />}
           </FormField>
           <FormField label={t('auth.lastName')}>
-            {(p) => <input {...p} value={form.last_name} onChange={(e) => update('last_name', e.target.value)} required />}
+            {(p) => <input {...p} className="patient-field" value={form.last_name} onChange={(e) => update('last_name', e.target.value)} required />}
           </FormField>
           <FormField label={t('auth.email')}>
             {(p) => (
-              <input {...p} type="email" value={form.email} onChange={(e) => update('email', e.target.value)} required />
+              <input {...p} className="patient-field" type="email" value={form.email} onChange={(e) => update('email', e.target.value)} required />
             )}
           </FormField>
           <FormField label={t('auth.phone')}>
-            {(p) => <input {...p} value={form.phone} onChange={(e) => update('phone', e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" value={form.phone} onChange={(e) => update('phone', e.target.value)} />}
           </FormField>
           <FormField label={t('staff.licenseNumber')}>
             {(p) => (
               <input
                 {...p}
+                className="patient-field"
                 value={form.license_number}
                 onChange={(e) => update('license_number', e.target.value)}
                 required
@@ -123,7 +135,7 @@ export function CreateDoctorPage() {
             )}
           </FormField>
           <FormField label={t('doctors.room')}>
-            {(p) => <input {...p} value={form.room_number} onChange={(e) => update('room_number', e.target.value)} />}
+            {(p) => <input {...p} className="patient-field" value={form.room_number} onChange={(e) => update('room_number', e.target.value)} />}
           </FormField>
         </div>
 
@@ -141,7 +153,7 @@ export function CreateDoctorPage() {
         </FormField>
 
         <FormField label={t('doctors.bio')}>
-          {(p) => <textarea {...p} rows={4} value={form.bio} onChange={(e) => update('bio', e.target.value)} />}
+          {(p) => <textarea {...p} className="patient-field" rows={4} value={form.bio} onChange={(e) => update('bio', e.target.value)} />}
         </FormField>
 
         <FormField label={t('staff.photo')}>
@@ -159,6 +171,7 @@ export function CreateDoctorPage() {
           {(p) => (
             <input
               {...p}
+              className="patient-field"
               type="password"
               value={form.password}
               onChange={(e) => update('password', e.target.value)}
@@ -166,9 +179,11 @@ export function CreateDoctorPage() {
           )}
         </FormField>
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-          <Button type="submit" loading={createDoctor.isPending}>{t('staff.createDoctor')}</Button>
-          <Button variant="secondary" onClick={() => navigate('/manager/users')}>{t('common.cancel')}</Button>
+        <div className="mt-2 flex flex-wrap gap-3">
+          <button type="submit" disabled={createDoctor.isPending} className={BTN_PRIMARY}>
+            {createDoctor.isPending && <Spinner size={14} />}{t('staff.createDoctor')}
+          </button>
+          <button type="button" onClick={() => navigate('/manager/users')} className={BTN_SECONDARY}>{t('common.cancel')}</button>
         </div>
       </form>
     </div>
