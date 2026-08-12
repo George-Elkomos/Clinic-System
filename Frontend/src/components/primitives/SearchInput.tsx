@@ -1,3 +1,4 @@
+import { Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -20,21 +21,31 @@ export function SearchInput({ onSearch, placeholder, debounceMs = 300, defaultVa
   }, [value, debounceMs, onSearch])
 
   return (
-    <div className="search-input">
-      <span className="search-input__icon" aria-hidden="true">🔍</span>
+    <div className="relative">
+      <span className="pointer-events-none absolute inset-y-0 start-3 flex items-center text-slate-400">
+        <Search size={16} aria-hidden="true" />
+      </span>
       <input
-        type="search"
+        type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder ?? t('common.searchPlaceholder')}
         aria-label={placeholder ?? t('common.searchPlaceholder')}
+        // patient-field / .public-shell input already supply the real
+        // border/background/color/focus-ring per-shell (see the "Tailwind vs
+        // unlayered CSS" trap notes in patient-tokens.css and public.css) —
+        // search-input-control just adds icon-clearance padding on top.
+        className="patient-field search-input-control focus:ring-2 focus:ring-teal-500/20"
       />
       {value && (
         <button
-          className="search-input__clear"
+          type="button"
           onClick={() => setValue('')}
           aria-label={t('common.clear')}
-        >×</button>
+          className="absolute inset-y-0 end-2 flex items-center text-slate-400 transition-colors hover:text-slate-600"
+        >
+          <X size={16} />
+        </button>
       )}
     </div>
   )

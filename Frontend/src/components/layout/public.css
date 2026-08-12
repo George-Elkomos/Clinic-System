@@ -160,6 +160,12 @@
 .public-shell input.public-input--with-icon {
   padding-inline-start: 2.75rem;
 }
+/* Shared SearchInput primitive (used in the doctors filter bar): needs room
+   on both sides for its leading Search icon and trailing clear button. */
+.public-shell input.search-input-control {
+  padding-inline-start: 2.5rem;
+  padding-inline-end: 2.25rem;
+}
 
 /* Field wrapper (shared FormField primitive). primitives.css's unlayered
    `.field { margin-bottom: var(--space-4) }` needs neutralizing here same as
@@ -197,24 +203,4 @@
   color: #dc2626;
 }
 
-/* Search input (shared SearchInput primitive, used in the doctors filter bar) */
-.public-shell .search-input input {
-  height: 2.75rem;
-  min-height: 0;
-  padding-inline: 2.5rem 1rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-  font-size: 0.875rem;
-  background: #ffffff;
-  color: #1e293b;
-}
-.public-shell .search-input input:focus {
-  border-color: #0d9488;
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(59, 201, 203, 0.5);
-}
-.public-shell .search-input__icon {
-  font-size: 1rem;
-  color: #94a3b8;
-}
 

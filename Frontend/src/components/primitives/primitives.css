@@ -128,25 +128,6 @@
 .breadcrumbs a { color: var(--primary); text-decoration: none; }
 .breadcrumbs span[aria-hidden] { margin-inline: var(--space-2); }
 
-/* ---- Search input ---- */
-.search-input { position: relative; }
-.search-input input {
-  width: 100%; min-height: var(--tap-min);
-  padding-inline: calc(var(--space-7) + var(--space-2)) var(--space-4);
-  border: 2px solid var(--border); border-radius: var(--radius);
-  font-size: var(--font-body); background: var(--bg);
-}
-.search-input input:focus { border-color: var(--primary); outline: 3px solid var(--focus-ring); outline-offset: 2px; }
-.search-input__icon {
-  position: absolute; inset-block: 0; inset-inline-start: var(--space-3);
-  display: flex; align-items: center; color: var(--text-muted); pointer-events: none; font-size: 20px;
-}
-.search-input__clear {
-  position: absolute; inset-block: 0; inset-inline-end: var(--space-2);
-  display: flex; align-items: center;
-  background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 20px; min-height: auto; padding: 0 var(--space-2);
-}
-
 /* ---- Doctor card ---- */
 .doctor-card {
   background: var(--bg); border: 1px solid var(--border);

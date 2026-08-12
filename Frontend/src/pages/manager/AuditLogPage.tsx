@@ -26,6 +26,25 @@ interface AuditEntry {
 
 const ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'ACCESS']
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
+const ENTRY_CARD = 'space-y-2 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:border-slate-200'
+
+const ACTION_BADGE: Record<string, string> = {
+  CREATE: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  UPDATE: 'bg-blue-50 text-blue-700 border border-blue-200',
+  DELETE: 'bg-rose-50 text-rose-700 border border-rose-200',
+  ACCESS: 'bg-slate-100 text-slate-700 border border-slate-200',
+  READ: 'bg-slate-100 text-slate-700 border border-slate-200',
+  LOGIN: 'bg-sky-50 text-sky-700 border border-sky-200',
+  LOGOUT: 'bg-slate-100 text-slate-700 border border-slate-200',
+}
+
+function ActionBadge({ action, text }: { action: string; text: string }) {
+  return (
+    <span className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-medium ${ACTION_BADGE[action] ?? ACTION_BADGE.ACCESS}`}>
+      {text}
+    </span>
+  )
+}
 
 const CHECKLIST_LINE_STYLE: Record<string, string> = {
   added: 'text-sky-600',
@@ -145,26 +164,25 @@ export function AuditLogPage() {
         <h1 className="patient-text-page-title lg:hidden" style={{ color: 'var(--text-primary)' }}>{t('audit.title')}</h1>
       </div>
 
-      <div className={CARD}>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <SearchInput onSearch={setSearch} placeholder={t('audit.searchPlaceholder')} />
-          </div>
-          <div className="w-full sm:w-56">
-            <FormField label={t('audit.filterAction')}>
-              {(p) => (
-                <Select
-                  id={p.id}
-                  options={[
-                    { value: '', label: t('appointments.filterAll') },
-                    ...ACTIONS.map((a) => ({ value: a, label: a })),
-                  ]}
-                  value={action}
-                  onChange={(v) => setAction(Array.isArray(v) ? '' : String(v))}
-                />
-              )}
-            </FormField>
-          </div>
+      <div className="mb-6 flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
+        <div className="field flex-1">
+          <label className="field__label">{t('audit.searchLabel')}</label>
+          <SearchInput onSearch={setSearch} placeholder={t('audit.searchPlaceholder')} />
+        </div>
+        <div className="w-full sm:w-56">
+          <FormField label={t('audit.filterAction')}>
+            {(p) => (
+              <Select
+                id={p.id}
+                options={[
+                  { value: '', label: t('appointments.filterAll') },
+                  ...ACTIONS.map((a) => ({ value: a, label: a })),
+                ]}
+                value={action}
+                onChange={(v) => setAction(Array.isArray(v) ? '' : String(v))}
+              />
+            )}
+          </FormField>
         </div>
       </div>
 
@@ -175,18 +193,20 @@ export function AuditLogPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {rows.map((e) => (
-            <div key={e.id} className={CARD}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <strong className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{e.action_display} · {e.model_name}</strong>
-                <span className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{formatDateTime(e.timestamp, language)}</span>
+            <div key={e.id} className={ENTRY_CARD}>
+              <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                <div className="flex flex-wrap items-center gap-3">
+                  <ActionBadge action={e.action} text={e.action_display} />
+                  <span className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{e.model_name}</span>
+                </div>
+                <span className="shrink-0 text-xs font-medium text-slate-500">{formatDateTime(e.timestamp, language)}</span>
               </div>
-              <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>
-                {t('audit.actor')}: <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{e.actor_email ?? t('common.none')}</span>
-                {' · '}
-                {t('audit.object')}: <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{e.object_repr}</span>
+              <div className="text-sm">
+                <span className="text-slate-500">{t('audit.actor')}:</span> <span className="font-medium text-slate-800">{e.actor_email || t('audit.systemActor')}</span>
+                <span className="text-slate-500"> · {t('audit.object')}:</span> <span className="font-medium text-slate-800">{e.object_repr || t('common.none')}</span>
               </div>
               {Object.keys(e.changes || {}).length > 0 && (
-                <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3">
+                <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
                   <h4 className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{t('audit.changes')}</h4>
                   {Object.entries(e.changes).map(([field, diff]) => {
                     if (isChecklistArray(diff.old) || isChecklistArray(diff.new)) {

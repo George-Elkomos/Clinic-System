@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, FlaskConical } from 'lucide-react'
+import { AlertCircle, Download, Eye, FlaskConical } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
+import { FormField } from '../../components/primitives/FormField'
+import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
@@ -85,8 +87,8 @@ export function LabOrdersListPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex items-center justify-between rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm">
           <div>
-            <div className="patient-text-body-secondary text-[#94A3B8]">{t('lab.pendingCount')}</div>
-            <div className="mt-1 text-2xl font-extrabold" style={{ color: 'var(--brand-teal-start)' }}>{pendingOrders?.count ?? '—'}</div>
+            <div className="font-medium text-slate-600">{t('lab.pendingCount')}</div>
+            <div className="mt-1 text-3xl font-bold text-slate-900">{pendingOrders?.count ?? '—'}</div>
           </div>
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: '#E6F7F7' }}>
             <FlaskConical className="h-6 w-6" style={{ color: 'var(--brand-teal-start)' }} />
@@ -94,8 +96,8 @@ export function LabOrdersListPage() {
         </div>
         <div className="flex items-center justify-between rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm">
           <div>
-            <div className="patient-text-body-secondary text-[#94A3B8]">{t('lab.criticalCount')}</div>
-            <div className="mt-1 text-2xl font-extrabold" style={{ color: '#EF4444' }}>{completedOrders?.count ?? '—'}</div>
+            <div className="font-medium text-slate-600">{t('lab.criticalCount')}</div>
+            <div className="mt-1 text-3xl font-bold text-slate-900">{completedOrders?.count ?? '—'}</div>
           </div>
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ background: '#FEF2F2' }}>
             <AlertCircle className="h-6 w-6" style={{ color: '#EF4444' }} />
@@ -104,37 +106,43 @@ export function LabOrdersListPage() {
       </div>
 
       <div className={CARD}>
-        <div className="mb-4">
-          <label className="patient-text-body mb-1.5 block font-semibold" style={{ color: 'var(--text-primary)' }}>{t('lab.filterStatus')}</label>
-          <select
-            value={status}
-            onChange={(e) => { setStatus(e.target.value as LabOrderStatus | ''); setPage(1) }}
-            className="patient-field w-full sm:w-64"
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{s ? t(`status.${s}`) : t('common.none')}</option>
-            ))}
-          </select>
+        <div className="sm:w-64">
+          <FormField label={t('lab.filterStatus')}>
+            {(p) => (
+              <Select
+                id={p.id}
+                options={STATUSES.map((s) => ({ value: s, label: s ? t(`status.${s}`) : t('common.none') }))}
+                value={status}
+                onChange={(v) => {
+                  setStatus((Array.isArray(v) ? '' : String(v)) as LabOrderStatus | '')
+                  setPage(1)
+                }}
+              />
+            )}
+          </FormField>
         </div>
+      </div>
 
-        {isLoading ? <CenteredSpinner /> : (data?.results ?? []).length === 0 ? (
-          <p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('lab.noOrders')}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b-2 border-slate-100">
-                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.orderNumber')}</th>
-                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</th>
-                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.status')}</th>
-                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.priority')}</th>
-                  <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('appointments.when')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.results ?? []).map((order) => (
-                  <tr key={order.id} className="border-b border-slate-100">
+      {isLoading ? <CenteredSpinner /> : (data?.results ?? []).length === 0 ? (
+        <div className={CARD}><p className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('lab.noOrders')}</p></div>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b-2 border-slate-100 bg-slate-50/60">
+                <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.orderNumber')}</th>
+                <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.patient')}</th>
+                <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.status')}</th>
+                <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('lab.priority')}</th>
+                <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('appointments.when')}</th>
+                <th className="patient-text-overline px-3 py-2 text-right" style={{ color: 'var(--text-muted)' }}>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.results ?? []).map((order) => {
+                const canDownload = order.status === 'COMPLETED' || order.status === 'REVIEWED'
+                return (
+                  <tr key={order.id} className="border-b border-slate-100 bg-white">
                     <td className="px-3 py-2.5 font-semibold">
                       <Link to={`/doctor/lab-orders/${order.id}`} className="hover:underline" style={{ color: 'var(--brand-blue-start)' }}>
                         {order.order_number}
@@ -147,25 +155,42 @@ export function LabOrdersListPage() {
                       {formatDate(order.created_at, language)}
                     </td>
                     <td className="px-3 py-2.5">
-                      <Link to={`/doctor/lab-orders/${order.id}`} className={BTN_SECONDARY_SM}>
-                        {t('common.actions')}
-                      </Link>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          to={`/doctor/lab-orders/${order.id}`}
+                          title={t('common.view')}
+                          aria-label={t('common.view')}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                        >
+                          <Eye size={15} />
+                        </Link>
+                        {canDownload && (
+                          <Link
+                            to={`/doctor/lab-orders/${order.id}`}
+                            title={t('lab.download')}
+                            aria-label={t('lab.download')}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-teal-600"
+                          >
+                            <Download size={15} />
+                          </Link>
+                        )}
+                      </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-        {totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={BTN_SECONDARY_SM}>‹</button>
-            <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('lab.page')} {page} {t('lab.of')} {totalPages}</span>
-            <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={BTN_SECONDARY_SM}>›</button>
-          </div>
-        )}
-      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={BTN_SECONDARY_SM}>‹</button>
+          <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('lab.page')} {page} {t('lab.of')} {totalPages}</span>
+          <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={BTN_SECONDARY_SM}>›</button>
+        </div>
+      )}
     </div>
   )
 }

@@ -130,6 +130,16 @@
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .patient-field:focus { border-color: #0D9488; background: #FFFFFF; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }
+/* Icon-clearance padding for SearchInput — layered on top of .patient-field's
+   real border/background/color/focus-ring values above, which already beat
+   the unlayered globals.css `input{}` rule on their own (a single class
+   already outranks a bare element selector). Needs its own compound
+   selector because Tailwind's `ps-10`/`pe-9` utilities can't touch `padding`
+   here either — same unlayered-beats-layered rule, just one level down. */
+.patient-field.search-input-control {
+  padding-inline-start: 2.5rem;
+  padding-inline-end: 2.25rem;
+}
 /* Variant for fields that want a plain white background + smaller text
    instead of the tinted default above (e.g. the review-comment box). */
 .patient-field--compact { background: #FFFFFF; font-size: 0.75rem; }
