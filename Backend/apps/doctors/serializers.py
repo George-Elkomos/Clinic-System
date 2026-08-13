@@ -73,7 +73,7 @@ class PublicDoctorSerializer(serializers.ModelSerializer):
         fields = [
             "id", "full_name", "bio", "bio_ar", "photo", "room_number",
             "years_experience", "languages_spoken", "avg_appointment_duration",
-            "accepts_walk_ins", "is_accepting_patients",
+            "consultation_fee", "accepts_walk_ins", "is_accepting_patients",
             "specialties_detail", "average_rating", "review_count", "next_available_date",
         ]
 

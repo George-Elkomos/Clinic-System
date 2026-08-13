@@ -11,7 +11,7 @@ import { StarRating } from '../../components/primitives/StarRating'
 import { useToast } from '../../components/primitives/Toast'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatDate, formatTime } from '../../lib/format'
+import { formatDate, formatMoney, formatTime } from '../../lib/format'
 import { appointmentsApi } from '../../services/appointments.api'
 import { errorMessage, publicApi } from '../../services/apiClient'
 import type { Paginated, PublicDoctor, Review, TimeSlot } from '../../services/types'
@@ -191,9 +191,7 @@ export function DoctorDetailPage() {
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   {t('doctors.room')}
                 </dt>
-                <dd className="mt-1 text-sm font-bold text-slate-800">
-                  {t('doctors.roomValue', { room: doctor.room_number })}
-                </dd>
+                <dd className="mt-1 text-sm font-bold text-slate-800">{doctor.room_number}</dd>
               </div>
             )}
             <div>
@@ -219,6 +217,16 @@ export function DoctorDetailPage() {
                 </dt>
                 <dd className="mt-1 text-sm font-bold text-slate-800">
                   {t('doctors.experienceValue', { n: doctor.years_experience })}
+                </dd>
+              </div>
+            )}
+            {doctor.consultation_fee != null && (
+              <div>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  {t('doctors.consultationFee')}
+                </dt>
+                <dd className="mt-1 text-sm font-bold text-slate-800">
+                  {formatMoney(doctor.consultation_fee, 'USD', language)}
                 </dd>
               </div>
             )}
@@ -277,33 +285,31 @@ export function DoctorDetailPage() {
                 })}
               </div>
 
-              <div className="mt-5 border-t border-slate-100 pt-5">
-                <FormField label={t('booking.reason')}>
-                  {(p) => (
-                    <textarea
-                      {...p}
-                      rows={3}
-                      className="public-textarea--reason"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                    />
-                  )}
-                </FormField>
+              {selectedSlotId && (
+                <div className="mt-5 border-t border-slate-100 pt-5">
+                  <FormField label={t('booking.reason')}>
+                    {(p) => (
+                      <textarea
+                        {...p}
+                        rows={3}
+                        className="public-textarea--reason"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                      />
+                    )}
+                  </FormField>
 
-                {!selectedSlotId && (
-                  <p className="mb-3 text-xs text-slate-400">{t('booking.selectSlotHint')}</p>
-                )}
-
-                <button
-                  type="button"
-                  disabled={!selectedSlotId || booking.isPending}
-                  onClick={confirmBooking}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
-                  {booking.isPending && <Spinner size={16} />}
-                  {t('booking.confirmBook')}
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    disabled={booking.isPending}
+                    onClick={confirmBooking}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {booking.isPending && <Spinner size={16} />}
+                    {t('booking.confirmBook')}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </section>
@@ -313,16 +319,28 @@ export function DoctorDetailPage() {
           {reviews.length === 0 ? (
             <p className="text-sm text-slate-500">{t('reviews.none')}</p>
           ) : (
-            <div className="divide-y divide-slate-100">
-              {reviews.map((review) => (
-                <article key={review.id} className="py-4 first:pt-0 last:pb-0">
-                  <StarRating value={review.rating} readOnly />
-                  {review.comment && <p className="my-2 text-sm text-slate-600">{review.comment}</p>}
-                  <small className="text-xs text-slate-400">
-                    {review.patient_name || t('reviews.anonymous')} · {formatDate(review.created_at, language)}
-                  </small>
-                </article>
-              ))}
+            <div>
+              {reviews.map((review) => {
+                const reviewerName = review.patient_name || t('reviews.anonymous')
+                return (
+                  <article
+                    key={review.id}
+                    className="mb-3 space-y-2 rounded-xl border border-slate-100 bg-slate-50 p-4 last:mb-0"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0D9488]/10 text-xs font-bold text-[#0D9488]">
+                        {initials(reviewerName)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-700">{reviewerName}</p>
+                        <p className="text-xs text-slate-500">{formatDate(review.created_at, language)}</p>
+                      </div>
+                    </div>
+                    <StarRating value={review.rating} readOnly />
+                    {review.comment && <p className="text-sm text-slate-600">{review.comment}</p>}
+                  </article>
+                )
+              })}
             </div>
           )}
         </section>

@@ -78,6 +78,7 @@ export interface PublicDoctor {
   years_experience: number
   languages_spoken: string
   avg_appointment_duration: number
+  consultation_fee: string | null
   accepts_walk_ins: boolean
   is_accepting_patients: boolean
   specialties_detail: Specialty[]

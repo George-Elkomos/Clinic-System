@@ -167,7 +167,6 @@
     "booked": "تم طلب موعدك. سيقوم مكتب الاستقبال بتأكيده.",
     "selectDoctorFirst": "يرجى اختيار طبيب لعرض الأوقات المتاحة.",
     "patientOnly": "يرجى تسجيل الدخول أو إنشاء حساب لحجز هذا الموعد.",
-    "selectSlotHint": "اختر وقتًا متاحًا أعلاه للمتابعة.",
     "confirmBook": "تأكيد وحجز الموعد"
   },
   "appointments": {
@@ -272,7 +271,7 @@
     "languagesDefault": "الإنجليزية، العربية",
     "consultationDuration": "مدة الاستشارة",
     "durationValue": "{{n}} دقيقة",
-    "roomValue": "غرفة {{room}}",
+    "consultationFee": "رسوم الاستشارة",
     "noBio": "لم تتم إضافة نبذة عن الطبيب بعد.",
     "backToDoctors": "العودة إلى قائمة الأطباء",
     "publicTitle": "أطباؤنا",

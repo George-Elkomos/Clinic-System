@@ -167,7 +167,6 @@
     "booked": "Your appointment has been requested. The front desk will confirm it.",
     "selectDoctorFirst": "Please choose a doctor to see available times.",
     "patientOnly": "Please sign in or create an account to book this appointment.",
-    "selectSlotHint": "Select an available time above to continue.",
     "confirmBook": "Confirm & Book Appointment"
   },
   "appointments": {
@@ -272,7 +271,7 @@
     "languagesDefault": "English, Arabic",
     "consultationDuration": "Consultation Duration",
     "durationValue": "{{n}} mins",
-    "roomValue": "Room {{room}}",
+    "consultationFee": "Consultation Fee",
     "noBio": "No background summary provided yet.",
     "backToDoctors": "Back to all doctors",
     "publicTitle": "Our Doctors",
