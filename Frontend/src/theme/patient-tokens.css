@@ -141,6 +141,11 @@
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .patient-field:focus { border-color: #0D9488; background: #FFFFFF; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }
+/* Read-only/disabled fields (e.g. a patient's own email) need to look
+   visually distinct from editable ones — Tailwind's disabled:bg-* utilities
+   are inert here for the same unlayered-beats-layered reason as everywhere
+   else `.patient-field` is involved, so this has to be a real plain-CSS rule. */
+.patient-field:disabled { background: #F1F5F9; color: #64748B; cursor: not-allowed; }
 /* Icon-clearance padding for SearchInput — layered on top of .patient-field's
    real border/background/color/focus-ring values above, which already beat
    the unlayered globals.css `input{}` rule on their own (a single class

@@ -45,7 +45,7 @@ export function ChangePasswordForm() {
 
   return (
     <form onSubmit={submit} noValidate>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="max-w-md">
         <FormField label={t('auth.currentPasswordLabel')}>
           {(p) => (
             <input
@@ -59,6 +59,9 @@ export function ChangePasswordForm() {
             />
           )}
         </FormField>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('auth.newPassword')}>
           {(p) => (
             <input

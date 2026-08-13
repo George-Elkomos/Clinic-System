@@ -262,19 +262,21 @@ export function MyProfilePage() {
               />
             )}
           </FormField>
-          <FormField label={t('doctors.consultationFee')} hint={t('doctors.feeHint')}>
-            {(p) => (
-              <input
-                {...p}
-                type="number"
-                min={0}
-                step="0.01"
-                className="patient-field"
-                value={fee}
-                onChange={(e) => setFee(e.target.value)}
-              />
-            )}
-          </FormField>
+          <div className="sm:col-span-2">
+            <FormField label={t('doctors.consultationFee')} hint={t('doctors.feeHint')}>
+              {(p) => (
+                <input
+                  {...p}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="patient-field"
+                  value={fee}
+                  onChange={(e) => setFee(e.target.value)}
+                />
+              )}
+            </FormField>
+          </div>
         </div>
 
         <label className="patient-text-body mt-4 mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>

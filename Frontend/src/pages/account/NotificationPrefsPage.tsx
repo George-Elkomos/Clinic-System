@@ -47,7 +47,7 @@ function SectionCard({ title, children }: { title: string; children: ReactNode }
   )
 }
 
-export function PrefsForm({ initial }: { initial: NotificationPreference }) {
+function PrefsForm({ initial }: { initial: NotificationPreference }) {
   const { t } = useTranslation()
   const { showToast } = useToast()
   const qc = useQueryClient()

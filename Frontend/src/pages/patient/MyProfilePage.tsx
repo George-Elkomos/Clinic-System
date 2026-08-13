@@ -163,18 +163,16 @@ export function MyProfilePage() {
 
       <div className={CARD}>
         <h2 className={CARD_TITLE}>{t('patients.medicalEmergency')}</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label={t('medical.bloodType')}>
-            {(p) => (
-              <Select
-                id={p.id}
-                options={BLOOD_OPTIONS}
-                value={form.blood_type ?? ''}
-                onChange={(value) => setForm((f) => ({ ...f, blood_type: String(value) }))}
-              />
-            )}
-          </FormField>
-        </div>
+        <FormField label={t('medical.bloodType')}>
+          {(p) => (
+            <Select
+              id={p.id}
+              options={BLOOD_OPTIONS}
+              value={form.blood_type ?? ''}
+              onChange={(value) => setForm((f) => ({ ...f, blood_type: String(value) }))}
+            />
+          )}
+        </FormField>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label={t('medical.allergies')}>
