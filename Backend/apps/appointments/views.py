@@ -59,14 +59,20 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
         user = request.user
 
+        staff_override = False
+        override_reason = ""
         if user.role == RoleChoices.PATIENT:
             patient = getattr(user, "patient_profile", None)
             if patient is None:
                 raise ValidationError({"detail": "Your patient profile is missing."})
+            # Patients can never self-override is_accepting_patients — only
+            # front-desk staff, after seeing the warning, can do that.
         elif user.role in STAFF_ROLES:
             if not data.get("patient"):
                 raise ValidationError({"patient": "Select a patient to book for."})
             patient = get_object_or_404(PatientProfile, pk=data["patient"])
+            staff_override = data.get("override", False)
+            override_reason = data.get("override_reason", "")
         else:
             raise PermissionDenied("Doctors cannot create bookings here.")
 
@@ -76,6 +82,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             reason=data.get("reason", ""),
             created_by=user,
             appointment_type=AppointmentType.SCHEDULED,
+            staff_override=staff_override,
+            override_reason=override_reason,
         )
         return Response(
             AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED
@@ -176,6 +184,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment = services.create_walk_in(
             patient=patient, doctor=doctor, reason=data.get("reason", ""),
             created_by=request.user, emergency=data.get("emergency", False),
+            staff_override=data.get("override", False),
+            override_reason=data.get("override_reason", ""),
         )
         return Response(AppointmentSerializer(appointment).data, status=status.HTTP_201_CREATED)
 

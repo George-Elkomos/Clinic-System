@@ -1,9 +1,16 @@
 import { api } from './apiClient'
-import type { Language, NotificationPreference, PatientProfile, User } from './types'
+import type { Language, NotificationPreference, PatientProfile, StaffProfile, User } from './types'
 
 export interface LoginResponse {
   access: string
   user: User
+}
+
+// null means "remove the current photo", a File means "upload this one",
+// undefined/omitted means "leave it alone".
+export type UpdateMePayload = Partial<Pick<User, 'first_name' | 'last_name' | 'phone'>> & {
+  preferred_language?: Language
+  avatar?: File | null
 }
 
 export const authApi = {
@@ -16,8 +23,25 @@ export const authApi = {
 
   me: () => api.get<User>('/auth/me/').then((r) => r.data),
 
-  updateMe: (data: Partial<Pick<User, 'first_name' | 'last_name' | 'phone'>> & { preferred_language?: Language }) =>
-    api.patch<User>('/auth/me/', data).then((r) => r.data),
+  updateMe: (data: UpdateMePayload) => {
+    if (data.avatar !== undefined) {
+      const form = new FormData()
+      Object.entries(data).forEach(([k, v]) => {
+        if (k === 'avatar') {
+          form.append('avatar', v === null ? '' : (v as File))
+        } else if (v !== undefined && v !== null) {
+          form.append(k, String(v))
+        }
+      })
+      return api.patch<User>('/auth/me/', form).then((r) => r.data)
+    }
+    return api.patch<User>('/auth/me/', data).then((r) => r.data)
+  },
+
+  staffProfile: () => api.get<StaffProfile>('/auth/me/staff-profile/').then((r) => r.data),
+
+  updateStaffProfile: (data: Partial<StaffProfile>) =>
+    api.patch<StaffProfile>('/auth/me/staff-profile/', data).then((r) => r.data),
 
   register: (data: {
     email: string

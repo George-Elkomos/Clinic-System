@@ -246,26 +246,6 @@
 .patient-thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .patient-thin-scrollbar::-webkit-scrollbar-thumb { background-color: #E2E8F0; border-radius: 9999px; }
 
-/* Inline sort control (My Appointments) — a bare <select>'s width/padding/
-   border/background are set unlayered by globals.css, which beats Tailwind's
-   layered utilities regardless of className, so the exact look has to be
-   plain CSS here too (same fix as .patient-field above), just sized to
-   content instead of block/100%. */
-.appt-sort-select {
-  display: inline-block;
-  width: auto;
-  min-height: 0;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 0.75rem;
-  color: #334155;
-  font-size: 0.875rem;
-  padding: 0.5rem 0.75rem;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.appt-sort-select:focus { border-color: #0D9488; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }
-
 /* Cancel Appointment modal title — globals.css's bare `h2 { font-size; margin }`
    is unlayered too (same trap as h1/h3), so Tailwind's text-xl/mb-2 on an
    <h2> would be inert; only these two properties need the plain-CSS escape,

@@ -16,6 +16,14 @@ export interface PatientProfile {
   chronic_conditions: string
   previous_surgeries: string
   current_medications: string
+  insurance_provider: string
+  insurance_policy_number: string
+}
+
+export interface StaffProfile {
+  id: number
+  staff_id: string
+  assigned_room: string
 }
 
 export interface NotificationPreference {
@@ -37,9 +45,11 @@ export interface User {
   phone: string
   preferred_language: Language
   must_change_password: boolean
+  avatar_url: string | null
   patient_profile?: PatientProfile | null
   notification_preference?: NotificationPreference | null
   doctor_profile?: { id: number; specialties_detail: Specialty[] } | null
+  staff_profile?: StaffProfile | null
 }
 
 export interface Specialty {
@@ -53,10 +63,12 @@ export interface Specialty {
 export interface Doctor {
   id: number
   full_name: string
+  full_name_ar: string
   email: string
   phone: string
   bio: string
   bio_ar: string
+  education: string
   room_number: string
   years_experience: number
   languages_spoken: string
@@ -72,6 +84,7 @@ export interface Doctor {
 export interface PublicDoctor {
   id: number
   full_name: string
+  full_name_ar: string
   bio: string
   bio_ar: string
   photo: string | null
@@ -123,6 +136,8 @@ export interface Appointment {
   completed_at: string | null
   created_at: string
   encounter_id: number | null
+  is_manual_override: boolean
+  override_reason: string
 }
 
 export interface QueueAppointment extends Appointment {

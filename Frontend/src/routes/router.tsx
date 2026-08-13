@@ -17,6 +17,7 @@ import { MyScansLabsPage } from '../pages/patient/MyScansLabsPage'
 import { MyPrescriptionsPage } from '../pages/patient/MyPrescriptionsPage'
 import { PatientVitalSignsTab } from '../pages/patient/PatientVitalSignsTab'
 import { PatientTimelinePage } from '../pages/patient/PatientTimelinePage'
+import { MyProfilePage as PatientMyProfilePage } from '../pages/patient/MyProfilePage'
 import { DoctorDashboard } from '../pages/doctor/DoctorDashboard'
 import { DoctorQueuePage } from '../pages/doctor/DoctorQueuePage'
 import { ScheduleManagementPage } from '../pages/doctor/ScheduleManagementPage'
@@ -32,6 +33,7 @@ import { PatientLabResultsPage } from '../pages/patient/PatientLabResultsPage'
 import { SampleCollectionPage } from '../pages/secretary/SampleCollectionPage'
 import { SecretaryDashboard } from '../pages/secretary/SecretaryDashboard'
 import { AppointmentDeskPage } from '../pages/secretary/AppointmentDeskPage'
+import { BookAppointmentPage as SecretaryBookAppointmentPage } from '../pages/secretary/BookAppointmentPage'
 import { DoctorsPage } from '../pages/secretary/DoctorsPage'
 import { QueueBoardPage } from '../pages/secretary/QueueBoardPage'
 import { DoctorAbsencePage } from '../pages/secretary/DoctorAbsencePage'
@@ -46,6 +48,7 @@ import { BillingDeskPage } from '../pages/secretary/BillingDeskPage'
 import { MyInvoicesPage } from '../pages/patient/MyInvoicesPage'
 import { BillingReportsPage } from '../pages/manager/BillingReportsPage'
 import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
+import { AccountSettingsPage } from '../pages/account/AccountSettingsPage'
 import { PatientNotificationSettingsPage } from '../pages/patient/PatientNotificationSettingsPage'
 import { MustChangePasswordPage } from '../pages/account/MustChangePasswordPage'
 import { MyReferralsPage } from '../pages/patient/MyReferralsPage'
@@ -87,6 +90,7 @@ export const router = createBrowserRouter([
       { path: 'invoices', element: <MyInvoicesPage /> },
       { path: 'referrals', element: <MyReferralsPage /> },
       { path: 'radiology', element: <MyRadiologyPage /> },
+      { path: 'profile', element: <PatientMyProfilePage /> },
       { path: 'settings', element: <PatientNotificationSettingsPage /> },
     ],
   },
@@ -117,6 +121,7 @@ export const router = createBrowserRouter([
     element: <RoleRoute roles={['SECRETARY', 'MANAGER']}><PortalShell /></RoleRoute>,
     children: [
       { index: true, element: <SecretaryDashboard /> },
+      { path: 'booking', element: <SecretaryBookAppointmentPage /> },
       { path: 'desk', element: <AppointmentDeskPage /> },
       { path: 'queue', element: <QueueBoardPage /> },
       { path: 'absences', element: <DoctorAbsencePage /> },
@@ -141,6 +146,7 @@ export const router = createBrowserRouter([
     path: '/account',
     element: <RoleRoute roles={['PATIENT', 'DOCTOR', 'SECRETARY', 'MANAGER']}><PortalShell /></RoleRoute>,
     children: [
+      { path: 'settings', element: <AccountSettingsPage /> },
       { path: 'notifications', element: <NotificationPrefsPage /> },
     ],
   },

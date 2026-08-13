@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -236,79 +236,90 @@ export function DoctorDetailPage() {
         <section className={CARD}>
           <h2 className="mb-4 text-lg font-bold text-slate-800">{t('booking.availableTimes')}</h2>
 
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
-            {weekFromToday().map((day, index) => {
-              const active = day === date
-              return (
-                <button
-                  key={day}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => pickDate(day)}
-                  className={`flex shrink-0 flex-col items-center rounded-xl px-3.5 py-2 transition-colors ${
-                    active ? 'bg-teal-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
-                    {index === 0 ? t('common.today') : weekdayShort(day, language)}
-                  </span>
-                  <span className="text-sm font-bold">{monthDay(day, language)}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {slotsLoading ? (
-            <CenteredSpinner />
-          ) : slots.length === 0 ? (
-            <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">{t('booking.noSlots')}</p>
+          {!doctor.is_accepting_patients ? (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+              <p className="text-sm font-medium">
+                {t('booking.notAcceptingBanner', { name: doctor.full_name })}
+              </p>
+            </div>
           ) : (
             <>
-              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                {slots.map((slot) => {
-                  const selected = slot.id === selectedSlotId
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+                {weekFromToday().map((day, index) => {
+                  const active = day === date
                   return (
                     <button
-                      key={slot.id}
+                      key={day}
                       type="button"
-                      aria-pressed={selected}
-                      onClick={() => setSelectedSlotId(slot.id)}
-                      className={`rounded-xl border px-2 py-2.5 text-sm font-semibold transition-colors ${
-                        selected
-                          ? 'border-teal-600 bg-teal-600 text-white'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-teal-600 hover:text-teal-700'
+                      aria-pressed={active}
+                      onClick={() => pickDate(day)}
+                      className={`flex shrink-0 flex-col items-center rounded-xl px-3.5 py-2 transition-colors ${
+                        active ? 'bg-teal-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                       }`}
                     >
-                      {formatTime(slot.start_datetime, language)}
+                      <span className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                        {index === 0 ? t('common.today') : weekdayShort(day, language)}
+                      </span>
+                      <span className="text-sm font-bold">{monthDay(day, language)}</span>
                     </button>
                   )
                 })}
               </div>
 
-              {selectedSlotId && (
-                <div className="mt-5 border-t border-slate-100 pt-5">
-                  <FormField label={t('booking.reason')}>
-                    {(p) => (
-                      <textarea
-                        {...p}
-                        rows={3}
-                        className="public-textarea--reason"
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                      />
-                    )}
-                  </FormField>
+              {slotsLoading ? (
+                <CenteredSpinner />
+              ) : slots.length === 0 ? (
+                <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">{t('booking.noSlots')}</p>
+              ) : (
+                <>
+                  <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                    {slots.map((slot) => {
+                      const selected = slot.id === selectedSlotId
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setSelectedSlotId(slot.id)}
+                          className={`rounded-xl border px-2 py-2.5 text-sm font-semibold transition-colors ${
+                            selected
+                              ? 'border-teal-600 bg-teal-600 text-white'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-teal-600 hover:text-teal-700'
+                          }`}
+                        >
+                          {formatTime(slot.start_datetime, language)}
+                        </button>
+                      )
+                    })}
+                  </div>
 
-                  <button
-                    type="button"
-                    disabled={booking.isPending}
-                    onClick={confirmBooking}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {booking.isPending && <Spinner size={16} />}
-                    {t('booking.confirmBook')}
-                  </button>
-                </div>
+                  {selectedSlotId && (
+                    <div className="mt-5 border-t border-slate-100 pt-5">
+                      <FormField label={t('booking.reason')}>
+                        {(p) => (
+                          <textarea
+                            {...p}
+                            rows={3}
+                            className="public-textarea--reason"
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                          />
+                        )}
+                      </FormField>
+
+                      <button
+                        type="button"
+                        disabled={booking.isPending}
+                        onClick={confirmBooking}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {booking.isPending && <Spinner size={16} />}
+                        {t('booking.confirmBook')}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

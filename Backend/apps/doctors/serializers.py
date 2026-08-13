@@ -38,7 +38,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            "id", "full_name", "email", "phone",
+            "id", "full_name", "full_name_ar", "email", "phone",
             "license_number", "bio", "bio_ar", "education", "languages_spoken",
             "years_experience", "consultation_fee", "avg_appointment_duration",
             "room_number", "photo", "accepts_walk_ins", "is_accepting_patients",
@@ -53,9 +53,10 @@ class DoctorProfileWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            "bio", "bio_ar", "education", "languages_spoken", "years_experience",
-            "consultation_fee", "avg_appointment_duration", "room_number",
-            "photo", "accepts_walk_ins", "is_accepting_patients", "specialties",
+            "bio", "bio_ar", "full_name_ar", "education", "languages_spoken",
+            "years_experience", "consultation_fee", "avg_appointment_duration",
+            "room_number", "photo", "accepts_walk_ins", "is_accepting_patients",
+            "specialties",
         ]
 
 
@@ -71,7 +72,7 @@ class PublicDoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            "id", "full_name", "bio", "bio_ar", "photo", "room_number",
+            "id", "full_name", "full_name_ar", "bio", "bio_ar", "photo", "room_number",
             "years_experience", "languages_spoken", "avg_appointment_duration",
             "consultation_fee", "accepts_walk_ins", "is_accepting_patients",
             "specialties_detail", "average_rating", "review_count", "next_available_date",

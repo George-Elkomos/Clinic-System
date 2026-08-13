@@ -19,8 +19,17 @@ from .models import Appointment
 
 @transaction.atomic
 def book_slot(*, patient, slot_id, reason="", created_by=None,
-              appointment_type=AppointmentType.SCHEDULED):
-    """Book an AVAILABLE slot -> a PENDING appointment. Concurrency-safe."""
+              appointment_type=AppointmentType.SCHEDULED,
+              staff_override=False, override_reason="", bypass_accepting_gate=False):
+    """Book an AVAILABLE slot -> a PENDING appointment. Concurrency-safe.
+
+    `bypass_accepting_gate` is for callers where is_accepting_patients simply
+    doesn't apply (e.g. confirming a follow-up the doctor themselves already
+    recommended to an existing patient) -- it skips the gate silently, no
+    override flag recorded. `staff_override` is the front-desk's explicit
+    "book anyway" after being warned -- it's the only way past the gate for
+    everyone else, and it's recorded on the appointment for audit.
+    """
     try:
         slot = TimeSlot.objects.select_for_update().get(pk=slot_id)
     except TimeSlot.DoesNotExist:
@@ -31,6 +40,14 @@ def book_slot(*, patient, slot_id, reason="", created_by=None,
         raise ValidationError(
             {"slot": "Sorry, that time was just taken. Please pick another time."}
         )
+
+    is_manual_override = False
+    if not slot.doctor.is_accepting_patients and not bypass_accepting_gate:
+        if not staff_override:
+            raise ValidationError({
+                "doctor": f"{slot.doctor} is not currently accepting new appointments."
+            })
+        is_manual_override = True
 
     slot.status = SlotStatus.BOOKED
     slot.save(update_fields=["status"])
@@ -45,6 +62,8 @@ def book_slot(*, patient, slot_id, reason="", created_by=None,
         appointment_type=appointment_type,
         reason=reason,
         created_by=created_by,
+        is_manual_override=is_manual_override,
+        override_reason=override_reason if is_manual_override else "",
     )
 
 
@@ -175,10 +194,19 @@ def notify_waitlist_for_slot(slot):
 
 
 @transaction.atomic
-def create_walk_in(*, patient, doctor, reason="", created_by=None, emergency=False):
+def create_walk_in(*, patient, doctor, reason="", created_by=None, emergency=False,
+                    staff_override=False, override_reason=""):
     """Add a walk-in (or emergency) patient straight into the doctor's queue."""
     from apps.core.enums import DoctorPatientSource
     from apps.doctors.models import DoctorPatient
+
+    is_manual_override = False
+    if not doctor.accepts_walk_ins:
+        if not staff_override:
+            raise ValidationError({
+                "doctor": f"{doctor} does not currently accept walk-ins."
+            })
+        is_manual_override = True
 
     now = timezone.now()
     duration = timedelta(minutes=doctor.avg_appointment_duration or 15)
@@ -194,6 +222,8 @@ def create_walk_in(*, patient, doctor, reason="", created_by=None, emergency=Fal
         reason=reason,
         created_by=created_by,
         checked_in_at=now,
+        is_manual_override=is_manual_override,
+        override_reason=override_reason if is_manual_override else "",
     )
     link, _ = DoctorPatient.objects.get_or_create(
         doctor=doctor, patient=patient,
@@ -302,6 +332,7 @@ def confirm_followup(followup, *, created_by=None):
         reason="Follow-up visit",
         created_by=created_by,
         appointment_type=AppointmentType.FOLLOW_UP,
+        bypass_accepting_gate=True,
     )
     followup.resulting_appointment = appointment
     followup.status = FollowUpStatus.SCHEDULED

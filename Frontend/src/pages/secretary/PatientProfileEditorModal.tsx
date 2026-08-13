@@ -22,9 +22,10 @@ interface PatientProfileEditorModalProps {
 
 const GENDER_OPTIONS = [
   { value: '', label: '-' },
-  { value: 'M', label: 'Male' },
-  { value: 'F', label: 'Female' },
-  { value: 'O', label: 'Other' },
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+  { value: 'OTHER', label: 'Other' },
+  { value: 'UNDISCLOSED', label: 'Prefer not to say' },
 ]
 
 const BLOOD_OPTIONS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((value) => ({

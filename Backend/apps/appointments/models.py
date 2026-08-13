@@ -45,6 +45,10 @@ class Appointment(TimeStampedModel):
     checked_in_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Set when front-desk staff knowingly booked/walked-in a patient against
+    # the doctor's is_accepting_patients / accepts_walk_ins preference.
+    is_manual_override = models.BooleanField(default=False)
+    override_reason = models.CharField(max_length=255, blank=True)
     # Idempotency flags for the reminder command (Phase 3).
     reminder_24h_sent = models.BooleanField(default=False)
     reminder_1h_sent = models.BooleanField(default=False)

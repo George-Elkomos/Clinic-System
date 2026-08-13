@@ -4,7 +4,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.core.enums import RoleChoices
 
-from .models import NotificationPreference, PatientProfile, User
+from .models import NotificationPreference, PatientProfile, StaffProfile, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -24,10 +24,11 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 def build_user_payload(user):
-    """Full current-user representation: base fields + nested patient/doctor
-    profile + notification prefs. Shared by login and /auth/me so the `user`
-    object is identical no matter which call produced it (otherwise the doctor
-    profile is missing right after login and only appears after a refresh)."""
+    """Full current-user representation: base fields + nested patient/doctor/
+    staff profile + notification prefs. Shared by login and /auth/me so the
+    `user` object is identical no matter which call produced it (otherwise the
+    doctor profile is missing right after login and only appears after a
+    refresh)."""
     data = UserSerializer(user).data
     profile = getattr(user, "patient_profile", None)
     data["patient_profile"] = PatientProfileSerializer(profile).data if profile else None
@@ -40,15 +41,26 @@ def build_user_payload(user):
         from apps.doctors.serializers import DoctorProfileSerializer
 
         data["doctor_profile"] = DoctorProfileSerializer(doctor_profile).data
+    staff_profile = getattr(user, "staff_profile", None)
+    data["staff_profile"] = StaffProfileSerializer(staff_profile).data if staff_profile else None
+    # Single field the frontend can read regardless of role — doctors' avatar
+    # lives on DoctorProfile.photo (already used by public listings), every
+    # other role uses User.avatar.
+    if doctor_profile is not None and doctor_profile.photo:
+        data["avatar_url"] = doctor_profile.photo.url
+    elif user.avatar:
+        data["avatar_url"] = user.avatar.url
+    else:
+        data["avatar_url"] = None
     return data
 
 
 class MeUpdateSerializer(serializers.ModelSerializer):
-    """Self-service profile edit (name, phone, language)."""
+    """Self-service profile edit (name, phone, language, avatar)."""
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "phone", "preferred_language"]
+        fields = ["first_name", "last_name", "phone", "preferred_language", "avatar"]
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -58,8 +70,14 @@ class PatientProfileSerializer(serializers.ModelSerializer):
             "id", "national_id", "date_of_birth", "gender", "blood_type",
             "address", "emergency_contact_name", "emergency_contact_phone",
             "allergies_summary", "chronic_conditions", "previous_surgeries",
-            "current_medications",
+            "current_medications", "insurance_provider", "insurance_policy_number",
         ]
+
+
+class StaffProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StaffProfile
+        fields = ["id", "staff_id", "assigned_room"]
 
 
 class NotificationPreferenceSerializer(serializers.ModelSerializer):

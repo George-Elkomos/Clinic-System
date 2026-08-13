@@ -26,7 +26,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "scheduled_start", "scheduled_end", "status", "status_display",
             "appointment_type", "type_display", "priority", "reason",
             "cancellation_reason", "checked_in_at", "started_at", "completed_at",
-            "created_at", "encounter_id",
+            "created_at", "encounter_id", "is_manual_override", "override_reason",
         ]
         read_only_fields = fields
 
@@ -74,6 +74,10 @@ class BookAppointmentSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True, default="")
     # Optional: staff booking for a specific patient.
     patient = serializers.IntegerField(required=False)
+    # Staff-only: explicit "book anyway" after being warned the doctor isn't
+    # accepting new patients (ignored for patient self-service bookings).
+    override = serializers.BooleanField(required=False, default=False)
+    override_reason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class CancelAppointmentSerializer(serializers.Serializer):
@@ -85,6 +89,9 @@ class WalkInSerializer(serializers.Serializer):
     doctor = serializers.IntegerField()
     reason = serializers.CharField(required=False, allow_blank=True, default="")
     emergency = serializers.BooleanField(required=False, default=False)
+    # Explicit "add anyway" after being warned the doctor isn't accepting walk-ins.
+    override = serializers.BooleanField(required=False, default=False)
+    override_reason = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class WaitlistEntrySerializer(serializers.ModelSerializer):

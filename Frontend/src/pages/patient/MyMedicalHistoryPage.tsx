@@ -1,40 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, AlertTriangle, ClipboardList, Droplets, FileText, Pill, Scissors, type LucideIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Activity, ClipboardList, FileText, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
-import { useToast } from '../../components/primitives/Toast'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatDate } from '../../lib/format'
-import { errorMessage } from '../../services/apiClient'
-import { authApi } from '../../services/auth.api'
 import { medicalApi } from '../../services/medical.api'
-import type { PatientProfile } from '../../services/types'
-
-// Plain CSS class, not Tailwind utilities — globals.css sets
-// input/select/textarea border/radius/background/color/padding as unlayered
-// plain CSS, which silently beats Tailwind's (always-layered) utilities for
-// those same properties regardless of className. See patient-field in
-// patient-tokens.css.
-const FIELD_CLASS = 'patient-field'
-const TEXTAREA_CLASS = `${FIELD_CLASS} resize-none`
-
-const BLOOD_OPTIONS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((value) => ({
-  value,
-  label: value || '-',
-}))
-
-function FieldLabel({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
-  return (
-    <span className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-      <Icon size={15} className="text-slate-400" />
-      {text}
-    </span>
-  )
-}
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -57,96 +29,14 @@ function EmptyState({ icon: Icon, text }: { icon: LucideIcon; text: string }) {
   )
 }
 
-// Initialized from the loaded profile (mounted only once data is present), so no
-// state-syncing effect is needed.
-function BackgroundForm({ initial }: { initial: PatientProfile }) {
-  const { t } = useTranslation()
-  const { showToast } = useToast()
-  const qc = useQueryClient()
-  const [form, setForm] = useState({
-    blood_type: initial.blood_type ?? '',
-    allergies_summary: initial.allergies_summary ?? '',
-    chronic_conditions: initial.chronic_conditions ?? '',
-    previous_surgeries: initial.previous_surgeries ?? '',
-    current_medications: initial.current_medications ?? '',
-  })
-
-  const save = useMutation({
-    mutationFn: () => authApi.updatePatientProfile(form as Partial<PatientProfile>),
-    onSuccess: () => {
-      showToast(t('medical.backgroundSaved'), 'success')
-      qc.invalidateQueries({ queryKey: ['patient-profile'] })
-    },
-    onError: (err) => showToast(errorMessage(err), 'error'),
-  })
-
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }))
-
-  return (
-    <SectionCard title={t('medical.background')}>
-      {/* globals.css's unlayered `p { margin: 0 0 var(--space-3) }` forces
-          margin-top:0 regardless of a mt-* class, so this goes inline instead. */}
-      <p className="text-sm text-slate-500" style={{ marginTop: '0.25rem' }}>{t('medical.backgroundIntro')}</p>
-
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* A plain <div>, not <label> — wrapping <Select> in a bare <label> makes the
-            browser's implicit label-activation fire a phantom second click on whatever
-            labelable element (e.g. the "×" clear button) appears inside it right after
-            a selection, which immediately re-clears the value. FormField-driven Selects
-            elsewhere avoid this because their <label> is a sibling with htmlFor, not a wrapper. */}
-        <div className="flex flex-col">
-          <FieldLabel icon={Droplets} text={t('medical.bloodType')} />
-          <Select
-            options={BLOOD_OPTIONS}
-            value={form.blood_type}
-            onChange={(value) => setForm((f) => ({ ...f, blood_type: String(value) }))}
-          />
-        </div>
-        <label className="flex flex-col">
-          <FieldLabel icon={AlertTriangle} text={t('medical.allergies')} />
-          <textarea rows={2} className={TEXTAREA_CLASS} value={form.allergies_summary} onChange={set('allergies_summary')} />
-        </label>
-        <label className="flex flex-col">
-          <FieldLabel icon={Activity} text={t('medical.chronicConditions')} />
-          <textarea rows={2} className={TEXTAREA_CLASS} value={form.chronic_conditions} onChange={set('chronic_conditions')} />
-        </label>
-        <label className="flex flex-col">
-          <FieldLabel icon={Pill} text={t('medical.currentMedications')} />
-          <textarea rows={2} className={TEXTAREA_CLASS} value={form.current_medications} onChange={set('current_medications')} />
-        </label>
-        <label className="flex flex-col sm:col-span-2">
-          <FieldLabel icon={Scissors} text={t('medical.previousSurgeries')} />
-          <textarea rows={2} className={TEXTAREA_CLASS} value={form.previous_surgeries} onChange={set('previous_surgeries')} />
-        </label>
-      </div>
-
-      <div className="mt-5 flex justify-end">
-        <button
-          type="button"
-          onClick={() => save.mutate()}
-          disabled={save.isPending}
-          className="rounded-xl bg-[#0D9488] border border-[#0B7A70] px-6 py-2.5 font-semibold text-white shadow-sm transition-all hover:bg-[#0B7A70] disabled:opacity-60"
-        >
-          {t('medical.saveBackground')}
-        </button>
-      </div>
-    </SectionCard>
-  )
-}
-
 export function MyMedicalHistoryPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
 
-  const { data: profile, isLoading } = useQuery({
-    queryKey: ['patient-profile'],
-    queryFn: authApi.patientProfile,
-  })
-  const { data: records = [] } = useQuery({ queryKey: ['records', 'mine'], queryFn: () => medicalApi.records() })
-  const { data: notes = [] } = useQuery({ queryKey: ['notes', 'mine'], queryFn: () => medicalApi.notes() })
+  const { data: records = [], isLoading: recordsLoading } = useQuery({ queryKey: ['records', 'mine'], queryFn: () => medicalApi.records() })
+  const { data: notes = [], isLoading: notesLoading } = useQuery({ queryKey: ['notes', 'mine'], queryFn: () => medicalApi.notes() })
 
-  if (isLoading || !profile) return <CenteredSpinner />
+  if (recordsLoading || notesLoading) return <CenteredSpinner />
 
   return (
     <div className="flex flex-col gap-6">
@@ -154,8 +44,6 @@ export function MyMedicalHistoryPage() {
       <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>
         {t('nav.medicalHistory')}
       </h1>
-
-      <BackgroundForm initial={profile} />
 
       <SectionCard title={t('medical.records')}>
         <div className="mt-4">

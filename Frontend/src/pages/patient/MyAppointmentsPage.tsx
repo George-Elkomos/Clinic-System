@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Calendar, Clock, Star } from 'lucide-react'
+import { AlertTriangle, Calendar, Clock, Star } from 'lucide-react'
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { Button } from '../../components/primitives/Button'
 import { Card } from '../../components/primitives/Card'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
+import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { StatusBadge } from '../../components/primitives/StatusBadge'
 import { useToast } from '../../components/primitives/Toast'
@@ -39,6 +40,7 @@ function doctorInitials(name: string) {
 }
 
 type ApptFilter = 'all' | 'upcoming' | 'completed'
+type ApptSort = 'newest' | 'oldest' | 'doctor'
 const UPCOMING_STATUSES: AppointmentStatus[] = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS']
 
 function TodayStatusCard({ appt }: { appt: Appointment }) {
@@ -178,6 +180,8 @@ export function MyAppointmentsPage() {
   const qc = useQueryClient()
   const [reviewingId, setReviewingId] = useState<number | null>(null)
   const [filter, setFilter] = useState<ApptFilter>('all')
+  const [sortBy, setSortBy] = useState<ApptSort>('newest')
+  const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null)
 
   const { data, isLoading } = useQuery({ queryKey: ['appointments', 'mine'], queryFn: () => appointmentsApi.list() })
   const { data: waitlist = [] } = useQuery({ queryKey: ['waitlist'], queryFn: () => waitlistApi.mine() })
@@ -208,13 +212,11 @@ export function MyAppointmentsPage() {
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
-  const onCancel = async (a: Appointment) => {
-    const ok = await confirm({
-      title: t('appointments.cancel'),
-      message: t('appointments.cancelConfirm', { name: a.doctor_name, when: formatDateTime(a.scheduled_start, language) }),
-      confirmLabel: t('appointments.cancel'), danger: true,
-    })
-    if (ok) cancel.mutate(a.id)
+  const onCancel = (a: Appointment) => setCancelTarget(a)
+  const confirmCancel = () => {
+    if (!cancelTarget) return
+    cancel.mutate(cancelTarget.id)
+    setCancelTarget(null)
   }
   const onLeaveWaitlist = async (id: number) => {
     if (await confirm({ title: t('waitlist.leave'), message: t('waitlist.leaveConfirm'), danger: true })) leaveWaitlist.mutate(id)
@@ -231,10 +233,20 @@ export function MyAppointmentsPage() {
     if (filter === 'completed') return a.status === 'COMPLETED'
     return true
   })
+  const sortedAppointments = [...filteredAppointments].sort((a, b) => {
+    if (sortBy === 'doctor') return a.doctor_name.localeCompare(b.doctor_name)
+    const diff = new Date(a.scheduled_start).getTime() - new Date(b.scheduled_start).getTime()
+    return sortBy === 'oldest' ? diff : -diff
+  })
   const FILTERS: { key: ApptFilter; label: string }[] = [
     { key: 'all', label: t('appointments.filterAll') },
     { key: 'upcoming', label: t('appointments.filterUpcoming') },
     { key: 'completed', label: t('appointments.filterCompleted') },
+  ]
+  const SORTS: { key: ApptSort; label: string }[] = [
+    { key: 'newest', label: t('appointments.sortNewest') },
+    { key: 'oldest', label: t('appointments.sortOldest') },
+    { key: 'doctor', label: t('appointments.sortDoctor') },
   ]
 
   return (
@@ -279,21 +291,39 @@ export function MyAppointmentsPage() {
       )}
 
       <div>
-        <div className="mb-4 flex flex-wrap gap-2">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className={
-                filter === f.key
-                  ? 'rounded-xl border border-[#0B7A70] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
-                  : 'rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 sm:text-sm'
-              }
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={
+                  filter === f.key
+                    ? 'rounded-xl border border-[#0B7A70] bg-[#0D9488] px-4 py-2 text-xs font-semibold text-white shadow-sm sm:text-sm'
+                    : 'rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 sm:text-sm'
+                }
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="w-full sm:w-56">
+            <label htmlFor="appt-sort" className="visually-hidden">{t('appointments.sortLabel')}</label>
+            <Select
+              id="appt-sort"
+              options={SORTS.map((s) => ({ value: s.key, label: s.label }))}
+              value={sortBy}
+              onChange={(v) => {
+                // Select always renders a clear (×) button once a value is set — not
+                // appropriate for a sort control, which has no valid "unset" state.
+                // Falling back to the default keeps sortedAppointments' logic (and the
+                // dropdown's displayed label) always in a valid state.
+                const next = Array.isArray(v) ? v[0] : v
+                setSortBy((next || 'newest') as ApptSort)
+              }}
+            />
+          </div>
         </div>
 
         {isLoading ? (
@@ -304,7 +334,7 @@ export function MyAppointmentsPage() {
           <Card><p>{t('appointments.noResults')}</p></Card>
         ) : (
           <div className="flex flex-col gap-3">
-          {filteredAppointments.map((a) => {
+          {sortedAppointments.map((a) => {
           const start = new Date(a.scheduled_start)
           const dateLabel = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', year: 'numeric' }).format(start)
           const timeLabel = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(start)
@@ -422,6 +452,51 @@ export function MyAppointmentsPage() {
             )
           })}
         </Card>
+      )}
+
+      {cancelTarget && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-appt-title"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setCancelTarget(null) }}
+          onKeyDown={(e) => e.key === 'Escape' && setCancelTarget(null)}
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <h2 id="cancel-appt-title" className="appt-cancel-modal-title text-center font-bold text-slate-900">
+              {t('appointments.cancel')}
+            </h2>
+            <p className="text-center text-sm text-slate-500">{t('appointments.cancelWarning')}</p>
+            <div className="my-4 rounded-xl border border-slate-100 bg-slate-50 p-3 text-center text-sm text-slate-700">
+              <Trans
+                i18nKey="appointments.cancelDetails"
+                values={{ name: cancelTarget.doctor_name, when: formatDateTime(cancelTarget.scheduled_start, language) }}
+                components={{ b: <strong /> }}
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setCancelTarget(null)}
+                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              >
+                {t('common.keep')}
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancel}
+                disabled={cancel.isPending}
+                className="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:opacity-60"
+              >
+                {t('appointments.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

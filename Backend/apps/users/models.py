@@ -1,3 +1,6 @@
+from pathlib import Path
+from uuid import uuid4
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -6,6 +9,11 @@ from apps.core.enums import BloodType, GenderChoices, LanguageChoices, RoleChoic
 from apps.core.models import TimeStampedModel
 
 from .managers import UserManager
+
+
+def user_avatar_path(instance, filename):
+    ext = Path(filename).suffix.lower()
+    return f"avatars/user_{instance.id}/{uuid4().hex}{ext}"
 
 
 class User(AbstractUser):
@@ -21,6 +29,10 @@ class User(AbstractUser):
     # Set whenever staff assign a temp/generated password; cleared once the
     # user sets a password of their own choosing.
     must_change_password = models.BooleanField(default=False)
+    # Self-service avatar for Patient/Secretary/Manager. Doctors use
+    # DoctorProfile.photo instead (already wired into public listings) —
+    # build_user_payload() picks whichever one applies per role.
+    avatar = models.ImageField(upload_to=user_avatar_path, null=True, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # email + password are prompted automatically
@@ -88,6 +100,21 @@ class PatientProfile(TimeStampedModel):
     chronic_conditions = models.TextField(blank=True)
     previous_surgeries = models.TextField(blank=True)
     current_medications = models.TextField(blank=True)
+    insurance_provider = models.CharField(max_length=150, blank=True)
+    insurance_policy_number = models.CharField(max_length=64, blank=True)
 
     def __str__(self):
         return f"Patient: {self.user.get_full_name() or self.user.email}"
+
+
+class StaffProfile(TimeStampedModel):
+    """Extended data for users with role=SECRETARY or MANAGER."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="staff_profile"
+    )
+    staff_id = models.CharField(max_length=32, blank=True)
+    assigned_room = models.CharField(max_length=32, blank=True)
+
+    def __str__(self):
+        return f"Staff: {self.user.get_full_name() or self.user.email}"

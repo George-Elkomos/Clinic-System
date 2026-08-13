@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
+import { OverrideWarningModal } from '../../components/OverrideWarningModal'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
@@ -49,8 +50,10 @@ export function QueueBoardPage() {
   const [emergency, setEmergency] = useState(false)
   const [registeringPatient, setRegisteringPatient] = useState(false)
   const [editingProfile, setEditingProfile] = useState<number | null>(null)
+  const [pendingWalkInWarning, setPendingWalkInWarning] = useState(false)
 
   const { data: doctors } = useQuery({ queryKey: ['doctors'], queryFn: () => doctorsApi.list() })
+  const selectedDoctor = (doctors?.results ?? []).find((d) => d.id === Number(doctorId))
 
   const { data: queue, isLoading } = useQuery({
     queryKey: ['queue', doctorId],
@@ -67,10 +70,30 @@ export function QueueBoardPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['queue', doctorId] })
 
   const addWalkIn = useMutation({
-    mutationFn: () => appointmentsApi.walkIn({ patient: Number(walkInPatient), doctor: Number(doctorId), emergency }),
-    onSuccess: () => { showToast(t('queue.added'), 'success'); setWalkInPatient(''); setEmergency(false); invalidate() },
+    mutationFn: (override?: string) =>
+      appointmentsApi.walkIn({
+        patient: Number(walkInPatient),
+        doctor: Number(doctorId),
+        emergency,
+        ...(override !== undefined ? { override: true, override_reason: override } : {}),
+      }),
+    onSuccess: () => {
+      showToast(t('queue.added'), 'success')
+      setWalkInPatient('')
+      setEmergency(false)
+      setPendingWalkInWarning(false)
+      invalidate()
+    },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
+
+  const handleAddWalkIn = () => {
+    if (selectedDoctor && !selectedDoctor.accepts_walk_ins) {
+      setPendingWalkInWarning(true)
+      return
+    }
+    addWalkIn.mutate(undefined)
+  }
 
   const transition = useMutation({
     mutationFn: ({ id, action }: { id: number; action: 'checkIn' | 'start' | 'complete' | 'markEmergency' }) =>
@@ -153,7 +176,7 @@ export function QueueBoardPage() {
               {t('queue.emergency')}
             </label>
             <div className="flex flex-wrap gap-3">
-              <button type="button" disabled={addWalkIn.isPending || !walkInPatient} onClick={() => addWalkIn.mutate()} className={BTN_PRIMARY}>
+              <button type="button" disabled={addWalkIn.isPending || !walkInPatient} onClick={handleAddWalkIn} className={BTN_PRIMARY}>
                 {addWalkIn.isPending && <Spinner size={14} />}{t('queue.addWalkIn')}
               </button>
               <button type="button" onClick={() => setRegisteringPatient(true)} className={BTN_SECONDARY}>{t('patients.register')}</button>
@@ -228,6 +251,16 @@ export function QueueBoardPage() {
         <PatientProfileEditorModal
           profileId={editingProfile}
           onClose={() => setEditingProfile(null)}
+        />
+      )}
+
+      {pendingWalkInWarning && selectedDoctor && (
+        <OverrideWarningModal
+          title={t('queue.addWalkIn')}
+          message={t('overrideModal.walkInWarning', { name: selectedDoctor.full_name })}
+          loading={addWalkIn.isPending}
+          onCancel={() => setPendingWalkInWarning(false)}
+          onConfirm={(reason) => addWalkIn.mutate(reason)}
         />
       )}
     </div>

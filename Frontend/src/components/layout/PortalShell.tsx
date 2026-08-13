@@ -1,6 +1,7 @@
 import {
   ArrowRightLeft,
   Bell,
+  CalendarCheck,
   CalendarDays,
   CalendarX,
   ChevronDown,
@@ -170,6 +171,7 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
         { to: '/patient', labelKey: 'nav.patientDashboard', icon: HomeSolidIcon, end: true },
         { to: '/patient/book', labelKey: 'nav.bookAppointment', icon: BookAppointmentSolidIcon },
         { to: '/patient/appointments', labelKey: 'nav.myAppointments', icon: fromLucide(Clock) },
+        { to: '/patient/profile', labelKey: 'nav.myProfile', icon: fromLucide(UserCircle) },
       ],
     },
     {
@@ -218,6 +220,7 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
     {
       items: [
         { to: '/secretary', labelKey: 'nav.dashboard', icon: HomeSolidIcon, end: true },
+        { to: '/secretary/booking', labelKey: 'nav.bookAppointment', icon: fromLucide(CalendarCheck) },
         { to: '/secretary/desk', labelKey: 'nav.appointmentDesk', icon: fromLucide(Inbox) },
         { to: '/secretary/queue', labelKey: 'nav.queueBoard', icon: fromLucide(LayoutGrid) },
         { to: '/secretary/patients', labelKey: 'nav.allPatients', icon: fromLucide(Users) },
@@ -231,7 +234,7 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
     },
     {
       headerKey: 'nav.sectionSettings',
-      items: [{ to: '/account/notifications', labelKey: 'notifications.title', icon: fromLucide(Bell) }],
+      items: [{ to: '/account/settings', labelKey: 'nav.settings', icon: fromLucide(Bell) }],
     },
   ],
   MANAGER: [
@@ -248,7 +251,7 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
     },
     {
       headerKey: 'nav.sectionSettings',
-      items: [{ to: '/account/notifications', labelKey: 'notifications.title', icon: fromLucide(Bell) }],
+      items: [{ to: '/account/settings', labelKey: 'nav.settings', icon: fromLucide(Bell) }],
     },
   ],
 }
@@ -261,14 +264,14 @@ const HOME_BY_ROLE: Record<Role, string> = {
 }
 
 // Where the avatar menu's profile/settings item sends each role. Secretary
-// and Manager have no personal public-facing profile page yet, so they land
-// on the shared account-settings page instead — matches spec's "relevant
-// account settings or profile view" allowance for those two roles.
+// and Manager have no personal public-facing profile page, so they land on
+// the shared /account/settings page (avatar, staff ID/room, password,
+// notification prefs, language) instead of a dedicated profile page.
 const PROFILE_PATH_BY_ROLE: Record<Role, string> = {
-  PATIENT: '/patient/history',
+  PATIENT: '/patient/profile',
   DOCTOR: '/doctor/profile',
-  SECRETARY: '/account/notifications',
-  MANAGER: '/account/notifications',
+  SECRETARY: '/account/settings',
+  MANAGER: '/account/settings',
 }
 
 const PROFILE_LABEL_KEY_BY_ROLE: Record<Role, string> = {
@@ -352,12 +355,14 @@ function ShellLanguageToggle() {
 // shared hook for it yet.
 function HeaderAvatarMenu({
   displayName,
+  avatarSrc,
   role,
   profileTo,
   profileLabelKey,
   onLogout,
 }: {
   displayName: string
+  avatarSrc: string
   role: Role
   profileTo: string
   profileLabelKey: string
@@ -387,7 +392,7 @@ function HeaderAvatarMenu({
         onClick={() => setOpen((o) => !o)}
       >
         <img
-          src={avatarUrl(displayName, 64)}
+          src={avatarSrc}
           alt=""
           className="h-9 w-9 rounded-full border border-gray-200 object-cover"
         />
@@ -400,7 +405,7 @@ function HeaderAvatarMenu({
           className="absolute end-0 top-[calc(100%+10px)] z-50 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-2 shadow-xl shadow-slate-900/10"
         >
           <div className="flex items-center gap-3 border-b border-slate-100 px-4 pb-3">
-            <img src={avatarUrl(displayName, 64)} alt="" className="h-9 w-9 shrink-0 rounded-full" />
+            <img src={avatarSrc} alt="" className="h-9 w-9 shrink-0 rounded-full" />
             <div className="min-w-0">
               <div className="patient-text-body truncate font-semibold" style={{ color: 'var(--text-primary)' }}>
                 {displayName}
@@ -466,6 +471,7 @@ export function PortalShell() {
   if (!user) return null
 
   const displayName = user.full_name || user.email
+  const avatarSrc = user.avatar_url ?? avatarUrl(displayName, 72)
   const navGroups = NAV_BY_ROLE[user.role]
   const allItems = navGroups.flatMap((g) => g.items)
 
@@ -552,7 +558,7 @@ export function PortalShell() {
         <div className="flex flex-col gap-3 border-t border-[#F3F4F6] p-4">
           <div className="flex items-center justify-between rounded-xl p-3" style={{ background: '#F9FAFB' }}>
             <div className="flex items-center gap-3">
-              <img src={avatarUrl(displayName, 72)} alt="" className="h-9 w-9 rounded-full" />
+              <img src={avatarSrc} alt="" className="h-9 w-9 rounded-full" />
               <div className="min-w-0">
                 <div className="patient-text-body truncate font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {displayName}
@@ -600,6 +606,7 @@ export function PortalShell() {
             <div className="hidden h-6 w-px bg-gray-200 sm:block" aria-hidden="true" />
             <HeaderAvatarMenu
               displayName={displayName}
+              avatarSrc={avatarSrc}
               role={user.role}
               profileTo={PROFILE_PATH_BY_ROLE[user.role]}
               profileLabelKey={PROFILE_LABEL_KEY_BY_ROLE[user.role]}

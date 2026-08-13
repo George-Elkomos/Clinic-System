@@ -13,7 +13,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.core.enums import AuditAction
 
-from .models import NotificationPreference, PatientProfile, User
+from .models import NotificationPreference, PatientProfile, StaffProfile, User
 from .serializers import (
     ChangePasswordSerializer,
     LoginSerializer,
@@ -23,6 +23,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     PatientProfileSerializer,
     RegisterSerializer,
+    StaffProfileSerializer,
     UserSerializer,
 )
 
@@ -159,6 +160,17 @@ class PatientProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         profile, _ = PatientProfile.objects.get_or_create(user=self.request.user)
+        return profile
+
+
+class StaffProfileView(generics.RetrieveUpdateAPIView):
+    """A secretary/manager reads/updates their own staff profile."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = StaffProfileSerializer
+
+    def get_object(self):
+        profile, _ = StaffProfile.objects.get_or_create(user=self.request.user)
         return profile
 
 

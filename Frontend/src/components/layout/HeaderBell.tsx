@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCircle, Clock, FileText, Star, type LucideIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useLanguage } from '../../hooks/useLanguage'
@@ -49,7 +49,18 @@ export function HeaderBell() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const qc = useQueryClient()
+
+  // Closes on outside click using the same mousedown-listener idiom
+  // Select.tsx/AsyncCombobox.tsx and HeaderAvatarMenu use.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const { data: unread = 0 } = useQuery({
     queryKey: ['notifications', 'unread'],
@@ -74,7 +85,7 @@ export function HeaderBell() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         className="patient-hover-lift relative flex h-10 w-10 items-center justify-center rounded-full border-0 bg-transparent hover:bg-bg-app"

@@ -13,8 +13,22 @@ export const appointmentsApi = {
   list: (params?: { status?: string; doctor?: number; date?: string }) =>
     api.get<Paginated<Appointment>>('/appointments/', { params }).then((r) => r.data),
 
-  book: (slot: number, reason?: string, patient?: number) =>
-    api.post<Appointment>('/appointments/', { slot, reason, patient }).then((r) => r.data),
+  book: (
+    slot: number,
+    reason?: string,
+    patient?: number,
+    override?: boolean,
+    overrideReason?: string,
+  ) =>
+    api
+      .post<Appointment>('/appointments/', {
+        slot,
+        reason,
+        patient,
+        override,
+        override_reason: overrideReason,
+      })
+      .then((r) => r.data),
 
   confirm: (id: number) =>
     api.post<Appointment>(`/appointments/${id}/confirm/`, {}).then((r) => r.data),
@@ -35,8 +49,14 @@ export const appointmentsApi = {
       .post<Appointment & { billing: AppointmentBilling }>(`/appointments/${id}/complete/`, {})
       .then((r) => r.data),
 
-  walkIn: (data: { patient: number; doctor: number; reason?: string; emergency?: boolean }) =>
-    api.post<Appointment>('/appointments/walk-in/', data).then((r) => r.data),
+  walkIn: (data: {
+    patient: number
+    doctor: number
+    reason?: string
+    emergency?: boolean
+    override?: boolean
+    override_reason?: string
+  }) => api.post<Appointment>('/appointments/walk-in/', data).then((r) => r.data),
 
   markEmergency: (id: number) =>
     api.post<Appointment>(`/appointments/${id}/mark-emergency/`, {}).then((r) => r.data),

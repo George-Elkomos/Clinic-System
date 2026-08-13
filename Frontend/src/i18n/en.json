@@ -127,6 +127,7 @@
     "mustChangePasswordTitle": "Choose a new password",
     "mustChangePasswordIntro": "You're using a temporary password. Set a new one to continue.",
     "currentPassword": "Temporary password",
+    "currentPasswordLabel": "Current password",
     "changePasswordSubmit": "Set new password",
     "changingPassword": "Saving…",
     "changePasswordSuccess": "Your password has been changed."
@@ -170,7 +171,19 @@
     "booked": "Your appointment has been requested. The front desk will confirm it.",
     "selectDoctorFirst": "Please choose a doctor to see available times.",
     "patientOnly": "Please sign in or create an account to book this appointment.",
-    "confirmBook": "Confirm & Book Appointment"
+    "confirmBook": "Confirm & Book Appointment",
+    "notAcceptingBanner": "Dr. {{name}} is not currently accepting new appointments."
+  },
+  "overrideModal": {
+    "reasonLabel": "Reason for override",
+    "reasonEmergency": "Emergency",
+    "reasonExistingPatient": "Existing Patient",
+    "reasonDoctorApproved": "Doctor Approved",
+    "reasonOther": "Other",
+    "reasonCustomLabel": "Please specify",
+    "confirmOverride": "Confirm Override",
+    "walkInWarning": "Dr. {{name}} does not accept walk-ins. Add this patient anyway?",
+    "bookingWarning": "Dr. {{name}} is currently not accepting new patients. Book this appointment anyway?"
   },
   "appointments": {
     "title": "Appointments",
@@ -292,7 +305,16 @@
     "myProfileIntro": "Update the information patients see on your public profile page.",
     "profileSaved": "Your profile has been updated.",
     "minutesHint": "In minutes",
-    "feeHint": "In USD — leave blank to hide it from patients"
+    "feeHint": "In USD — leave blank to hide it from patients",
+    "personalBio": "Personal & Bio",
+    "clinicConsultation": "Clinic & Consultation",
+    "bioAr": "About the doctor (Arabic)",
+    "fullNameAr": "Full name (Arabic)",
+    "fullNameArHint": "Shown to Arabic-speaking patients",
+    "education": "Education & Qualifications",
+    "weeklySchedule": "Weekly Schedule",
+    "manageSchedule": "Manage Schedule",
+    "noScheduleYet": "No working hours set yet."
   },
   "audit": {
     "title": "Audit Log",
@@ -499,8 +521,22 @@
       "OTHER": "Other"
     }
   },
+  "profile": {
+    "uploadPhoto": "Upload Photo",
+    "changePhoto": "Change Photo",
+    "removePhoto": "Remove Photo",
+    "avatarInvalidType": "Please choose an image file.",
+    "avatarTooLarge": "Image must be smaller than 5 MB."
+  },
   "settings": {
     "title": "Notification Settings",
+    "accountSettingsTitle": "Account Settings",
+    "profileSummary": "Profile Summary",
+    "security": "Security",
+    "profileSaved": "Your profile was updated.",
+    "roleTitle": "Role",
+    "staffId": "Staff ID",
+    "assignedRoom": "Assigned room",
     "channels": "How should we contact you?",
     "inApp": "In-app notifications",
     "email": "Email",
@@ -627,9 +663,17 @@
     "nationalId": "National ID (optional)",
     "dateOfBirth": "Date of birth",
     "gender": "Gender",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "genderOther": "Other",
+    "genderUndisclosed": "Prefer not to say",
     "address": "Address",
     "emergencyContactName": "Emergency contact name",
-    "emergencyContactPhone": "Emergency contact phone"
+    "emergencyContactPhone": "Emergency contact phone",
+    "personalDetails": "Personal Details",
+    "medicalEmergency": "Medical & Emergency",
+    "insuranceProvider": "Insurance provider",
+    "insurancePolicyNumber": "Insurance policy number"
   },
   "staff": {
     "users": "User Management",

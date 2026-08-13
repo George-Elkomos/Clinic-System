@@ -127,6 +127,7 @@
     "mustChangePasswordTitle": "اختر كلمة مرور جديدة",
     "mustChangePasswordIntro": "أنت تستخدم كلمة مرور مؤقتة. اختر كلمة مرور جديدة للاستمرار.",
     "currentPassword": "كلمة المرور المؤقتة",
+    "currentPasswordLabel": "كلمة المرور الحالية",
     "changePasswordSubmit": "تعيين كلمة المرور الجديدة",
     "changingPassword": "جارٍ الحفظ…",
     "changePasswordSuccess": "تم تغيير كلمة المرور بنجاح."
@@ -170,7 +171,19 @@
     "booked": "تم طلب موعدك. سيقوم مكتب الاستقبال بتأكيده.",
     "selectDoctorFirst": "يرجى اختيار طبيب لعرض الأوقات المتاحة.",
     "patientOnly": "يرجى تسجيل الدخول أو إنشاء حساب لحجز هذا الموعد.",
-    "confirmBook": "تأكيد وحجز الموعد"
+    "confirmBook": "تأكيد وحجز الموعد",
+    "notAcceptingBanner": "الدكتور {{name}} لا يستقبل مواعيد جديدة حاليًا."
+  },
+  "overrideModal": {
+    "reasonLabel": "سبب تجاوز الإعداد",
+    "reasonEmergency": "حالة طارئة",
+    "reasonExistingPatient": "مريض حالي",
+    "reasonDoctorApproved": "بموافقة الطبيب",
+    "reasonOther": "سبب آخر",
+    "reasonCustomLabel": "يرجى التوضيح",
+    "confirmOverride": "تأكيد التجاوز",
+    "walkInWarning": "الدكتور {{name}} لا يقبل الزيارات المباشرة. هل تريد إضافة هذا المريض على أي حال؟",
+    "bookingWarning": "الدكتور {{name}} لا يستقبل مرضى جدد حاليًا. هل تريد حجز هذا الموعد على أي حال؟"
   },
   "appointments": {
     "title": "المواعيد",
@@ -292,7 +305,16 @@
     "myProfileIntro": "حدّث المعلومات التي يراها المرضى في صفحة ملفك الشخصي العامة.",
     "profileSaved": "تم تحديث ملفك الشخصي.",
     "minutesHint": "بالدقائق",
-    "feeHint": "بالدولار الأمريكي — اتركه فارغاً لإخفائه عن المرضى"
+    "feeHint": "بالدولار الأمريكي — اتركه فارغاً لإخفائه عن المرضى",
+    "personalBio": "البيانات الشخصية والنبذة",
+    "clinicConsultation": "العيادة والاستشارة",
+    "bioAr": "نبذة عن الطبيب (بالعربية)",
+    "fullNameAr": "الاسم الكامل (بالعربية)",
+    "fullNameArHint": "يظهر للمرضى الناطقين بالعربية",
+    "education": "المؤهلات العلمية",
+    "weeklySchedule": "الجدول الأسبوعي",
+    "manageSchedule": "إدارة الجدول",
+    "noScheduleYet": "لم يتم تحديد ساعات عمل بعد."
   },
   "audit": {
     "title": "سجل التدقيق",
@@ -499,8 +521,23 @@
       "OTHER": "أخرى"
     }
   },
+  "profile": {
+    "uploadPhoto": "رفع صورة",
+    "changePhoto": "تغيير الصورة",
+    "removePhoto": "إزالة الصورة",
+    "avatarInvalidType": "يرجى اختيار ملف صورة.",
+    "avatarTooLarge": "يجب أن يكون حجم الصورة أقل من 5 ميجابايت."
+  },
   "settings": {
     "title": "إعدادات الإشعارات",
+    "accountSettingsTitle": "إعدادات الحساب",
+    "profileSummary": "ملخص الملف الشخصي",
+    "security": "الأمان",
+    "profileSaved": "تم تحديث ملفك الشخصي.",
+    "roleTitle": "الدور",
+    "staffId": "الرقم الوظيفي",
+    "assignedRoom": "الغرفة المخصصة",
+    "language": "اللغة",
     "channels": "كيف نتواصل معك؟",
     "inApp": "إشعارات داخل التطبيق",
     "email": "البريد الإلكتروني",
@@ -627,9 +664,17 @@
     "nationalId": "رقم الهوية الوطنية (اختياري)",
     "dateOfBirth": "تاريخ الميلاد",
     "gender": "الجنس",
+    "genderMale": "ذكر",
+    "genderFemale": "أنثى",
+    "genderOther": "آخر",
+    "genderUndisclosed": "تفضّل عدم الإفصاح",
     "address": "العنوان",
     "emergencyContactName": "اسم جهة الاتصال في الطوارئ",
-    "emergencyContactPhone": "هاتف جهة الاتصال في الطوارئ"
+    "emergencyContactPhone": "هاتف جهة الاتصال في الطوارئ",
+    "personalDetails": "البيانات الشخصية",
+    "medicalEmergency": "البيانات الطبية والطوارئ",
+    "insuranceProvider": "شركة التأمين",
+    "insurancePolicyNumber": "رقم بوليصة التأمين"
   },
   "staff": {
     "users": "إدارة المستخدمين",
