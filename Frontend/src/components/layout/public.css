@@ -203,4 +203,14 @@
   color: #dc2626;
 }
 
+/* Doctor-booking "Reason for visit" textarea: the base input/select/textarea
+   rule above fixes `height: 3rem` for single-line fields, which would clip a
+   multi-row textarea down to one line. */
+.public-shell textarea.public-textarea--reason {
+  height: auto;
+  min-height: 6rem;
+  padding-block: 0.75rem;
+  resize: vertical;
+}
+
 

@@ -128,46 +128,6 @@
 .breadcrumbs a { color: var(--primary); text-decoration: none; }
 .breadcrumbs span[aria-hidden] { margin-inline: var(--space-2); }
 
-/* ---- Doctor card ---- */
-.doctor-card {
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: var(--space-5);
-  box-shadow: var(--shadow); transition: box-shadow 0.18s, transform 0.18s;
-  display: flex; flex-direction: column; gap: var(--space-3);
-}
-.doctor-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-.doctor-card__header { display: flex; gap: var(--space-4); align-items: flex-start; }
-.doctor-card__photo {
-  width: 80px; height: 80px; border-radius: 50%; object-fit: cover;
-  flex-shrink: 0; background: var(--surface-2);
-  display: flex; align-items: center; justify-content: center;
-  font-size: var(--font-h2); font-weight: 700; color: var(--primary);
-  overflow: hidden;
-}
-.doctor-card__info { flex: 1; }
-.doctor-card__name { margin: 0 0 var(--space-1); font-size: var(--font-h3); }
-.doctor-card__tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
-.doctor-card__availability { font-size: var(--font-small); }
-.doctor-card__availability--soon { color: var(--success); }
-.doctor-card__availability--week { color: var(--warning); }
-.doctor-card__availability--later { color: var(--text-muted); }
-.doctor-card__footer { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; margin-top: auto; }
-.doctor-card__not-accepting { font-size: var(--font-small); color: var(--danger); }
-
-/* ---- Generic tag pill ---- */
-.tag {
-  display: inline-block; padding: 2px var(--space-3);
-  border-radius: 999px; font-size: var(--font-small); font-weight: 600;
-  color: var(--on-primary); white-space: nowrap;
-}
-.tag--blue   { background: var(--tag-blue); }
-.tag--green  { background: var(--tag-green); }
-.tag--orange { background: var(--tag-orange); }
-.tag--purple { background: var(--tag-purple); }
-.tag--teal   { background: var(--tag-teal); }
-.tag--red    { background: var(--tag-red); }
-.tag--muted  { background: var(--surface-2); color: var(--text-muted); }
-
 /* ---- Temp-password highlight box ---- */
 .temp-password-box {
   background: #fffde7; border: 2px solid var(--warning);

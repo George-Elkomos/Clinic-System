@@ -59,6 +59,7 @@ export interface Doctor {
   bio_ar: string
   room_number: string
   years_experience: number
+  languages_spoken: string
   avg_appointment_duration: number
   is_accepting_patients: boolean
   accepts_walk_ins: boolean

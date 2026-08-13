@@ -22,10 +22,18 @@ function DoctorEditor({ doctor }: { doctor: Doctor }) {
   const [room, setRoom] = useState(doctor.room_number)
   const [accepting, setAccepting] = useState(doctor.is_accepting_patients)
   const [bio, setBio] = useState(doctor.bio)
+  const [yearsExperience, setYearsExperience] = useState(doctor.years_experience)
+  const [languages, setLanguages] = useState(doctor.languages_spoken)
 
   const save = useMutation({
     mutationFn: () =>
-      doctorsApi.update(doctor.id, { room_number: room, is_accepting_patients: accepting, bio }),
+      doctorsApi.update(doctor.id, {
+        room_number: room,
+        is_accepting_patients: accepting,
+        bio,
+        years_experience: yearsExperience,
+        languages_spoken: languages,
+      }),
     onSuccess: () => {
       showToast(t('common.save'), 'success')
       qc.invalidateQueries({ queryKey: ['secretary-doctors'] })
@@ -45,6 +53,30 @@ function DoctorEditor({ doctor }: { doctor: Doctor }) {
         <div className="sm:col-span-2">
           <FormField label={t('doctors.bio')}>
             {(p) => <input {...p} className="patient-field" value={bio} onChange={(e) => setBio(e.target.value)} />}
+          </FormField>
+        </div>
+        <FormField label={t('doctors.experience')}>
+          {(p) => (
+            <input
+              {...p}
+              type="number"
+              min={0}
+              className="patient-field"
+              value={yearsExperience}
+              onChange={(e) => setYearsExperience(Number(e.target.value))}
+            />
+          )}
+        </FormField>
+        <div className="sm:col-span-2">
+          <FormField label={t('doctors.languages')}>
+            {(p) => (
+              <input
+                {...p}
+                className="patient-field"
+                value={languages}
+                onChange={(e) => setLanguages(e.target.value)}
+              />
+            )}
           </FormField>
         </div>
       </div>
