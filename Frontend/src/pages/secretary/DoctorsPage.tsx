@@ -81,7 +81,12 @@ function DoctorEditor({ doctor }: { doctor: Doctor }) {
         </div>
       </div>
       <label className="patient-text-body mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-        <input type="checkbox" checked={accepting} onChange={(e) => setAccepting(e.target.checked)} />
+        <input
+          type="checkbox"
+          className="patient-checkbox"
+          checked={accepting}
+          onChange={(e) => setAccepting(e.target.checked)}
+        />
         {t('doctors.acceptingPatients')}
       </label>
       <div className="flex flex-wrap items-center gap-3">

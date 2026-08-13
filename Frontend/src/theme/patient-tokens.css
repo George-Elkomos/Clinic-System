@@ -109,6 +109,17 @@
   font-size: inherit;
   min-height: 0; /* overrides globals.css's 48px elder-friendly tap-target floor */
 }
+/* globals.css's bare `input, select, textarea { width: 100% }` rule also
+   catches checkboxes/radios (not just text-style fields) — a bare
+   `<input type="checkbox">` inside a flex label stretches to fill the row,
+   pushing its label text off to the far end instead of sitting right next
+   to it. Opt-in class (not a blanket `input[type=checkbox]` selector) so it
+   doesn't fight components that already size their own checkboxes
+   explicitly, like `.procedure-checklist-item input[type='checkbox']`. */
+.patient-shell input.patient-checkbox {
+  width: 1.125rem;
+  flex-shrink: 0;
+}
 /* globals.css's `input, select, textarea {...}` and `h1`/`h2`/`h3` rules are
    unlayered plain CSS, which beats ANY Tailwind utility (always layered) for
    the same property — no matter the className, no matter specificity. A
@@ -234,3 +245,29 @@
 .patient-thin-scrollbar::-webkit-scrollbar { width: 6px; }
 .patient-thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .patient-thin-scrollbar::-webkit-scrollbar-thumb { background-color: #E2E8F0; border-radius: 9999px; }
+
+/* Inline sort control (My Appointments) — a bare <select>'s width/padding/
+   border/background are set unlayered by globals.css, which beats Tailwind's
+   layered utilities regardless of className, so the exact look has to be
+   plain CSS here too (same fix as .patient-field above), just sized to
+   content instead of block/100%. */
+.appt-sort-select {
+  display: inline-block;
+  width: auto;
+  min-height: 0;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  color: #334155;
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.appt-sort-select:focus { border-color: #0D9488; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15); }
+
+/* Cancel Appointment modal title — globals.css's bare `h2 { font-size; margin }`
+   is unlayered too (same trap as h1/h3), so Tailwind's text-xl/mb-2 on an
+   <h2> would be inert; only these two properties need the plain-CSS escape,
+   color/text-align/font-weight aren't pinned and stay as Tailwind utilities. */
+.appt-cancel-modal-title { margin: 0 0 0.5rem; font-size: 1.25rem; }

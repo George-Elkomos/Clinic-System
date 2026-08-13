@@ -18,12 +18,13 @@ import {
   Star,
   Stethoscope,
   TrendingUp,
+  UserCircle,
   Users,
   Wallet,
   X,
   Zap,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
@@ -205,6 +206,7 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
         { to: '/doctor/reviews', labelKey: 'nav.reviews', icon: fromLucide(Star) },
         { to: '/doctor/lab-orders', labelKey: 'nav.labOrders', icon: fromLucide(FlaskConical) },
         { to: '/doctor/referrals', labelKey: 'nav.referrals', icon: fromLucide(ArrowRightLeft) },
+        { to: '/doctor/profile', labelKey: 'nav.myProfile', icon: fromLucide(UserCircle) },
       ],
     },
     {
@@ -256,6 +258,24 @@ const HOME_BY_ROLE: Record<Role, string> = {
   DOCTOR: '/doctor',
   SECRETARY: '/secretary',
   MANAGER: '/manager',
+}
+
+// Where the avatar menu's profile/settings item sends each role. Secretary
+// and Manager have no personal public-facing profile page yet, so they land
+// on the shared account-settings page instead — matches spec's "relevant
+// account settings or profile view" allowance for those two roles.
+const PROFILE_PATH_BY_ROLE: Record<Role, string> = {
+  PATIENT: '/patient/history',
+  DOCTOR: '/doctor/profile',
+  SECRETARY: '/account/notifications',
+  MANAGER: '/account/notifications',
+}
+
+const PROFILE_LABEL_KEY_BY_ROLE: Record<Role, string> = {
+  PATIENT: 'nav.viewProfile',
+  DOCTOR: 'nav.viewProfile',
+  SECRETARY: 'nav.settings',
+  MANAGER: 'nav.settings',
 }
 
 // Detail/sub-pages reached via links rather than a persistent sidebar entry —
@@ -321,6 +341,103 @@ function ShellLanguageToggle() {
         |
       </span>
       {option('en', 'EN')}
+    </div>
+  )
+}
+
+// Avatar button + dropdown, shared by every role's header on all screen
+// sizes (unlike the sidebar's own logout button, which is hidden off-canvas
+// on mobile until the drawer opens). Closes on outside click using the same
+// mousedown-listener idiom Select.tsx/AsyncCombobox.tsx use — there's no
+// shared hook for it yet.
+function HeaderAvatarMenu({
+  displayName,
+  role,
+  profileTo,
+  profileLabelKey,
+  onLogout,
+}: {
+  displayName: string
+  role: Role
+  profileTo: string
+  profileLabelKey: string
+  onLogout: () => void
+}) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div className="relative shrink-0" ref={containerRef}>
+      <button
+        type="button"
+        className="flex shrink-0 items-center gap-1 border-0 bg-transparent p-0"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t('nav.accountMenu')}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <img
+          src={avatarUrl(displayName, 64)}
+          alt=""
+          className="h-9 w-9 rounded-full border border-gray-200 object-cover"
+        />
+        <ChevronDown size={14} className="hidden shrink-0 sm:block" style={{ color: 'var(--text-muted)' }} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute end-0 top-[calc(100%+10px)] z-50 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white py-2 shadow-xl shadow-slate-900/10"
+        >
+          <div className="flex items-center gap-3 border-b border-slate-100 px-4 pb-3">
+            <img src={avatarUrl(displayName, 64)} alt="" className="h-9 w-9 shrink-0 rounded-full" />
+            <div className="min-w-0">
+              <div className="patient-text-body truncate font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {displayName}
+              </div>
+              <div className="patient-text-body-secondary truncate" style={{ color: 'var(--text-secondary)' }}>
+                {t(`roles.${role}`)}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false)
+              navigate(profileTo)
+            }}
+            className="patient-text-body flex w-full items-center gap-2.5 border-0 bg-transparent px-4 py-2.5 text-start hover:bg-bg-app"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <UserCircle size={16} className="shrink-0" />
+            {t(profileLabelKey)}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false)
+              onLogout()
+            }}
+            className="patient-text-body flex w-full items-center gap-2.5 border-0 bg-transparent px-4 py-2.5 text-start hover:bg-red-50"
+            style={{ color: '#EF4444' }}
+          >
+            <LogOut size={16} className="shrink-0" />
+            {t('nav.logOut')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -477,17 +594,17 @@ export function PortalShell() {
               {t(currentItem?.labelKey ?? extraTitleKey ?? 'nav.dashboard')}
             </h1>
           </div>
-          <div className="flex h-[44px] items-center gap-4 sm:gap-6">
-            <img
-              src={avatarUrl(displayName, 64)}
-              alt=""
-              className="h-9 w-9 rounded-full border border-gray-200 object-cover"
-            />
+          <div className="flex h-[44px] items-center gap-2 sm:gap-4">
+            <ShellLanguageToggle />
             <HeaderBell />
-            <div className="hidden h-6 w-px bg-gray-200 lg:block" aria-hidden="true" />
-            <div className="hidden lg:block">
-              <ShellLanguageToggle />
-            </div>
+            <div className="hidden h-6 w-px bg-gray-200 sm:block" aria-hidden="true" />
+            <HeaderAvatarMenu
+              displayName={displayName}
+              role={user.role}
+              profileTo={PROFILE_PATH_BY_ROLE[user.role]}
+              profileLabelKey={PROFILE_LABEL_KEY_BY_ROLE[user.role]}
+              onLogout={() => void handleLogout()}
+            />
           </div>
         </header>
         <main

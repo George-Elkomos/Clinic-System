@@ -72,6 +72,9 @@
     "referrals": "Referrals",
     "radiology": "Radiology",
     "radiologyWorklist": "Radiology Worklist",
+    "myProfile": "My Profile",
+    "viewProfile": "View Profile",
+    "accountMenu": "Account menu",
     "patientDashboard": "Dashboard",
     "sectionMain": "Main",
     "sectionRecords": "Medical Records",
@@ -181,6 +184,8 @@
     "none": "You have no appointments yet.",
     "cancel": "Cancel appointment",
     "cancelConfirm": "Are you sure you want to cancel your appointment with {{name}} on {{when}}?",
+    "cancelWarning": "This action cannot be undone. Your doctor will be notified right away.",
+    "cancelDetails": "Cancelling appointment with <b>{{name}}</b> on <b>{{when}}</b>.",
     "cancelled": "Your appointment was cancelled.",
     "confirm": "Confirm",
     "confirmed": "Appointment confirmed.",
@@ -190,7 +195,11 @@
     "filterAll": "All",
     "filterUpcoming": "Upcoming",
     "filterCompleted": "Completed",
-    "noResults": "No appointments match this filter."
+    "noResults": "No appointments match this filter.",
+    "sortLabel": "Sort appointments",
+    "sortNewest": "Newest First",
+    "sortOldest": "Oldest First",
+    "sortDoctor": "Doctor Name (A-Z)"
   },
   "schedule": {
     "title": "My Working Schedule",
@@ -279,7 +288,11 @@
     "filters": "Filter doctors",
     "searchPlaceholder": "Search by name…",
     "filterSpecialty": "All specialties",
-    "noMatches": "No doctors found."
+    "noMatches": "No doctors found.",
+    "myProfileIntro": "Update the information patients see on your public profile page.",
+    "profileSaved": "Your profile has been updated.",
+    "minutesHint": "In minutes",
+    "feeHint": "In USD — leave blank to hide it from patients"
   },
   "audit": {
     "title": "Audit Log",

@@ -23,6 +23,7 @@ import { ScheduleManagementPage } from '../pages/doctor/ScheduleManagementPage'
 import { DoctorAppointmentsPage } from '../pages/doctor/DoctorAppointmentsPage'
 import { PatientRecordPage } from '../pages/doctor/PatientRecordPage'
 import { DoctorReviewsPage } from '../pages/doctor/DoctorReviewsPage'
+import { MyProfilePage } from '../pages/doctor/MyProfilePage'
 import { LabOrdersListPage } from '../pages/doctor/LabOrdersListPage'
 import { CreateLabOrderPage } from '../pages/doctor/CreateLabOrderPage'
 import { LabOrderDetailsPage } from '../pages/doctor/LabOrderDetailsPage'
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
       { path: 'lab-orders/:id', element: <LabOrderDetailsPage /> },
       { path: 'encounters/:appointmentId', element: <EncounterPage /> },
       { path: 'referrals', element: <DoctorReferralsPage /> },
+      { path: 'profile', element: <MyProfilePage /> },
     ],
   },
 

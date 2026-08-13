@@ -61,6 +61,7 @@ export interface Doctor {
   years_experience: number
   languages_spoken: string
   avg_appointment_duration: number
+  consultation_fee: string | null
   is_accepting_patients: boolean
   accepts_walk_ins: boolean
   specialties: number[]

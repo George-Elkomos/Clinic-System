@@ -72,6 +72,9 @@
     "referrals": "الإحالات",
     "radiology": "الأشعة",
     "radiologyWorklist": "قائمة عمل الأشعة",
+    "myProfile": "ملفي الشخصي",
+    "viewProfile": "عرض الملف الشخصي",
+    "accountMenu": "قائمة الحساب",
     "patientDashboard": "الرئيسية",
     "sectionMain": "الرئيسية",
     "sectionRecords": "السجلات الطبية",
@@ -181,6 +184,8 @@
     "none": "ليس لديك أي مواعيد بعد.",
     "cancel": "إلغاء الموعد",
     "cancelConfirm": "هل أنت متأكد من إلغاء موعدك مع {{name}} في {{when}}؟",
+    "cancelWarning": "لا يمكن التراجع عن هذا الإجراء. سيتم إخطار طبيبك فورًا.",
+    "cancelDetails": "إلغاء الموعد مع <b>{{name}}</b> في <b>{{when}}</b>.",
     "cancelled": "تم إلغاء موعدك.",
     "confirm": "تأكيد",
     "confirmed": "تم تأكيد الموعد.",
@@ -190,7 +195,11 @@
     "filterAll": "الكل",
     "filterUpcoming": "القادمة",
     "filterCompleted": "المكتملة",
-    "noResults": "لا توجد مواعيد تطابق هذا التصفية."
+    "noResults": "لا توجد مواعيد تطابق هذا التصفية.",
+    "sortLabel": "ترتيب المواعيد",
+    "sortNewest": "الأحدث أولاً",
+    "sortOldest": "الأقدم أولاً",
+    "sortDoctor": "اسم الطبيب (أ-ي)"
   },
   "schedule": {
     "title": "جدول عملي",
@@ -279,7 +288,11 @@
     "filters": "تصفية الأطباء",
     "searchPlaceholder": "ابحث بالاسم…",
     "filterSpecialty": "كل التخصصات",
-    "noMatches": "لا يوجد أطباء مطابقون."
+    "noMatches": "لا يوجد أطباء مطابقون.",
+    "myProfileIntro": "حدّث المعلومات التي يراها المرضى في صفحة ملفك الشخصي العامة.",
+    "profileSaved": "تم تحديث ملفك الشخصي.",
+    "minutesHint": "بالدقائق",
+    "feeHint": "بالدولار الأمريكي — اتركه فارغاً لإخفائه عن المرضى"
   },
   "audit": {
     "title": "سجل التدقيق",
