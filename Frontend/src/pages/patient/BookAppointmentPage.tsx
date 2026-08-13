@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck, CalendarX, Check, ChevronDown, Loader2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { CalendarCheck, CalendarX, Loader2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { AsyncCombobox, type ComboOption } from '../../components/primitives/AsyncCombobox'
 import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
@@ -17,74 +18,17 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-// Closes a popover on outside click, since neither custom control below
-// wraps a native element that would give us that for free.
-function useOutsideClose(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open, onClose])
-  return ref
-}
-
-interface ComboboxOption {
-  value: number
-  label: string
-}
-
-// Custom combobox replacing the native <select> — the OS-rendered native
-// dropdown can't be restyled to match the design system.
-function DoctorCombobox({
-  options,
-  value,
-  placeholder,
-  onChange,
-}: {
-  options: ComboboxOption[]
-  value: number | ''
-  placeholder: string
-  onChange: (value: number) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useOutsideClose(open, () => setOpen(false))
-  const selected = options.find((o) => o.value === value)
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex h-12 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-800 focus:border-[#3BC9CB] focus:outline-none"
-      >
-        <span className={`truncate ${selected ? '' : 'text-slate-400'}`}>{selected ? selected.label : placeholder}</span>
-        <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div className="absolute start-0 z-50 mt-2 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-100 bg-white p-2 shadow-xl">
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              onClick={() => {
-                onChange(o.value)
-                setOpen(false)
-              }}
-              className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-start text-sm text-slate-700 transition-colors hover:bg-slate-50 hover:text-[#0D9488]"
-            >
-              <span className="truncate">{o.label}</span>
-              {value === o.value && <Check size={14} className="shrink-0" style={{ color: '#0D9488' }} />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+// Backend already supports `search` across the doctor's name and specialty
+// (apps/doctors/views.py DoctorProfileViewSet.search_fields) — just needed
+// a picker that surfaces it, so this reuses the shared async-search combobox
+// instead of the old plain unsearchable dropdown.
+const doctorFetcher = (query: string): Promise<ComboOption[]> =>
+  doctorsApi.list({ search: query || undefined }).then((res) =>
+    res.results.map((d) => ({
+      value: d.id,
+      label: d.full_name + (d.specialties_detail[0] ? ` · ${d.specialties_detail[0].name}` : ''),
+    })),
   )
-}
 
 export function BookAppointmentPage() {
   const { t } = useTranslation()
@@ -92,15 +36,11 @@ export function BookAppointmentPage() {
   const { showToast } = useToast()
   const qc = useQueryClient()
 
-  const [doctorId, setDoctorId] = useState<number | ''>('')
+  const [doctor, setDoctor] = useState<ComboOption | null>(null)
+  const doctorId = doctor?.value ?? ''
   const [date, setDate] = useState(todayISO())
   const [reason, setReason] = useState('')
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
-
-  const { data: doctors } = useQuery({
-    queryKey: ['doctors'],
-    queryFn: () => doctorsApi.list(),
-  })
 
   const { data: slots, isLoading: slotsLoading } = useQuery({
     queryKey: ['slots', doctorId, date],
@@ -129,23 +69,21 @@ export function BookAppointmentPage() {
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
-  const doctorOptions = (doctors?.results ?? []).map((d) => ({
-    value: d.id,
-    label: d.full_name + (d.specialties_detail[0] ? ` · ${d.specialties_detail[0].name}` : ''),
-  }))
-
   return (
     <div className="flex flex-col gap-6">
       <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-800">{t('booking.chooseDoctor')}</label>
-            <DoctorCombobox
-              options={doctorOptions}
-              value={doctorId}
-              placeholder="—"
-              onChange={(id) => {
-                setDoctorId(id)
+            <label htmlFor="book-doctor" className="mb-2 block text-sm font-semibold text-slate-800">
+              {t('booking.chooseDoctor')}
+            </label>
+            <AsyncCombobox
+              id="book-doctor"
+              value={doctor}
+              placeholder={t('booking.searchDoctorPlaceholder')}
+              fetcher={doctorFetcher}
+              onChange={(opt) => {
+                setDoctor(opt)
                 setSelectedSlot(null)
               }}
             />

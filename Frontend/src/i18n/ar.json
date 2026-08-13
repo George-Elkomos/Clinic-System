@@ -157,6 +157,7 @@
   "booking": {
     "title": "حجز موعد",
     "chooseDoctor": "اختر طبيبًا",
+    "searchDoctorPlaceholder": "ابحث باسم الطبيب أو التخصص…",
     "chooseDate": "اختر التاريخ",
     "availableTimes": "الأوقات المتاحة",
     "noSlots": "لا توجد أوقات متاحة في هذا اليوم. يرجى اختيار تاريخ آخر.",
@@ -165,7 +166,9 @@
     "booking": "جارٍ الحجز…",
     "booked": "تم طلب موعدك. سيقوم مكتب الاستقبال بتأكيده.",
     "selectDoctorFirst": "يرجى اختيار طبيب لعرض الأوقات المتاحة.",
-    "patientOnly": "يرجى تسجيل الدخول أو إنشاء حساب لحجز هذا الموعد."
+    "patientOnly": "يرجى تسجيل الدخول أو إنشاء حساب لحجز هذا الموعد.",
+    "selectSlotHint": "اختر وقتًا متاحًا أعلاه للمتابعة.",
+    "confirmBook": "تأكيد وحجز الموعد"
   },
   "appointments": {
     "title": "المواعيد",
@@ -263,9 +266,14 @@
     "nextAvailable": "أقرب موعد متاح",
     "notAccepting": "لا يستقبل مرضى حالياً",
     "acceptsWalkIns": "يقبل الزيارات المباشرة",
-    "experience": "{{n}} سنوات خبرة",
+    "experience": "الخبرة",
+    "experienceValue": "{{n}}+ سنوات",
     "languages": "اللغات",
-    "appointmentLength": "مواعيد {{n}} دقيقة",
+    "languagesDefault": "الإنجليزية، العربية",
+    "consultationDuration": "مدة الاستشارة",
+    "durationValue": "{{n}} دقيقة",
+    "roomValue": "غرفة {{room}}",
+    "noBio": "لم تتم إضافة نبذة عن الطبيب بعد.",
     "backToDoctors": "العودة إلى قائمة الأطباء",
     "publicTitle": "أطباؤنا",
     "publicSub": "ابحث عن الطبيب المناسب لك واحجز موعداً.",

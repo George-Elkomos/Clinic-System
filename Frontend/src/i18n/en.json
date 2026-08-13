@@ -157,6 +157,7 @@
   "booking": {
     "title": "Book an Appointment",
     "chooseDoctor": "Choose a doctor",
+    "searchDoctorPlaceholder": "Search by doctor name or specialty…",
     "chooseDate": "Choose a date",
     "availableTimes": "Available times",
     "noSlots": "No available times for this day. Please try another date.",
@@ -165,7 +166,9 @@
     "booking": "Booking…",
     "booked": "Your appointment has been requested. The front desk will confirm it.",
     "selectDoctorFirst": "Please choose a doctor to see available times.",
-    "patientOnly": "Please sign in or create an account to book this appointment."
+    "patientOnly": "Please sign in or create an account to book this appointment.",
+    "selectSlotHint": "Select an available time above to continue.",
+    "confirmBook": "Confirm & Book Appointment"
   },
   "appointments": {
     "title": "Appointments",
@@ -263,9 +266,14 @@
     "nextAvailable": "Next available",
     "notAccepting": "Not currently accepting patients",
     "acceptsWalkIns": "Walk-ins welcome",
-    "experience": "{{n}} years experience",
+    "experience": "Experience",
+    "experienceValue": "{{n}}+ years",
     "languages": "Languages",
-    "appointmentLength": "{{n}} min appointments",
+    "languagesDefault": "English, Arabic",
+    "consultationDuration": "Consultation Duration",
+    "durationValue": "{{n}} mins",
+    "roomValue": "Room {{room}}",
+    "noBio": "No background summary provided yet.",
     "backToDoctors": "Back to all doctors",
     "publicTitle": "Our Doctors",
     "publicSub": "Find the right specialist for you and book an appointment.",
