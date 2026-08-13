@@ -19,8 +19,9 @@ interface AsyncComboboxProps {
 }
 
 /**
- * Debounced async-search combobox. Shares the same floating-menu visual
- * language as the static `Select`, but loads options remotely as the user types.
+ * Debounced async-search combobox. The trigger IS the search field — typing
+ * directly filters the remote options, rather than opening a second nested
+ * search box, so there's only ever one input and one focus ring on screen.
  */
 export function AsyncCombobox({
   value,
@@ -37,7 +38,7 @@ export function AsyncCombobox({
   const [loading, setLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const optionRefs = useRef<Array<HTMLDivElement | null>>([])
 
   // Debounced remote search whenever the menu is open and the query changes.
@@ -60,10 +61,6 @@ export function AsyncCombobox({
       window.clearTimeout(handle)
     }
   }, [open, query, fetcher])
-
-  useEffect(() => {
-    if (open) setTimeout(() => searchRef.current?.focus(), 50)
-  }, [open])
 
   useEffect(() => {
     optionRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' })
@@ -89,6 +86,18 @@ export function AsyncCombobox({
   const clear = (e: React.MouseEvent) => {
     e.stopPropagation()
     onChange(null)
+    setQuery('')
+  }
+
+  const toggleChevron = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (open) {
+      setOpen(false)
+      setQuery('')
+      inputRef.current?.blur()
+    } else {
+      inputRef.current?.focus()
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -117,22 +126,39 @@ export function AsyncCombobox({
     }
   }
 
+  // While closed the field shows the selected label; opening it (focus) clears
+  // the text so the full remote list loads immediately, same as before — it's
+  // just rendered in the trigger itself now instead of a second box below it.
+  const displayValue = open ? query : value?.label ?? ''
+
   return (
     <div className="relative" ref={containerRef} onKeyDown={handleKeyDown}>
       <div
-        id={id}
-        role="combobox"
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        tabIndex={disabled ? -1 : 0}
-        onClick={() => !disabled && setOpen((o) => !o)}
-        className={`flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm transition-colors ${
-          disabled ? 'cursor-not-allowed bg-slate-50 opacity-60' : 'cursor-pointer'
-        } ${open ? 'border-teal-500 ring-2 ring-teal-500/15' : 'border-slate-200 hover:border-slate-300'}`}
+        onClick={() => !disabled && inputRef.current?.focus()}
+        className={`flex w-full items-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm transition-colors focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20 ${
+          disabled ? 'cursor-not-allowed bg-slate-50 opacity-60' : 'cursor-text border-slate-200 hover:border-slate-300'
+        }`}
       >
-        <div className="min-w-0 flex-1">
-          {value ? <span className="truncate text-slate-800">{value.label}</span> : <span className="text-slate-400">{placeholder ?? t('common.select')}</span>}
-        </div>
+        <Search size={15} className="shrink-0 text-slate-400" />
+        <input
+          ref={inputRef}
+          id={id}
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          disabled={disabled}
+          value={displayValue}
+          onFocus={() => { setOpen(true); setQuery('') }}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setActiveIndex(0)
+            if (!open) setOpen(true)
+          }}
+          placeholder={placeholder ?? t('common.select')}
+          autoComplete="off"
+          className="min-w-0 flex-1 border-none bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
+        />
         {value && !disabled && (
           <button
             type="button"
@@ -141,22 +167,15 @@ export function AsyncCombobox({
             aria-label={t('common.clear')}
           ><X size={14} /></button>
         )}
-        <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          size={16}
+          onClick={toggleChevron}
+          className={`shrink-0 text-slate-400 transition-transform ${disabled ? '' : 'cursor-pointer'} ${open ? 'rotate-180' : ''}`}
+        />
       </div>
 
       {open && (
         <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xl" role="listbox">
-          <div className="relative flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-2">
-            <Search size={15} className="shrink-0 text-slate-400" />
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              placeholder={t('common.search')}
-              className="w-full border-none bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-            />
-          </div>
           <div className="max-h-64 overflow-y-auto p-1.5">
             {loading ? (
               <div className="flex justify-center p-3"><Spinner size={20} /></div>
