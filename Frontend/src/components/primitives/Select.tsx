@@ -166,7 +166,7 @@ export function Select({
                     <button
                       type="button"
                       onClick={(e) => removeTag(v, e)}
-                      className="text-teal-500 hover:text-teal-700"
+                      className="rounded-full border-none bg-transparent p-0.5 text-teal-500 transition-colors hover:bg-teal-100 hover:text-teal-700"
                       aria-label={`Remove ${opt.label}`}
                     ><X size={12} /></button>
                   </span>
@@ -180,7 +180,7 @@ export function Select({
           <button
             type="button"
             onClick={clearAll}
-            className="shrink-0 rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            className="shrink-0 rounded-full border-none bg-transparent p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             aria-label={t('common.clear')}
           ><X size={14} /></button>
         )}
@@ -198,7 +198,7 @@ export function Select({
                 onChange={(e) => { setSearch(e.target.value); setActiveIndex(0) }}
                 onClick={(e) => e.stopPropagation()}
                 placeholder={t('common.search')}
-                className="w-full border-none bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                className="combo-input-reset w-full text-sm text-slate-700 outline-none placeholder:text-slate-400"
               />
             </div>
           )}

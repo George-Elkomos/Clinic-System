@@ -164,13 +164,13 @@ export function AsyncCombobox({
           }}
           placeholder={placeholder ?? t('common.select')}
           autoComplete="off"
-          className="min-w-0 flex-1 border-none bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
+          className="combo-input-reset min-w-0 flex-1 text-sm text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
         />
         {value && !disabled && (
           <button
             type="button"
             onClick={clear}
-            className="shrink-0 rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            className="shrink-0 rounded-full border-none bg-transparent p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             aria-label={t('common.clear')}
           ><X size={14} /></button>
         )}

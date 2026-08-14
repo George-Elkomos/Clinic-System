@@ -42,7 +42,7 @@ export function SearchInput({ onSearch, placeholder, debounceMs = 300, defaultVa
           type="button"
           onClick={() => setValue('')}
           aria-label={t('common.clear')}
-          className="absolute inset-y-0 end-2 flex items-center text-slate-400 transition-colors hover:text-slate-600"
+          className="absolute inset-y-0 end-2 my-auto flex h-7 w-7 items-center justify-center rounded-full border-none bg-transparent text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
         >
           <X size={16} />
         </button>

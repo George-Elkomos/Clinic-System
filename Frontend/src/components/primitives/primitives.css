@@ -221,6 +221,24 @@
 /* ---- Hide column on mobile ---- */
 .col-hide-mobile { /* always visible by default */ }
 
+/* ---- Combobox/Select inner <input> reset ----
+   Select/AsyncCombobox render their own bordered <div> box and use a bare
+   <input> inside it only for typing. globals.css's unlayered
+   `input, select, textarea { border; padding; background }` rule always
+   beats a Tailwind reset utility on that input (unlayered wins over layered
+   regardless of specificity) — so the input showed its own boxed border,
+   padding, and focus color nested inside the wrapper's own border/ring, i.e.
+   a double-bordered field. A real plain-CSS class wins here via ordinary
+   specificity (class beats bare element, both unlayered). */
+.combo-input-reset {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  min-height: 0;
+}
+.combo-input-reset:focus { border-color: transparent; }
+
 /* ---- Language dropdown (custom — native <select> can't be styled) ---- */
 .lang-dropdown { position: relative; }
 
