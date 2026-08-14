@@ -1,5 +1,9 @@
 """Review access: patients create/read their own; doctors read their own
-(comments visible); managers moderate; secretaries are excluded entirely."""
+(comments visible); managers moderate. Secretaries have no authenticated
+route into this API, but reviews are intentionally public data — the
+`?doctor=` query on a GET is open to anyone, logged in or not (see
+has_permission below) — so a secretary sees the same published comments any
+anonymous visitor already could."""
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from apps.core.enums import RoleChoices

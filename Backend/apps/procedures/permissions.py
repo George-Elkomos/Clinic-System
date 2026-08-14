@@ -4,6 +4,11 @@ Procedures are clinical data performed by a doctor. There is no NURSE role in
 this system, so — unlike LabOrder, where secretaries handle sample-collection
 logistics — SECRETARY has no access to clinical procedure records at all
 (matching MedicalDataPermission's treatment of MedicalRecord/Prescription).
+
+MANAGER is read-only on individual procedure records: only the performing
+doctor may create/start/complete/cancel/edit one, since it documents an
+actual clinical act the manager did not witness or perform (same principle
+as EncounterPermission — administrative roles never author clinical content).
 """
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
@@ -45,7 +50,7 @@ class ClinicalProcedurePermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
         if user.role == RoleChoices.MANAGER:
-            return True
+            return request.method in SAFE_METHODS
         if user.role == RoleChoices.PATIENT:
             return request.method in SAFE_METHODS and obj.patient.user_id == user.id
         if user.role == RoleChoices.DOCTOR:

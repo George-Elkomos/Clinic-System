@@ -259,6 +259,17 @@ class TestReferralLifecycle:
         resp = api.post(reverse("referral-cancel", args=[internal_referral.id]))
         assert resp.status_code == 200
 
+    def test_manager_cannot_accept_or_complete(self, api, manager, internal_referral):
+        """Regression: accept/complete used to be nominally 'allowed' for
+        MANAGER at the permission layer but crashed with a 500 (a manager has
+        no DoctorProfile). Accepting/completing is a clinical decision a
+        manager can't make on a doctor's behalf, so it's now a clean 403."""
+        api.force_authenticate(manager)
+        resp = api.post(reverse("referral-accept", args=[internal_referral.id]))
+        assert resp.status_code == 403
+        resp = api.post(reverse("referral-complete", args=[internal_referral.id]))
+        assert resp.status_code == 403
+
     def test_unrelated_doctor_cannot_cancel(self, api, doctor2, internal_referral):
         # doctor2 is a valid recipient (read access) but didn't create the referral.
         api.force_authenticate(doctor2.user)

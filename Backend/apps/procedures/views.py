@@ -64,7 +64,7 @@ class ClinicalProcedureViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         procedure = self.get_object()
-        if procedure.doctor.user_id != request.user.id and request.user.role != RoleChoices.MANAGER:
+        if procedure.doctor.user_id != request.user.id:
             raise PermissionDenied("Only the performing doctor can start this procedure.")
         result = start_procedure(procedure)
         return Response(ClinicalProcedureSerializer(result, context={"request": request}).data)
@@ -72,7 +72,7 @@ class ClinicalProcedureViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         procedure = self.get_object()
-        if procedure.doctor.user_id != request.user.id and request.user.role != RoleChoices.MANAGER:
+        if procedure.doctor.user_id != request.user.id:
             raise PermissionDenied("Only the performing doctor can complete this procedure.")
         input_serializer = ProcedureCompleteSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
@@ -82,7 +82,7 @@ class ClinicalProcedureViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         procedure = self.get_object()
-        if procedure.doctor.user_id != request.user.id and request.user.role != RoleChoices.MANAGER:
+        if procedure.doctor.user_id != request.user.id:
             raise PermissionDenied("Only the performing doctor can cancel this procedure.")
         input_serializer = ProcedureCancelSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)

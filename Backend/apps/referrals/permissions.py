@@ -1,11 +1,18 @@
 """Access control for referrals.
 
-Create/accept/complete/cancel: doctor-only at this layer (fine-grained
-eligibility — is this doctor actually the recipient/acceptor? — is enforced
-inside services.py). Read: the referring doctor, the eligible receiving
-doctor, the owning patient, a manager, or a secretary (read-only, clinic-wide,
-so front desk can chase up scheduling — see ReferralLimitedSerializer, which
-strips the clinical reason/notes text before it ever reaches them).
+Create/accept/complete: doctor-only at this layer (fine-grained eligibility —
+is this doctor actually the recipient/acceptor? — is enforced inside
+services.py). Accepting or completing a referral is a clinical decision (a
+doctor agreeing to take on / finishing a case) — a manager cannot make that
+call on a doctor's behalf, so manager is excluded from those two actions
+entirely rather than falling through to accept_referral()/complete_referral()
+with request.user.doctor_profile, which would raise since a manager has no
+DoctorProfile. Cancel: doctor or manager (administrative override — e.g. a
+stale/erroneous referral — is a reasonable non-clinical action).
+Read: the referring doctor, the eligible receiving doctor, the owning
+patient, a manager, or a secretary (read-only, clinic-wide, so front desk can
+chase up scheduling — see ReferralLimitedSerializer, which strips the
+clinical reason/notes text before it ever reaches them).
 """
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
@@ -13,6 +20,7 @@ from apps.core.enums import RoleChoices
 
 REFERRAL_ROLES = (RoleChoices.PATIENT, RoleChoices.DOCTOR, RoleChoices.SECRETARY, RoleChoices.MANAGER)
 _WRITE_ACTIONS = ("create", "accept", "complete", "cancel")
+_DOCTOR_ONLY_ACTIONS = ("create", "accept", "complete")
 
 
 class ReferralPermission(BasePermission):
@@ -22,11 +30,15 @@ class ReferralPermission(BasePermission):
             return False
         if view.action in _WRITE_ACTIONS and user.role in (RoleChoices.PATIENT, RoleChoices.SECRETARY):
             return False
+        if view.action in _DOCTOR_ONLY_ACTIONS and user.role == RoleChoices.MANAGER:
+            return False
         return True
 
     def has_object_permission(self, request, view, obj):
         user = request.user
         if user.role == RoleChoices.MANAGER:
+            # Coarse gate above already excludes accept/complete for manager;
+            # this only ever reaches here for read or cancel.
             return True
         if user.role == RoleChoices.SECRETARY:
             return request.method in SAFE_METHODS

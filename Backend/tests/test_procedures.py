@@ -187,8 +187,12 @@ def test_role_scoping(api, doctor_profile, treated, patient2, secretary, make_us
     assert api.get(reverse("procedure-list")).status_code == 403
 
 
-# --- Manager role (full oversight) -----------------------------------------------
-def test_manager_sees_all_and_can_act_on_any_procedure(api, doctor_profile, treated, manager, template):
+# --- Manager role (read-only oversight) ------------------------------------------
+def test_manager_sees_all_but_cannot_act_on_a_procedure(api, doctor_profile, treated, manager, template):
+    """Regression: a manager used to be able to start/complete/cancel — or PATCH
+    any field of — any procedure, even one they never performed. Procedures
+    document a real clinical act, so only the performing doctor may drive its
+    lifecycle; manager keeps full-visibility read access for oversight."""
     api.force_authenticate(doctor_profile.user)
     created = api.post(reverse("procedure-list"), {
         "patient": treated.patient_profile.id, "template": template.id,
@@ -196,14 +200,22 @@ def test_manager_sees_all_and_can_act_on_any_procedure(api, doctor_profile, trea
 
     api.force_authenticate(manager)
     assert api.get(reverse("procedure-list")).data["count"] == 1
+    assert api.get(reverse("procedure-detail", args=[created["id"]])).status_code == 200
 
     started = api.post(reverse("procedure-start", args=[created["id"]]))
-    assert started.status_code == 200
+    assert started.status_code == 403
     completed = api.post(reverse("procedure-complete", args=[created["id"]]), {
         "post_procedure_notes": "Completed by manager oversight.",
     }, format="json")
-    assert completed.status_code == 200
-    assert completed.data["status"] == "COMPLETED"
+    assert completed.status_code == 403
+    cancelled = api.post(reverse("procedure-cancel", args=[created["id"]]), {
+        "reason": "Manager override attempt.",
+    }, format="json")
+    assert cancelled.status_code == 403
+    patched = api.patch(reverse("procedure-detail", args=[created["id"]]), {
+        "pre_procedure_notes": "Manager edit attempt.",
+    }, format="json")
+    assert patched.status_code == 403
 
 
 def test_manager_can_manage_templates(api, manager, template):
