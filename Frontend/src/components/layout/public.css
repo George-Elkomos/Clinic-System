@@ -166,6 +166,27 @@
   padding-inline-start: 2.5rem;
   padding-inline-end: 2.25rem;
 }
+/* Select/AsyncCombobox's inner <input> (see primitives.css's
+   `.combo-input-reset`) sits inside its own bordered wrapper <div> and needs
+   to render invisibly — but `.public-shell input` above is a class+element
+   selector that outranks `.combo-input-reset`'s single class on its own, so
+   the input kept re-growing its own boxed border/padding/background nested
+   inside the wrapper, with its Search-icon sibling appearing to float
+   outside that inner box. Two classes here reliably outrank one class + one
+   element regardless of source order. */
+.public-shell .combo-input-reset {
+  height: auto;
+  min-height: 0;
+  padding-inline: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.public-shell .combo-input-reset:hover,
+.public-shell .combo-input-reset:focus {
+  background: transparent;
+  border-color: transparent;
+}
 
 /* Field wrapper (shared FormField primitive). primitives.css's unlayered
    `.field { margin-bottom: var(--space-4) }` needs neutralizing here same as

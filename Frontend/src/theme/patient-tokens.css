@@ -233,6 +233,15 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* Select/AsyncCombobox's inner <input> (see primitives.css's
+   `.combo-input-reset`) already sits inside a wrapper <div> that draws its
+   own focus-within border/ring — the blanket rule above then doubled that up
+   with a second, nested teal outline directly on the input itself. Needs
+   three selectors to reliably outrank the two-selector rule above regardless
+   of source order. */
+.patient-shell .combo-input-reset:focus-visible {
+  outline: none;
+}
 
 /* Hover lift for cards/buttons (§5) */
 .patient-hover-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
