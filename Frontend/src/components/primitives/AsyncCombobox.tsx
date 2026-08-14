@@ -169,6 +169,7 @@ export function AsyncCombobox({
         {value && !disabled && (
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={clear}
             className="shrink-0 rounded-full border-none bg-transparent p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             aria-label={t('common.clear')}
@@ -217,6 +218,7 @@ export function AsyncCombobox({
                     role="option"
                     aria-selected={selected}
                     onMouseEnter={() => setActiveIndex(i)}
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={(e) => { e.stopPropagation(); pick(o) }}
                     className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg p-3 text-sm transition-colors duration-150 ${
                       selected
