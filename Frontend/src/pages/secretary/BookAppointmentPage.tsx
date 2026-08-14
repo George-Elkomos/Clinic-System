@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { OverrideWarningModal } from '../../components/OverrideWarningModal'
+import { AsyncCombobox, type ComboOption } from '../../components/primitives/AsyncCombobox'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { FormField } from '../../components/primitives/FormField'
@@ -15,6 +16,7 @@ import { formatTime } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
 import { doctorsApi } from '../../services/doctors.api'
+import { RegisterPatientModal } from './RegisterPatientModal'
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
@@ -23,25 +25,27 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+const patientFetcher = (query: string): Promise<ComboOption[]> =>
+  appointmentsApi.patients(query || undefined).then((results) =>
+    results.map((pt) => ({ value: pt.id, label: pt.full_name || pt.email || String(pt.id) })),
+  )
+
 export function BookAppointmentPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const { showToast } = useToast()
   const qc = useQueryClient()
 
-  const [patientSearch, setPatientSearch] = useState('')
-  const [patientId, setPatientId] = useState<number | ''>('')
+  const [patientOption, setPatientOption] = useState<ComboOption | null>(null)
+  const [registeringPatient, setRegisteringPatient] = useState(false)
   const [doctorId, setDoctorId] = useState<number | ''>('')
   const [date, setDate] = useState(todayISO())
   const [reason, setReason] = useState('')
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null)
   const [pendingWarning, setPendingWarning] = useState(false)
+  const patientId = patientOption?.value ?? ''
 
   const { data: doctors } = useQuery({ queryKey: ['doctors'], queryFn: () => doctorsApi.list() })
-  const { data: patients = [] } = useQuery({
-    queryKey: ['patient-directory', patientSearch],
-    queryFn: () => appointmentsApi.patients(patientSearch || undefined),
-  })
   const selectedDoctor = (doctors?.results ?? []).find((d) => d.id === Number(doctorId))
 
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
@@ -99,29 +103,19 @@ export function BookAppointmentPage() {
       </div>
 
       <div className={CARD}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label={t('queue.searchPatient')}>
-            {(p) => (
-              <input
-                {...p}
-                className="patient-field"
-                value={patientSearch}
-                onChange={(e) => setPatientSearch(e.target.value)}
-              />
-            )}
-          </FormField>
-          <FormField label={t('appointments.patient')}>
-            {(p) => (
-              <Select
-                id={p.id}
-                options={patients.map((pt) => ({ value: pt.id, label: pt.full_name || pt.email || String(pt.id) }))}
-                value={patientId}
-                onChange={(v) => setPatientId(Array.isArray(v) || v === '' ? '' : Number(v))}
-                placeholder="—"
-                searchable
-              />
-            )}
-          </FormField>
+        <div className="mb-4">
+          <label htmlFor="book-patient" className="mb-2 block text-sm font-semibold text-slate-800">
+            {t('appointments.patient')}
+          </label>
+          <AsyncCombobox
+            id="book-patient"
+            value={patientOption}
+            placeholder={t('queue.searchPatient')}
+            fetcher={patientFetcher}
+            onChange={setPatientOption}
+            onCreateNew={() => setRegisteringPatient(true)}
+            createNewLabel={t('patients.register')}
+          />
         </div>
 
         <FormField label={t('booking.chooseDoctor')}>
@@ -224,6 +218,16 @@ export function BookAppointmentPage() {
           loading={booking.isPending}
           onCancel={() => setPendingWarning(false)}
           onConfirm={(reason) => booking.mutate(reason)}
+        />
+      )}
+
+      {registeringPatient && (
+        <RegisterPatientModal
+          onClose={() => setRegisteringPatient(false)}
+          onCreated={(profileId, fullName) => {
+            setRegisteringPatient(false)
+            setPatientOption({ value: profileId, label: fullName })
+          }}
         />
       )}
     </div>

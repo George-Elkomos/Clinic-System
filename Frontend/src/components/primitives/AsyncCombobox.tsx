@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { Check, ChevronDown, Plus, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -16,6 +16,11 @@ interface AsyncComboboxProps {
   placeholder?: string
   disabled?: boolean
   id?: string
+  // Shown as an inline action in the empty-results state (e.g. "no patients
+  // matched this search — register a new one") instead of just the plain
+  // "No options found" text.
+  onCreateNew?: () => void
+  createNewLabel?: string
 }
 
 /**
@@ -30,6 +35,8 @@ export function AsyncCombobox({
   placeholder,
   disabled = false,
   id,
+  onCreateNew,
+  createNewLabel,
 }: AsyncComboboxProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -180,7 +187,25 @@ export function AsyncCombobox({
             {loading ? (
               <div className="flex justify-center p-3"><Spinner size={20} /></div>
             ) : options.length === 0 ? (
-              <div className="px-3 py-3 text-sm italic text-slate-400">{t('common.noOptions')}</div>
+              <div className="px-2 py-2">
+                <p className="px-1 py-2 text-sm italic text-slate-400">{t('common.noOptions')}</p>
+                {onCreateNew && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpen(false)
+                      setQuery('')
+                      onCreateNew()
+                    }}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-teal-300 bg-teal-50/50 py-2 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-50"
+                  >
+                    <Plus size={15} className="shrink-0" />
+                    {createNewLabel ?? t('common.createNew')}
+                  </button>
+                )}
+              </div>
             ) : (
               options.map((o, i) => {
                 const selected = value?.value === o.value
