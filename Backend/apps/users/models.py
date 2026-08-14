@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.core.enums import BloodType, GenderChoices, LanguageChoices, RoleChoices
 from apps.core.models import TimeStampedModel
+from apps.core.text import capitalize_first
 
 from .managers import UserManager
 
@@ -44,6 +45,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name() or self.email} ({self.role})"
+
+    def save(self, *args, **kwargs):
+        self.first_name = capitalize_first(self.first_name)
+        self.last_name = capitalize_first(self.last_name)
+        super().save(*args, **kwargs)
 
     @property
     def is_patient(self):

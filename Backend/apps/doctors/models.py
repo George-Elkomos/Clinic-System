@@ -6,6 +6,7 @@ from django.db import models
 
 from apps.core.enums import AbsenceType, DoctorPatientSource, SlotStatus, Weekday
 from apps.core.models import TimeStampedModel
+from apps.core.text import capitalize_first
 from apps.users.models import PatientProfile, User
 
 
@@ -47,6 +48,10 @@ class Specialty(TimeStampedModel):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        self.name = capitalize_first(self.name)
+        super().save(*args, **kwargs)
 
 
 class DoctorProfile(TimeStampedModel):
