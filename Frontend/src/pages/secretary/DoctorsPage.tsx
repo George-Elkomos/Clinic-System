@@ -9,6 +9,7 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select, type SelectOption } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { LANGUAGE_OPTIONS, parseLanguages } from '../../lib/languages'
 import { errorMessage } from '../../services/apiClient'
 import { doctorsApi } from '../../services/doctors.api'
 import type { Doctor } from '../../services/types'
@@ -26,7 +27,7 @@ function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyO
   const [walkIns, setWalkIns] = useState(doctor.accepts_walk_ins)
   const [bio, setBio] = useState(doctor.bio)
   const [yearsExperience, setYearsExperience] = useState(doctor.years_experience)
-  const [languages, setLanguages] = useState(doctor.languages_spoken)
+  const [languages, setLanguages] = useState<string[]>(parseLanguages(doctor.languages_spoken))
   const [duration, setDuration] = useState(doctor.avg_appointment_duration)
   const [fee, setFee] = useState(doctor.consultation_fee ?? '')
   const [specialties, setSpecialties] = useState<number[]>(doctor.specialties)
@@ -40,7 +41,7 @@ function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyO
         accepts_walk_ins: walkIns,
         bio,
         years_experience: yearsExperience,
-        languages_spoken: languages,
+        languages_spoken: languages.join(', '),
         avg_appointment_duration: duration,
         consultation_fee: fee === '' ? null : fee,
         specialties,
@@ -102,11 +103,13 @@ function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyO
         <div className="sm:col-span-2">
           <FormField label={t('doctors.languages')}>
             {(p) => (
-              <input
-                {...p}
-                className="patient-field"
+              <Select
+                id={p.id}
+                options={LANGUAGE_OPTIONS}
                 value={languages}
-                onChange={(e) => setLanguages(e.target.value)}
+                onChange={(value) => setLanguages(Array.isArray(value) ? value.map(String) : [])}
+                searchable
+                multi
               />
             )}
           </FormField>

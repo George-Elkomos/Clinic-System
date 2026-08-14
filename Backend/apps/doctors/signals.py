@@ -1,7 +1,7 @@
 """When a DoctorAbsence is recorded, block matching slots (never delete) and
 cancel any booked appointments so affected patients get notified."""
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
 from apps.core.enums import AppointmentStatus, SlotStatus
@@ -66,17 +66,33 @@ def _notify_absence(appt):
 
 @receiver(post_save, sender=WorkingSchedule)
 def generate_slots_for_new_schedule(sender, instance, **kwargs):
-    """When a working day is added/edited, materialize its slots across the
-    horizon so newly opened times are immediately bookable (idempotent)."""
-    if not instance.is_active:
-        return
-    from datetime import timedelta
-
-    from django.conf import settings
-    from django.utils import timezone
-
+    """When a working day is added or edited, first retract any still-open
+    slots this rule previously generated — its old start/end/break/duration
+    may no longer apply — then re-materialize across the horizon so what's
+    bookable always matches the rule currently in force (idempotent)."""
     from .services import slot_generator
 
-    start = max(instance.valid_from, timezone.localdate())
-    end = instance.valid_until or (timezone.localdate() + timedelta(days=settings.SLOT_HORIZON_DAYS))
-    slot_generator.generate_slots_for_doctor(instance.doctor, start, end)
+    with transaction.atomic():
+        slot_generator.clear_unbooked_slots(source_schedule=instance)
+
+        if not instance.is_active:
+            return
+
+        from datetime import timedelta
+
+        from django.conf import settings
+        from django.utils import timezone
+
+        start = max(instance.valid_from, timezone.localdate())
+        end = instance.valid_until or (timezone.localdate() + timedelta(days=settings.SLOT_HORIZON_DAYS))
+        slot_generator.generate_slots_for_doctor(instance.doctor, start, end)
+
+
+@receiver(pre_delete, sender=WorkingSchedule)
+def clear_slots_for_deleted_schedule(sender, instance, **kwargs):
+    """Deleting a working day should retract its still-open slots immediately
+    instead of leaving stale AVAILABLE rows visible to patients until the
+    next generate_all sweep."""
+    from .services import slot_generator
+
+    slot_generator.clear_unbooked_slots(source_schedule=instance)

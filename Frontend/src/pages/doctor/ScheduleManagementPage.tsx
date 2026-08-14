@@ -28,7 +28,6 @@ export function ScheduleManagementPage() {
   const [weekday, setWeekday] = useState(0)
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('13:00')
-  const [slotDuration, setSlotDuration] = useState(15)
 
   const { data: schedules, isLoading } = useQuery({
     queryKey: ['my-schedules'],
@@ -41,7 +40,6 @@ export function ScheduleManagementPage() {
         weekday,
         start_time: startTime,
         end_time: endTime,
-        slot_duration: slotDuration,
         valid_from: todayISO(),
       }),
     onSuccess: () => {
@@ -83,17 +81,17 @@ export function ScheduleManagementPage() {
             />
           )}
         </FormField>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label={t('schedule.startTime')}>
             {(p) => <input {...p} className="patient-field" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />}
           </FormField>
           <FormField label={t('schedule.endTime')}>
             {(p) => <input {...p} className="patient-field" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />}
           </FormField>
-          <FormField label={t('schedule.slotDuration')}>
-            {(p) => <input {...p} className="patient-field" type="number" min={5} step={5} value={slotDuration} onChange={(e) => setSlotDuration(Number(e.target.value))} />}
-          </FormField>
         </div>
+        <p className="patient-text-body-secondary mt-3" style={{ color: 'var(--text-secondary)' }}>
+          {t('schedule.durationFollowsProfile')}
+        </p>
         <button type="button" disabled={create.isPending} onClick={() => create.mutate()} className={`${BTN_PRIMARY} mt-4`}>
           {create.isPending && <Spinner size={14} />}
           {create.isPending ? t('schedule.adding') : t('schedule.add')}

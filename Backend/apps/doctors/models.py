@@ -101,7 +101,11 @@ class WorkingSchedule(TimeStampedModel):
     end_time = models.TimeField()
     slot_duration = models.PositiveIntegerField(
         null=True, blank=True,
-        help_text="Minutes; overrides the doctor's default if set.",
+        help_text=(
+            "Minutes. Deprecated: the generator now always uses the doctor's "
+            "own Consultation Duration (see effective_slot_duration) so slot "
+            "length can't drift out of sync with what the doctor's profile shows."
+        ),
     )
     break_start = models.TimeField(null=True, blank=True)
     break_end = models.TimeField(null=True, blank=True)
@@ -118,7 +122,10 @@ class WorkingSchedule(TimeStampedModel):
 
     @property
     def effective_slot_duration(self):
-        return self.slot_duration or self.doctor.avg_appointment_duration
+        """Always the doctor's own Consultation Duration — a per-shift
+        `slot_duration` override is no longer honored, so the generator can
+        never disagree with what the doctor's profile shows."""
+        return self.doctor.avg_appointment_duration
 
 
 class TimeSlot(models.Model):

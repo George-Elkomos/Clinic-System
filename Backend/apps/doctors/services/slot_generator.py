@@ -57,6 +57,19 @@ def generate_slots_for_doctor(doctor, start_date, end_date):
     return created
 
 
+def clear_unbooked_slots(*, doctor=None, source_schedule=None):
+    """Retract still-open AVAILABLE slots so stale times/durations stop being
+    shown to patients — e.g. after a working-hours rule is edited/deleted or
+    the doctor's consultation duration changes. Booked, blocked, and past
+    slots are left untouched; regeneration (idempotent) can safely follow."""
+    qs = TimeSlot.objects.filter(status=SlotStatus.AVAILABLE)
+    if source_schedule is not None:
+        qs = qs.filter(source_schedule=source_schedule)
+    if doctor is not None:
+        qs = qs.filter(doctor=doctor)
+    return qs.delete()[0]
+
+
 def mark_past_slots(doctor=None):
     """Flip elapsed AVAILABLE slots to PAST so they drop out of availability."""
     qs = TimeSlot.objects.filter(

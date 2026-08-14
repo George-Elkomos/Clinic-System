@@ -71,6 +71,25 @@ class DoctorProfileWriteSerializer(serializers.ModelSerializer):
             "specialties",
         ]
 
+    def update(self, instance, validated_data):
+        old_duration = instance.avg_appointment_duration
+        doctor = super().update(instance, validated_data)
+        if doctor.avg_appointment_duration != old_duration:
+            # Slot length always follows this setting (see
+            # WorkingSchedule.effective_slot_duration) — resync now so
+            # already-open slots don't keep showing the old cadence.
+            from datetime import timedelta
+
+            from django.conf import settings
+            from django.utils import timezone
+
+            from .services.slot_generator import clear_unbooked_slots, generate_slots_for_doctor
+
+            clear_unbooked_slots(doctor=doctor)
+            today = timezone.localdate()
+            generate_slots_for_doctor(doctor, today, today + timedelta(days=settings.SLOT_HORIZON_DAYS))
+        return doctor
+
 
 class PublicDoctorSerializer(serializers.ModelSerializer):
     """No-login doctor card: identity + specialty + aggregate rating + availability."""

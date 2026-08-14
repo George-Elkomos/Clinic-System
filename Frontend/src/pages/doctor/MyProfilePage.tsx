@@ -11,6 +11,7 @@ import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { ChangePasswordForm } from '../../components/settings/ChangePasswordForm'
 import { useAuth } from '../../hooks/useAuth'
+import { LANGUAGE_OPTIONS, parseLanguages } from '../../lib/languages'
 import { errorMessage } from '../../services/apiClient'
 import { authApi } from '../../services/auth.api'
 import { doctorsApi } from '../../services/doctors.api'
@@ -20,15 +21,6 @@ const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
 const CARD_TITLE = 'mb-4 text-sm font-bold text-slate-800 sm:text-base'
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
 const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
-
-const LANGUAGE_OPTIONS = [
-  'Arabic', 'English', 'French', 'German', 'Spanish', 'Italian',
-  'Russian', 'Turkish', 'Urdu', 'Hindi', 'Chinese', 'Portuguese',
-].map((label) => ({ value: label, label }))
-
-function parseLanguages(value: string): string[] {
-  return value.split(',').map((s) => s.trim()).filter(Boolean)
-}
 
 export function MyProfilePage() {
   const { t } = useTranslation()

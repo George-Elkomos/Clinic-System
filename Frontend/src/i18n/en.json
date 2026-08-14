@@ -222,7 +222,7 @@
     "weekday": "Day",
     "startTime": "Start time",
     "endTime": "End time",
-    "slotDuration": "Appointment length (minutes)",
+    "durationFollowsProfile": "Appointment slots are generated using the Consultation Duration set on your profile.",
     "validFrom": "Starting from",
     "add": "Add working day",
     "adding": "Adding…",
