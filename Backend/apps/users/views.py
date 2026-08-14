@@ -73,9 +73,12 @@ class LoginView(TokenObtainPairView):
         refresh = response.data.pop("refresh", None)
         if refresh:
             _set_refresh_cookie(response, refresh)
-        email = request.data.get("email")
-        if email:
-            _audit_auth(User.objects.filter(email=email).first(), AuditAction.LOGIN, request)
+        # Looked up by id from the just-built payload, not by re-querying
+        # request.data["email"] -- that value may be a phone number instead
+        # (EmailOrPhoneBackend), which wouldn't match any user's email column.
+        user_id = response.data.get("user", {}).get("id")
+        if user_id:
+            _audit_auth(User.objects.filter(pk=user_id).first(), AuditAction.LOGIN, request)
         return response
 
 

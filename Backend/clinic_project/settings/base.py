@@ -133,6 +133,12 @@ DATABASES["default"]["OPTIONS"]["timeout"] = 20
 # --- Auth -------------------------------------------------------------------
 AUTH_USER_MODEL = "users.User"
 
+# Lets login authenticate by phone number too (see apps/users/backends.py) --
+# front-desk "quick registration" only requires a phone, not a real email.
+AUTHENTICATION_BACKENDS = [
+    "apps.users.backends.EmailOrPhoneBackend",
+]
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

@@ -1,11 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
+import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { SearchInput } from '../../components/primitives/SearchInput'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
+import { useToast } from '../../components/primitives/Toast'
+import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
+import { staffApi } from '../../services/staff.api'
 import type { PatientSummary } from '../../services/types'
 import { PatientProfileEditorModal } from './PatientProfileEditorModal'
 import { RegisterPatientModal } from './RegisterPatientModal'
@@ -16,15 +20,36 @@ const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg bor
 
 export function PatientDirectoryPage() {
   const { t } = useTranslation()
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<PatientSummary | null>(null)
   const [registering, setRegistering] = useState(false)
+  const [tempPassword, setTempPassword] = useState('')
   const onSearch = useCallback((value: string) => setSearch(value), [])
 
   const { data = [], isLoading, refetch } = useQuery({
     queryKey: ['patient-directory', search],
     queryFn: () => appointmentsApi.patients(search || undefined),
   })
+
+  const resetPassword = useMutation({
+    mutationFn: staffApi.resetPassword,
+    onSuccess: (data) => {
+      setTempPassword(data.temp_password)
+      showToast(t('staff.passwordReset'), 'success')
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const requestReset = async (patient: PatientSummary) => {
+    const ok = await confirm({
+      title: t('staff.resetPassword'),
+      message: t('staff.resetPasswordConfirm', { name: patient.full_name }),
+      confirmLabel: t('staff.resetPassword'),
+    })
+    if (ok) resetPassword.mutate(patient.user_id)
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -42,6 +67,22 @@ export function PatientDirectoryPage() {
       <div className={CARD}>
         <SearchInput onSearch={onSearch} placeholder={t('patients.searchPlaceholder')} />
       </div>
+
+      {tempPassword && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <p className="patient-text-body" style={{ color: 'var(--text-primary)' }}>{t('staff.tempPasswordNote')}</p>
+          <div className="mt-2 rounded-lg bg-white px-3 py-2 text-center font-mono text-lg font-bold" style={{ color: 'var(--brand-teal-start)' }}>
+            {tempPassword}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard?.writeText(tempPassword)}
+            className={`${BTN_SECONDARY_SM} mt-3`}
+          >
+            {t('staff.copyPassword')}
+          </button>
+        </div>
+      )}
 
       <div className={CARD}>
         {isLoading ? (
@@ -68,9 +109,19 @@ export function PatientDirectoryPage() {
                     <td className="px-3 py-2.5 patient-text-body" style={{ color: 'var(--text-secondary)' }}>{patient.email || t('patients.noEmailShort')}</td>
                     <td className="px-3 py-2.5 patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{patient.date_of_birth || t('common.none')}</td>
                     <td className="px-3 py-2.5">
-                      <button type="button" onClick={() => setEditing(patient)} className={BTN_SECONDARY_SM}>
-                        {t('patients.editProfile')}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => setEditing(patient)} className={BTN_SECONDARY_SM}>
+                          {t('patients.editProfile')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={resetPassword.isPending && resetPassword.variables === patient.user_id}
+                          onClick={() => requestReset(patient)}
+                          className={BTN_SECONDARY_SM}
+                        >
+                          {t('staff.resetPassword')}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -15,7 +15,7 @@ export function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -25,7 +25,7 @@ export function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const user = await login(email, password)
+      const user = await login(identifier, password)
       navigate(resolvePostAuthRedirect(params.get('next'), user.role), { replace: true })
     } catch (err) {
       // Distinguish "backend unreachable" from a real credential rejection so we
@@ -60,7 +60,7 @@ export function LoginPage() {
               already supplies; space-y-* would be a second, inert declaration
               for the same blocked property. */}
           <form onSubmit={submit} noValidate>
-            <FormField label={t('auth.email')}>
+            <FormField label={t('auth.emailOrPhone')}>
               {(p) => (
                 <div className="relative">
                   <Mail
@@ -69,10 +69,11 @@ export function LoginPage() {
                   />
                   <input
                     {...p}
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    inputMode="email"
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
                     required
                     className={`${AUTH_INPUT_CLASS} public-input--with-icon`}
                   />

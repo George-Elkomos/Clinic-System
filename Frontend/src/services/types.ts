@@ -248,6 +248,7 @@ export interface Paginated<T> {
 
 export interface PatientSummary {
   id: number
+  user_id: number
   full_name: string
   email: string | null
   phone: string

@@ -20,7 +20,7 @@ type Status = 'loading' | 'authed' | 'anon'
 interface AuthContextValue {
   user: User | null
   status: Status
-  login: (email: string, password: string) => Promise<User>
+  login: (identifier: string, password: string) => Promise<User>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   hasRole: (...roles: Role[]) => boolean
@@ -84,8 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })()
   }, [resetToAnon])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { access, user: loggedIn } = await authApi.login(email, password)
+  const login = useCallback(async (identifier: string, password: string) => {
+    const { access, user: loggedIn } = await authApi.login(identifier, password)
     tokenStore.set(access)
     setUser(loggedIn)
     setStatus('authed')

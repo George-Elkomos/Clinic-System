@@ -4,6 +4,7 @@ import secrets
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -243,10 +244,15 @@ class UserReactivateView(APIView):
 
 
 class UserResetPasswordView(APIView):
+    """Secretaries may only reset a PATIENT's password; resetting another
+    staff member's (doctor/secretary/manager) password stays manager-only."""
+
     permission_classes = [IsSecretaryOrManager]
 
     def post(self, request, pk):
         user = get_object_or_404(User, pk=pk)
+        if request.user.role == RoleChoices.SECRETARY and user.role != RoleChoices.PATIENT:
+            raise PermissionDenied("Secretaries can only reset a patient's password.")
         temp_password = secrets.token_urlsafe(12)
         user.set_password(temp_password)
         user.must_change_password = True

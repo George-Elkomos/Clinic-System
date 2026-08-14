@@ -14,8 +14,10 @@ export type UpdateMePayload = Partial<Pick<User, 'first_name' | 'last_name' | 'p
 }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<LoginResponse>('/auth/login/', { email, password }).then((r) => r.data),
+  // `identifier` is either an email address or a phone number -- the backend
+  // accepts both under the same "email" field (see EmailOrPhoneBackend).
+  login: (identifier: string, password: string) =>
+    api.post<LoginResponse>('/auth/login/', { email: identifier, password }).then((r) => r.data),
 
   refresh: () => api.post<{ access: string }>('/auth/refresh/', {}).then((r) => r.data),
 

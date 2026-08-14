@@ -195,6 +195,9 @@ class PatientSummarySerializer(serializers.Serializer):
     """Lightweight patient row for the doctor's patient picker."""
 
     id = serializers.IntegerField()
+    # PatientProfile pk above is the row identity; user_id is the User pk
+    # needed for account-level actions (e.g. staff/users/<id>/reset-password/).
+    user_id = serializers.IntegerField(source="user.id")
     full_name = serializers.CharField(source="user.get_full_name")
     email = serializers.SerializerMethodField()
     phone = serializers.CharField(source="user.phone")
