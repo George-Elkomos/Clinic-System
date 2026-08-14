@@ -131,7 +131,7 @@ export function UserManagementPage() {
       </div>
 
       <div className={CARD}>
-        <SearchInput onSearch={onSearch} placeholder={t('staff.searchUsers')} />
+        <SearchInput onSearch={onSearch} placeholder={t('staff.searchUsers')} autoComplete="off" />
       </div>
 
       {tempPassword && (

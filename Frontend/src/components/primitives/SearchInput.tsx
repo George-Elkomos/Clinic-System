@@ -7,9 +7,16 @@ interface SearchInputProps {
   placeholder?: string
   debounceMs?: number
   defaultValue?: string
+  autoComplete?: string
 }
 
-export function SearchInput({ onSearch, placeholder, debounceMs = 300, defaultValue = '' }: SearchInputProps) {
+export function SearchInput({
+  onSearch,
+  placeholder,
+  debounceMs = 300,
+  defaultValue = '',
+  autoComplete,
+}: SearchInputProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState(defaultValue)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -29,6 +36,7 @@ export function SearchInput({ onSearch, placeholder, debounceMs = 300, defaultVa
         type="text"
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        autoComplete={autoComplete}
         placeholder={placeholder ?? t('common.searchPlaceholder')}
         aria-label={placeholder ?? t('common.searchPlaceholder')}
         // patient-field / .public-shell input already supply the real
