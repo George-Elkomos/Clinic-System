@@ -45,6 +45,18 @@ def test_doctor_creates_record_via_api(api, doctor_profile, treated):
     assert resp.data["version"] == 1 and resp.data["is_current"] is True
 
 
+def test_manager_cannot_author_medical_record(api, make_user, treated):
+    """Regression: clinical content is doctor-exclusive to author — a manager
+    is administrative, not a treating clinician, and must not be able to
+    write into a patient's medical record (matches Encounters/Clinical Notes)."""
+    manager = make_user("mgr-mr@test.dev", RoleChoices.MANAGER)
+    api.force_authenticate(manager)
+    resp = api.post(reverse("medical-record-list"),
+                    {"patient": treated.patient_profile.id, "diagnosis": "Should not save"}, format="json")
+    assert resp.status_code == 403
+    assert MedicalRecord.objects.filter(diagnosis="Should not save").count() == 0
+
+
 # --- Specialty-tagged clinical note rule ------------------------------------
 def test_note_specialty_rule(api, doctor_profile, treated):
     # doctor_profile's specialty is in the "General" category (see conftest).
@@ -85,7 +97,11 @@ def test_record_scoping(api, doctor_profile, treated, make_user):
 def test_secretary_forbidden_from_medical(api, secretary):
     api.force_authenticate(secretary)
     assert api.get(reverse("medical-record-list")).status_code == 403
-    assert api.get(reverse("prescription-list")).status_code == 403
+    # Prescriptions are the one exception: secretaries get read-only access
+    # for the desk "view status / print & hand over" workflow (see
+    # test_secretary_scope.py), but still can't write one.
+    assert api.get(reverse("prescription-list")).status_code == 200
+    assert api.post(reverse("prescription-list"), {}, format="json").status_code == 403
 
 
 # --- Scan upload + secure download ------------------------------------------

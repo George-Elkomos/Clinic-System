@@ -89,16 +89,15 @@ export function MyProfilePage() {
     if (!myDoctorId) return
     setSaving(true)
     try {
+      // room_number/consultation_fee are Manager-exclusive — not sent from here.
       const doctorPayload: Partial<Doctor> = {
         bio,
         bio_ar: bioAr,
         full_name_ar: fullNameAr,
         education,
-        room_number: room,
         languages_spoken: languages.join(', '),
         years_experience: yearsExperience,
         avg_appointment_duration: duration,
-        consultation_fee: fee === '' ? null : fee,
         is_accepting_patients: accepting,
         accepts_walk_ins: walkIns,
         specialties,
@@ -238,8 +237,8 @@ export function MyProfilePage() {
       <div className={CARD}>
         <h2 className={CARD_TITLE}>{t('doctors.clinicConsultation')}</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label={t('doctors.room')}>
-            {(p) => <input {...p} className="patient-field" value={room} onChange={(e) => setRoom(e.target.value)} />}
+          <FormField label={t('doctors.room')} hint={t('doctors.adminOnlyField')}>
+            {(p) => <input {...p} className="patient-field" value={room} disabled readOnly />}
           </FormField>
           <FormField label={t('doctors.consultationDuration')} hint={t('doctors.minutesHint')}>
             {(p) => (
@@ -255,7 +254,7 @@ export function MyProfilePage() {
             )}
           </FormField>
           <div className="sm:col-span-2">
-            <FormField label={t('doctors.consultationFee')} hint={t('doctors.feeHint')}>
+            <FormField label={t('doctors.consultationFee')} hint={t('doctors.adminOnlyField')}>
               {(p) => (
                 <input
                   {...p}
@@ -264,7 +263,8 @@ export function MyProfilePage() {
                   step="0.01"
                   className="patient-field"
                   value={fee}
-                  onChange={(e) => setFee(e.target.value)}
+                  disabled
+                  readOnly
                 />
               )}
             </FormField>

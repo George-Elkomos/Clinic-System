@@ -37,6 +37,7 @@ import { BookAppointmentPage as SecretaryBookAppointmentPage } from '../pages/se
 import { DoctorsPage } from '../pages/secretary/DoctorsPage'
 import { QueueBoardPage } from '../pages/secretary/QueueBoardPage'
 import { DoctorAbsencePage } from '../pages/secretary/DoctorAbsencePage'
+import { PrescriptionsDeskPage } from '../pages/secretary/PrescriptionsDeskPage'
 import { ManagerDashboard } from '../pages/manager/ManagerDashboard'
 import { AuditLogPage } from '../pages/manager/AuditLogPage'
 import { ReportsDashboardPage } from '../pages/manager/ReportsDashboardPage'
@@ -129,6 +130,7 @@ export const router = createBrowserRouter([
       { path: 'patients', element: <PatientDirectoryPage /> },
       { path: 'lab', element: <SampleCollectionPage /> },
       { path: 'lab/:id', element: <LabOrderDetailsPage /> },
+      { path: 'prescriptions', element: <PrescriptionsDeskPage /> },
       { path: 'billing', element: <BillingDeskPage /> },
       { path: 'referrals', element: <SecretaryReferralsPage /> },
       { path: 'radiology', element: <RadiologyWorklistPage /> },

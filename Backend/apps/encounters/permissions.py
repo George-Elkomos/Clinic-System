@@ -1,7 +1,8 @@
 """Access control for encounters.
 
-Create/write/submit/amend: the owning doctor (or manager). Read: owning patient,
-owning doctor, or manager. Secretaries have no access to encounters.
+Create/write/submit/amend: the owning doctor only — clinical encounters are
+doctor-exclusive. Read: owning patient, owning doctor, or manager. Secretaries
+have no access to encounters.
 """
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
@@ -25,7 +26,8 @@ class EncounterPermission(BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
         if user.role == RoleChoices.MANAGER:
-            return True
+            # Managers can read any encounter but never write clinical content.
+            return request.method in SAFE_METHODS
         if user.role == RoleChoices.PATIENT:
             return request.method in SAFE_METHODS and obj.patient.user_id == user.id
         if user.role == RoleChoices.DOCTOR:

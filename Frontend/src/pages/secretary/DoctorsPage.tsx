@@ -3,12 +3,12 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
-import { AvatarUploader } from '../../components/primitives/AvatarUploader'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { FormField } from '../../components/primitives/FormField'
 import { Select, type SelectOption } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { useAuth } from '../../hooks/useAuth'
 import { LANGUAGE_OPTIONS, parseLanguages } from '../../lib/languages'
 import { errorMessage } from '../../services/apiClient'
 import { doctorsApi } from '../../services/doctors.api'
@@ -18,10 +18,25 @@ const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
 const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
 
+// Read-only — the doctor's own photo is theirs to manage from /doctor/profile.
+function DoctorAvatar({ name, imageUrl }: { name: string; imageUrl: string | null }) {
+  const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?'
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-100 font-semibold text-teal-700"
+      style={{ width: 64, height: 64, fontSize: 64 / 3 }}
+    >
+      {imageUrl ? <img src={imageUrl} alt={name} className="h-full w-full object-cover" /> : <span>{initials}</span>}
+    </div>
+  )
+}
+
 function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyOptions: SelectOption[] }) {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const { showToast } = useToast()
   const qc = useQueryClient()
+  const isManager = user?.role === 'MANAGER'
   const [room, setRoom] = useState(doctor.room_number)
   const [accepting, setAccepting] = useState(doctor.is_accepting_patients)
   const [walkIns, setWalkIns] = useState(doctor.accepts_walk_ins)
@@ -31,40 +46,28 @@ function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyO
   const [duration, setDuration] = useState(doctor.avg_appointment_duration)
   const [fee, setFee] = useState(doctor.consultation_fee ?? '')
   const [specialties, setSpecialties] = useState<number[]>(doctor.specialties)
-  const [avatarValue, setAvatarValue] = useState<File | null | undefined>(undefined)
 
   const save = useMutation({
     mutationFn: () => {
       const payload: Partial<Doctor> = {
-        room_number: room,
         is_accepting_patients: accepting,
         accepts_walk_ins: walkIns,
         bio,
         years_experience: yearsExperience,
         languages_spoken: languages.join(', '),
         avg_appointment_duration: duration,
-        consultation_fee: fee === '' ? null : fee,
         specialties,
       }
-      if (avatarValue === undefined) {
-        return doctorsApi.update(doctor.id, payload)
+      // Fee/room are Manager-exclusive — never sent by a secretary, even unchanged.
+      if (isManager) {
+        payload.room_number = room
+        payload.consultation_fee = fee === '' ? null : fee
       }
-      const form = new FormData()
-      Object.entries(payload).forEach(([k, v]) => {
-        if (v === null || v === undefined) return
-        if (k === 'specialties') {
-          ;(v as number[]).forEach((id) => form.append('specialties', String(id)))
-        } else {
-          form.append(k, String(v))
-        }
-      })
-      form.append('photo', avatarValue === null ? '' : avatarValue)
-      return doctorsApi.update(doctor.id, form)
+      return doctorsApi.update(doctor.id, payload)
     },
     onSuccess: () => {
       showToast(t('common.save'), 'success')
       qc.invalidateQueries({ queryKey: ['secretary-doctors'] })
-      setAvatarValue(undefined)
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
@@ -76,12 +79,20 @@ function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyO
       </h2>
 
       <div className="mb-4">
-        <AvatarUploader name={doctor.full_name} imageUrl={doctor.photo} value={avatarValue} onChange={setAvatarValue} size={64} />
+        <DoctorAvatar name={doctor.full_name} imageUrl={doctor.photo} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <FormField label={t('doctors.room')}>
-          {(p) => <input {...p} className="patient-field" value={room} onChange={(e) => setRoom(e.target.value)} />}
+        <FormField label={t('doctors.room')} hint={isManager ? undefined : t('doctors.managerOnlyField')}>
+          {(p) => (
+            <input
+              {...p}
+              className="patient-field"
+              value={room}
+              onChange={(e) => setRoom(e.target.value)}
+              disabled={!isManager}
+            />
+          )}
         </FormField>
         <div className="sm:col-span-2">
           <FormField label={t('doctors.bio')}>
@@ -127,7 +138,7 @@ function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyO
             />
           )}
         </FormField>
-        <FormField label={t('doctors.consultationFee')} hint={t('doctors.feeHint')}>
+        <FormField label={t('doctors.consultationFee')} hint={isManager ? t('doctors.feeHint') : t('doctors.managerOnlyField')}>
           {(p) => (
             <input
               {...p}
@@ -137,6 +148,7 @@ function DoctorEditor({ doctor, specialtyOptions }: { doctor: Doctor; specialtyO
               className="patient-field"
               value={fee}
               onChange={(e) => setFee(e.target.value)}
+              disabled={!isManager}
             />
           )}
         </FormField>

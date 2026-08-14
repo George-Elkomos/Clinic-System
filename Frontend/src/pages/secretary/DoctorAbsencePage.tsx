@@ -9,6 +9,7 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatDate } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
@@ -25,10 +26,12 @@ function todayISO() {
 
 export function DoctorAbsencePage() {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const { language } = useLanguage()
   const { showToast } = useToast()
   const confirm = useConfirm()
   const qc = useQueryClient()
+  const isManager = user?.role === 'MANAGER'
 
   const [doctorId, setDoctorId] = useState<number | ''>('')
   const [startDate, setStartDate] = useState(todayISO())
@@ -70,6 +73,7 @@ export function DoctorAbsencePage() {
         <p className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{t('absence.intro')}</p>
       </div>
 
+      {isManager && (
       <div className={CARD}>
         <h2 className="patient-text-card-title mb-4" style={{ color: 'var(--text-primary)' }}>{t('absence.create')}</h2>
         <FormField label={t('absence.doctor')}>
@@ -109,6 +113,7 @@ export function DoctorAbsencePage() {
           {create.isPending && <Spinner size={14} />}{t('absence.create')}
         </button>
       </div>
+      )}
 
       <div className={CARD}>
         <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('absence.title')}</h2>

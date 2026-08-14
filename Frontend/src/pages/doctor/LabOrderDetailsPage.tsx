@@ -284,8 +284,10 @@ export function LabOrderDetailsPage() {
           </>
         )}
 
-        {/* Result entry form */}
-        {(isSecretary || isManager) && order.status === 'PROCESSING' && (
+        {/* Result entry form — entering result values is Manager-exclusive
+           (clinical data); secretaries handle sample logistics only, see the
+           collect/send/receive actions below. */}
+        {isManager && order.status === 'PROCESSING' && (
           <>
             {showResultForm ? (
               <>

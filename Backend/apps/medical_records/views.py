@@ -15,7 +15,13 @@ from apps.users.models import PatientProfile
 from apps.users.permissions import IsDoctorOrManager
 
 from .models import ClinicalNote, LabOrder, LabResult, MedicalRecord, Prescription, Scan, SampleCollection
-from .permissions import ClinicalNotePermission, LabOrderPermission, MedicalDataPermission, doctor_treats
+from .permissions import (
+    ClinicalNotePermission,
+    LabOrderPermission,
+    MedicalDataPermission,
+    PrescriptionPermission,
+    doctor_treats,
+)
 from .serializers import (
     ClinicalNoteSerializer,
     CollectSampleInputSerializer,
@@ -79,12 +85,15 @@ class MedicalRecordViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
         return qs.order_by("-version")
 
     def create(self, request, *args, **kwargs):
-        if request.user.role == RoleChoices.PATIENT:
-            raise PermissionDenied("Patients cannot author clinical records.")
+        # Clinical content is doctor-exclusive to author, same as Encounters
+        # and Clinical Notes — a manager is administrative, not a treating
+        # clinician, and must not be able to write into a patient's record.
+        if request.user.role != RoleChoices.DOCTOR:
+            raise PermissionDenied("Only doctors can author clinical records.")
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         patient = self._resolve_patient(serializer)
-        doctor = request.user.doctor_profile if request.user.role == RoleChoices.DOCTOR else None
+        doctor = request.user.doctor_profile
         v = serializer.validated_data
         record = create_record_version(
             patient=patient, doctor=doctor,
@@ -181,6 +190,7 @@ class LabResultViewSet(_UploadViewSet):
 
 class PrescriptionViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
     serializer_class = PrescriptionSerializer
+    permission_classes = [PrescriptionPermission]
     http_method_names = ["get", "post", "patch", "head", "options"]
     filterset_fields = ["patient", "status"]
 
@@ -188,7 +198,13 @@ class PrescriptionViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
         qs = Prescription.objects.select_related(
             "doctor__user", "patient__user"
         ).prefetch_related("items")
-        return scope_to_user(qs, self.request.user).order_by("-created_at")
+        user = self.request.user
+        # Secretaries get read-only access to every prescription (desk
+        # print/handover), not the patient/doctor-scoped view scope_to_user
+        # gives clinical roles.
+        if user.role == RoleChoices.SECRETARY:
+            return qs.order_by("-created_at")
+        return scope_to_user(qs, user).order_by("-created_at")
 
     def perform_create(self, serializer):
         if self.request.user.role != RoleChoices.DOCTOR:
@@ -454,8 +470,11 @@ class LabOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="enter-results",
             parser_classes=[MultiPartParser, FormParser, JSONParser])
     def enter_results(self, request, pk=None):
-        if request.user.role not in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
-            raise PermissionDenied("Only lab staff can enter results.")
+        # Entering result values is clinical data entry, unlike the sample
+        # logistics actions above — Manager-exclusive, matching how
+        # RadiologyOrderViewSet.report() locks out secretaries.
+        if request.user.role != RoleChoices.MANAGER:
+            raise PermissionDenied("Only a manager can enter lab results.")
         order = self.get_object()
         results_data = request.data.get("results", [])
         if not isinstance(results_data, list):

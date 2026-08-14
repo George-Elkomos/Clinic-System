@@ -50,6 +50,25 @@ class MedicalDataPermission(BasePermission):
         return False
 
 
+class PrescriptionPermission(MedicalDataPermission):
+    """Same as MedicalDataPermission (patient/doctor/manager), plus read-only
+    access for secretaries — the desk "view status, print & hand over"
+    workflow. Writing (issue/cancel/reissue/check-interactions) stays
+    doctor/manager-only, enforced in the view."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        if user and user.is_authenticated and user.role == RoleChoices.SECRETARY:
+            return request.method in SAFE_METHODS
+        return super().has_permission(request, view)
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if user.role == RoleChoices.SECRETARY:
+            return request.method in SAFE_METHODS
+        return super().has_object_permission(request, view, obj)
+
+
 class ClinicalNotePermission(BasePermission):
     """Read like medical data; writing requires a DOCTOR whose specialty
     categories include the note's specialty_category (enforced fully in the

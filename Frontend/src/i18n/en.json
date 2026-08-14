@@ -252,6 +252,7 @@
     "updated": "Updated {{time}}"
   },
   "status": {
+    "ACTIVE": "Active",
     "PENDING": "Pending",
     "CONFIRMED": "Confirmed",
     "CHECKED_IN": "Checked In",
@@ -308,6 +309,8 @@
     "profileSaved": "Your profile has been updated.",
     "minutesHint": "In minutes",
     "feeHint": "In USD — leave blank to hide it from patients",
+    "managerOnlyField": "Only a manager can change this",
+    "adminOnlyField": "Set by clinic management — contact your manager to change it",
     "personalBio": "Personal & Bio",
     "clinicConsultation": "Clinic & Consultation",
     "bioAr": "About the doctor (Arabic)",
@@ -396,6 +399,7 @@
     "prescriptions": "Prescriptions",
     "noPrescriptions": "No prescriptions yet.",
     "prescriptionsSubtitle": "View and download your active and past medical prescriptions issued by your doctors.",
+    "prescriptionsDeskIntro": "View status and print a copy to hand over to the patient. Prescriptions are written and edited by doctors only.",
     "noPrescriptionsTitle": "No prescriptions found",
     "noPrescriptionsSub": "Prescriptions issued by your doctors will appear here.",
     "newPrescription": "New prescription",

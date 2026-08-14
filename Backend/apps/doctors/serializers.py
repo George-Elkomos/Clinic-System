@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.core.enums import RoleChoices
 from apps.users.models import User
 
 from .models import (
@@ -60,7 +61,16 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 
 class DoctorProfileWriteSerializer(serializers.ModelSerializer):
-    """Doctor self-edit / secretary edit (no license edits by the doctor)."""
+    """Doctor self-edit / secretary / manager edit — one shared endpoint, but
+    not every field is writable by every role:
+
+    - consultation_fee / room_number: Manager-exclusive (financial/space admin).
+    - photo: doctor-exclusive (only the doctor editing their own profile).
+
+    Fields outside a caller's authority are made read-only rather than
+    rejecting the request, so a shared save payload from a less-privileged
+    caller simply leaves them unchanged.
+    """
 
     class Meta:
         model = DoctorProfile
@@ -70,6 +80,17 @@ class DoctorProfileWriteSerializer(serializers.ModelSerializer):
             "room_number", "photo", "accepts_walk_ins", "is_accepting_patients",
             "specialties",
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        user = getattr(self.context.get("request"), "user", None)
+        if user is None:
+            return
+        if user.role != RoleChoices.MANAGER:
+            self.fields["consultation_fee"].read_only = True
+            self.fields["room_number"].read_only = True
+        if not (self.instance and self.instance.user_id == user.id):
+            self.fields["photo"].read_only = True
 
     def update(self, instance, validated_data):
         old_duration = instance.avg_appointment_duration

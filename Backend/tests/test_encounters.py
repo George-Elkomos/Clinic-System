@@ -6,13 +6,19 @@ on the appointment OneToOne link that `get_or_create_draft` depends on to
 resolve `/doctor/encounters/<appointmentId>` to the right version.
 """
 import pytest
+from django.urls import reverse
 
 from apps.appointments import services as appt_services
-from apps.core.enums import AppointmentStatus
+from apps.core.enums import AppointmentStatus, RoleChoices
 from apps.encounters import services as encounter_services
 from apps.encounters.models import Encounter, EncounterStatus
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def manager(make_user):
+    return make_user("mgr-enc@test.dev", RoleChoices.MANAGER, first_name="Man", last_name="Ager")
 
 
 def _completed_appointment(patient, doctor_profile, future_slot):
@@ -91,3 +97,47 @@ def test_double_amend_chain_keeps_appointment_on_latest(patient, doctor_profile,
     assert v2.appointment_id is None
     assert v3.appointment_id == appt.id
     assert Encounter.objects.filter(appointment=appt).count() == 1
+
+
+def test_manager_cannot_edit_draft_encounter(api, manager, patient, doctor_profile, future_slot):
+    """Regression: EncounterPermission used to grant managers unconditional
+    object-level access, letting them PATCH clinical encounter content via the
+    API even though encounters are doctor-exclusive. Managers keep read access."""
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+
+    api.force_authenticate(manager)
+    resp = api.patch(reverse("encounter-detail", args=[draft.id]), {}, format="json")
+    assert resp.status_code == 403
+
+    resp = api.get(reverse("encounter-detail", args=[draft.id]))
+    assert resp.status_code == 200
+
+
+def test_manager_cannot_submit_or_amend_encounter(api, manager, patient, doctor_profile, future_slot):
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+
+    api.force_authenticate(manager)
+    resp = api.post(reverse("encounter-submit", args=[draft.id]))
+    assert resp.status_code == 403
+
+    encounter_services.submit_encounter(draft)
+    draft.refresh_from_db()
+    resp = api.post(reverse("encounter-amend", args=[draft.id]))
+    assert resp.status_code == 403
+
+
+def test_doctor_can_still_edit_own_draft_encounter(api, doctor_profile, patient, future_slot):
+    """Guard against overcorrecting the manager-write fix above."""
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+
+    api.force_authenticate(doctor_profile.user)
+    resp = api.patch(
+        reverse("encounter-detail", args=[draft.id]),
+        {"chief_complaint": "Headache"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.data["chief_complaint"] == "Headache"

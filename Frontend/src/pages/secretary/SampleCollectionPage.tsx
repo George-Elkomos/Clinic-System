@@ -381,8 +381,10 @@ export function SampleCollectionPage() {
                           {receiveMut.isPending && receiveMut.variables === order.id && <Spinner size={14} />}{t('lab.receiveAtLab')}
                         </button>
                       )}
+                      {/* Entering results is Manager-exclusive (clinical data) —
+                         secretaries only get a view link here. */}
                       <Link to={`/secretary/lab/${order.id}`}>
-                        <button type="button" className={BTN_PRIMARY}>{t('lab.enterResults')}</button>
+                        <button type="button" className={BTN_SECONDARY}>{t('common.view')}</button>
                       </Link>
                     </>
                   )}
