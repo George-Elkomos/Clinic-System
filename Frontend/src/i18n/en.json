@@ -701,6 +701,8 @@
     "createSecretary": "Register New Secretary",
     "licenseNumber": "Medical license number",
     "specialties": "Specialties",
+    "addSpecialty": "Add \"{{name}}\"",
+    "specialtyCreated": "Specialty \"{{name}}\" added.",
     "photo": "Profile photo (optional)",
     "passwordOptional": "Initial password (leave blank to auto-generate)",
     "tempPasswordNote": "Write this down and share it securely — you will not see it again.",

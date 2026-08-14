@@ -19,11 +19,23 @@ class SpecialtyCategorySerializer(serializers.ModelSerializer):
 
 
 class SpecialtySerializer(serializers.ModelSerializer):
+    """`category` is optional on write: quick-add flows (e.g. the manager's
+    Add Doctor form) create a bare specialty by name only, so an uncategorized
+    one falls into a catch-all "General" category rather than failing."""
+
     category_name = serializers.CharField(source="category.name", read_only=True)
 
     class Meta:
         model = Specialty
         fields = ["id", "name", "name_ar", "category", "category_name", "description", "is_active"]
+        extra_kwargs = {"category": {"required": False}}
+
+    def create(self, validated_data):
+        if not validated_data.get("category"):
+            validated_data["category"], _ = SpecialtyCategory.objects.get_or_create(
+                name="General", defaults={"name_ar": "عام"}
+            )
+        return super().create(validated_data)
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):

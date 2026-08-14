@@ -701,6 +701,8 @@
     "createSecretary": "تسجيل سكرتير/ة جديد/ة",
     "licenseNumber": "رقم الترخيص الطبي",
     "specialties": "التخصصات",
+    "addSpecialty": "إضافة \"{{name}}\"",
+    "specialtyCreated": "تمت إضافة تخصص \"{{name}}\".",
     "photo": "الصورة الشخصية (اختياري)",
     "passwordOptional": "كلمة المرور الأولى (اتركها فارغة للإنشاء التلقائي)",
     "tempPasswordNote": "دوّن هذه الكلمة وشاركها بشكل آمن — لن تظهر مرة أخرى.",

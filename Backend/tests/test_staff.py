@@ -122,6 +122,47 @@ def test_secretary_cannot_create_secretary(api, secretary):
     assert resp.status_code == 403
 
 
+# --- Quick-create specialty (Add Doctor form) --------------------------------
+
+def test_manager_quick_creates_specialty_without_category(api, manager):
+    from apps.doctors.models import Specialty, SpecialtyCategory
+
+    api.force_authenticate(manager)
+    resp = api.post(reverse("specialty-list"), {"name": "Oncology"}, format="json")
+    assert resp.status_code == 201
+    specialty = Specialty.objects.get(name="Oncology")
+    assert specialty.category == SpecialtyCategory.objects.get(name="General")
+    assert resp.data["category_name"] == "General"
+
+
+def test_quick_created_specialty_is_searchable_and_selectable(api, manager):
+    api.force_authenticate(manager)
+    create_resp = api.post(reverse("specialty-list"), {"name": "Oncology"}, format="json")
+    specialty_id = create_resp.data["id"]
+
+    search_resp = api.get(reverse("specialty-list"), {"search": "onco"})
+    assert any(row["id"] == specialty_id for row in search_resp.data["results"])
+
+    doctor_resp = api.post(reverse("staff-create-doctor"), {
+        "first_name": "Nora", "last_name": "Onc",
+        "email": "dr.nora@test.dev", "license_number": "LIC-ONC",
+        "specialties": [specialty_id],
+    }, format="json")
+    assert doctor_resp.status_code == 201
+
+
+def test_duplicate_specialty_name_rejected(api, manager, specialty):
+    api.force_authenticate(manager)
+    resp = api.post(reverse("specialty-list"), {"name": specialty.name}, format="json")
+    assert resp.status_code == 400
+
+
+def test_secretary_cannot_create_specialty(api, secretary):
+    api.force_authenticate(secretary)
+    resp = api.post(reverse("specialty-list"), {"name": "Neurology"}, format="json")
+    assert resp.status_code == 403
+
+
 # --- Create patient (staff) -------------------------------------------------
 
 def test_secretary_creates_minimal_patient(api, secretary):

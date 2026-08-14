@@ -1,6 +1,8 @@
-import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { Check, ChevronDown, Plus, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { Spinner } from './Spinner'
 
 export interface SelectOption {
   value: string | number
@@ -18,6 +20,13 @@ interface SelectProps {
   multi?: boolean
   disabled?: boolean
   id?: string
+  // Shown as an inline action in the empty-results state, same pattern as
+  // AsyncCombobox — e.g. "no specialties matched this search — add it" rather
+  // than just the plain "No options found" text. `query` is the typed search
+  // text so the label can name what's about to be created.
+  onCreateNew?: (query: string) => void
+  createNewLabel?: (query: string) => string
+  creatingNewOption?: boolean
 }
 
 function initials(label: string): string {
@@ -36,6 +45,9 @@ export function Select({
   multi = false,
   disabled = false,
   id,
+  onCreateNew,
+  createNewLabel,
+  creatingNewOption = false,
 }: SelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -151,8 +163,32 @@ export function Select({
 
   const hasValue = selectedValues.length > 0
 
+  const triggerCreateNew = () => {
+    const query = search.trim()
+    if (!query || !onCreateNew) return
+    onCreateNew(query)
+    setSearch('')
+    // Single-select has nothing left to do once a pick is made — close like a
+    // normal selection. Multi stays open so the manager can keep adding.
+    if (!multi) closeMenu()
+  }
+
   const optionRows = filtered.length === 0 ? (
-    <div className="px-3 py-3 text-sm italic text-slate-400">{t('common.noOptions')}</div>
+    <div className="px-2 py-2">
+      <p className="px-1 py-2 text-sm italic text-slate-400">{t('common.noOptions')}</p>
+      {onCreateNew && search.trim() && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => { e.stopPropagation(); triggerCreateNew() }}
+          disabled={creatingNewOption}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-teal-300 bg-teal-50/50 py-2 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {creatingNewOption ? <Spinner size={15} /> : <Plus size={15} className="shrink-0" />}
+          {createNewLabel ? createNewLabel(search.trim()) : t('common.createNew')}
+        </button>
+      )}
+    </div>
   ) : (
     filtered.map((o, i) => {
       const selected = selectedValues.includes(o.value)

@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
@@ -22,8 +22,8 @@ export function CreateDoctorPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { showToast } = useToast()
-  const [created, setCreated] = useState<CreateDoctorResponse | null>(null)
-  const [form, setForm] = useState({
+  const queryClient = useQueryClient()
+  const emptyForm = {
     first_name: '',
     last_name: '',
     email: '',
@@ -34,7 +34,10 @@ export function CreateDoctorPage() {
     room_number: '',
     bio: '',
     photo: null as File | null,
-  })
+  }
+
+  const [created, setCreated] = useState<CreateDoctorResponse | null>(null)
+  const [form, setForm] = useState(emptyForm)
 
   const { data: specialties = [] } = useQuery({
     queryKey: ['specialties'],
@@ -49,7 +52,20 @@ export function CreateDoctorPage() {
     mutationFn: () => staffApi.createDoctor(form),
     onSuccess: (data) => {
       setCreated(data)
+      setForm(emptyForm)
       showToast(t('staff.doctorCreated'), 'success')
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const createSpecialty = useMutation({
+    mutationFn: (name: string) => doctorsApi.createSpecialty(name),
+    onSuccess: (newSpecialty) => {
+      queryClient.setQueryData<typeof specialties>(['specialties'], (current) =>
+        [...(current ?? []), newSpecialty].sort((a, b) => a.name.localeCompare(b.name))
+      )
+      update('specialties', [...form.specialties, newSpecialty.id])
+      showToast(t('staff.specialtyCreated', { name: newSpecialty.name }), 'success')
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
@@ -148,6 +164,9 @@ export function CreateDoctorPage() {
               onChange={(value) => update('specialties', (Array.isArray(value) ? value.map(Number) : []) as number[])}
               searchable
               multi
+              onCreateNew={(name) => createSpecialty.mutate(name)}
+              createNewLabel={(name) => t('staff.addSpecialty', { name })}
+              creatingNewOption={createSpecialty.isPending}
             />
           )}
         </FormField>

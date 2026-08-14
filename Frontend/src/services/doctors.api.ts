@@ -20,6 +20,9 @@ export const doctorsApi = {
   specialties: () =>
     api.get<Paginated<Specialty>>('/specialties/').then((r) => r.data.results),
 
+  createSpecialty: (name: string) =>
+    api.post<Specialty>('/specialties/', { name }).then((r) => r.data),
+
   availableSlots: (doctorId: number, date?: string) =>
     api
       .get<TimeSlot[]>('/slots/available/', { params: { doctor: doctorId, date } })
