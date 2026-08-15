@@ -280,14 +280,53 @@ def test_start_rejected_from_cancelled(api, patient, doctor_profile, future_slot
 
 
 def test_complete_succeeds_from_in_progress(api, patient, doctor_profile, future_slot):
+    """A documented encounter is required (Finding #3) -- see the
+    test_complete_rejected_* cases below for the undocumented paths."""
+    from apps.encounters import services as encounter_services
+
     appt = _book(patient, future_slot)
     appt.status = AppointmentStatus.IN_PROGRESS
     appt.save(update_fields=["status"])
+    encounter = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+    encounter.chief_complaint = "Headache"
+    encounter.save(update_fields=["chief_complaint"])
+
     api.force_authenticate(doctor_profile.user)
     resp = api.post(reverse("appointment-complete", args=[appt.id]))
     assert resp.status_code == 200
     appt.refresh_from_db()
     assert appt.status == AppointmentStatus.COMPLETED
+
+
+def test_complete_rejected_without_any_encounter(api, patient, doctor_profile, future_slot):
+    """Regression test for Finding #3's second entry point: the queue's direct
+    "Complete Visit" action (AppointmentViewSet.complete) used to skip straight
+    to complete_appointment() with no encounter at all, bypassing the same
+    zero-clinical-content guard enforced on the encounter submit path."""
+    appt = _book(patient, future_slot)
+    appt.status = AppointmentStatus.IN_PROGRESS
+    appt.save(update_fields=["status"])
+
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-complete", args=[appt.id]))
+    assert resp.status_code == 400
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.IN_PROGRESS
+
+
+def test_complete_rejected_with_empty_encounter(api, patient, doctor_profile, future_slot):
+    from apps.encounters import services as encounter_services
+
+    appt = _book(patient, future_slot)
+    appt.status = AppointmentStatus.IN_PROGRESS
+    appt.save(update_fields=["status"])
+    encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)  # left blank
+
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-complete", args=[appt.id]))
+    assert resp.status_code == 400
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.IN_PROGRESS
 
 
 @pytest.mark.parametrize("bad_status", [

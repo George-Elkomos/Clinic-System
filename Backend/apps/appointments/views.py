@@ -158,6 +158,19 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         self._staff_or_owning_doctor(appointment)
         if appointment.status != AppointmentStatus.IN_PROGRESS:
             raise ValidationError({"detail": "Only an in-progress appointment can be completed."})
+
+        # Mirrors encounters.services.submit_encounter's guard: completing a visit
+        # straight from the queue (bypassing "Submit & Close Encounter") must not
+        # let a visit close with zero clinical documentation either.
+        from apps.encounters.services import encounter_has_clinical_content
+
+        if not encounter_has_clinical_content(getattr(appointment, "encounter", None)):
+            raise ValidationError({
+                "detail": "Cannot complete a visit with no clinical documentation. Open the "
+                          "clinical encounter and record at least a chief complaint, diagnosis, "
+                          "or clinical notes first.",
+            })
+
         services.complete_appointment(appointment)
         data = AppointmentSerializer(appointment).data
         # Billing outcome (Phase 12): lets the desk show "Invoice #INV-XXXX

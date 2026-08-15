@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom'
 
 import { OverrideWarningModal } from '../../components/OverrideWarningModal'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
@@ -42,7 +41,6 @@ export function QueueBoardPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const { showToast } = useToast()
-  const confirm = useConfirm()
   const qc = useQueryClient()
   const [doctorId, setDoctorId] = useState<number | ''>('')
   const [patientSearch, setPatientSearch] = useState('')
@@ -109,14 +107,13 @@ export function QueueBoardPage() {
     return null
   }
 
-  const handleTransition = async (a: Appointment, action: 'checkIn' | 'start' | 'complete' | 'markEmergency') => {
+  const handleTransition = (a: Appointment, action: 'checkIn' | 'start' | 'complete' | 'markEmergency') => {
+    // The backend rejects completing a visit with no documented clinical
+    // encounter (Finding #3) — catch the common case client-side so the
+    // desk gets a clear pointer instead of a raw error after clicking.
     if (action === 'complete' && a.encounter_id == null) {
-      const ok = await confirm({
-        title: t('queue.completeNoEncounterTitle'),
-        message: t('queue.completeNoEncounterMessage'),
-        confirmLabel: t('appointments.complete'),
-      })
-      if (!ok) return
+      showToast(t('queue.completeNoEncounterBlocked'), 'error')
+      return
     }
     transition.mutate({ id: a.id, action })
   }

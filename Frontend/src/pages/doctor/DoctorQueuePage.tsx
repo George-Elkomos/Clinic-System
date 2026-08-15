@@ -299,14 +299,13 @@ export function DoctorQueuePage() {
     if (ok) noShow.mutate(id)
   }
 
-  const handleComplete = async (appt: QueueAppointment) => {
+  const handleComplete = (appt: QueueAppointment) => {
+    // The backend rejects completing a visit with no documented clinical
+    // encounter (Finding #3) — catch the common case client-side so the
+    // doctor gets a clear pointer instead of a raw error after clicking.
     if (appt.encounter_id == null) {
-      const ok = await confirm({
-        title: t('queue.completeNoEncounterTitle'),
-        message: t('queue.completeNoEncounterMessage'),
-        confirmLabel: t('queue.complete'),
-      })
-      if (!ok) return
+      showToast(t('queue.completeNoEncounterBlocked'), 'error')
+      return
     }
     complete.mutate(appt.id)
   }

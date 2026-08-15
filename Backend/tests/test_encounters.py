@@ -11,7 +11,7 @@ from django.urls import reverse
 from apps.appointments import services as appt_services
 from apps.core.enums import AppointmentStatus, RoleChoices
 from apps.encounters import services as encounter_services
-from apps.encounters.models import Encounter, EncounterStatus
+from apps.encounters.models import Diagnosis, Encounter, EncounterStatus
 
 pytestmark = pytest.mark.django_db
 
@@ -19,6 +19,11 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def manager(make_user):
     return make_user("mgr-enc@test.dev", RoleChoices.MANAGER, first_name="Man", last_name="Ager")
+
+
+@pytest.fixture
+def diagnosis(db):
+    return Diagnosis.objects.create(name="Common cold")
 
 
 def _completed_appointment(patient, doctor_profile, future_slot):
@@ -40,6 +45,8 @@ def test_draft_for_appointment_creates_then_reuses(patient, doctor_profile, futu
 def test_submit_completes_appointment_and_locks_encounter(patient, doctor_profile, future_slot):
     appt = _completed_appointment(patient, doctor_profile, future_slot)
     draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+    draft.chief_complaint = "Headache"
+    draft.save(update_fields=["chief_complaint"])
     encounter_services.submit_encounter(draft)
     draft.refresh_from_db()
     appt.refresh_from_db()
@@ -54,6 +61,8 @@ def test_amend_moves_appointment_link_to_the_new_current_twin(patient, doctor_pr
     stale pre-amendment content forever."""
     appt = _completed_appointment(patient, doctor_profile, future_slot)
     original = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+    original.chief_complaint = "Headache"
+    original.save(update_fields=["chief_complaint"])
     encounter_services.submit_encounter(original)
 
     twin = encounter_services.amend_encounter(original)
@@ -86,6 +95,8 @@ def test_amend_rejects_non_submitted_encounter(patient, doctor_profile, future_s
 def test_double_amend_chain_keeps_appointment_on_latest(patient, doctor_profile, future_slot):
     appt = _completed_appointment(patient, doctor_profile, future_slot)
     v1 = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+    v1.chief_complaint = "Headache"
+    v1.save(update_fields=["chief_complaint"])
     encounter_services.submit_encounter(v1)
     v2 = encounter_services.amend_encounter(v1)
     encounter_services.submit_encounter(v2)
@@ -97,6 +108,79 @@ def test_double_amend_chain_keeps_appointment_on_latest(patient, doctor_profile,
     assert v2.appointment_id is None
     assert v3.appointment_id == appt.id
     assert Encounter.objects.filter(appointment=appt).count() == 1
+
+
+def test_submit_rejects_encounter_with_zero_clinical_content(patient, doctor_profile, future_slot):
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+
+    from rest_framework.exceptions import ValidationError
+
+    with pytest.raises(ValidationError):
+        encounter_services.submit_encounter(draft)
+
+    draft.refresh_from_db()
+    appt.refresh_from_db()
+    assert draft.status == EncounterStatus.DRAFT
+    assert appt.status != AppointmentStatus.COMPLETED
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"chief_complaint": "Headache"},
+        {"diagnosis_notes": "Likely tension headache."},
+        {"treatment_plan": "Rest and hydration."},
+        {"examination_findings": "No focal deficits."},
+    ],
+)
+def test_submit_accepts_encounter_with_any_single_clinical_field(
+    patient, doctor_profile, future_slot, fields,
+):
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+    for field, value in fields.items():
+        setattr(draft, field, value)
+    draft.save(update_fields=list(fields))
+
+    encounter_services.submit_encounter(draft)
+    draft.refresh_from_db()
+    assert draft.status == EncounterStatus.SUBMITTED
+
+
+def test_submit_accepts_encounter_with_only_a_diagnosis(patient, doctor_profile, future_slot, diagnosis):
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+    draft.diagnosis = diagnosis
+    draft.save(update_fields=["diagnosis"])
+
+    encounter_services.submit_encounter(draft)
+    draft.refresh_from_db()
+    assert draft.status == EncounterStatus.SUBMITTED
+
+
+def test_submit_endpoint_returns_400_for_empty_encounter(api, doctor_profile, patient, future_slot):
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("encounter-submit", args=[draft.id]))
+    assert resp.status_code == 400
+
+    draft.refresh_from_db()
+    assert draft.status == EncounterStatus.DRAFT
+
+
+def test_submit_endpoint_returns_200_for_encounter_with_content(api, doctor_profile, patient, future_slot):
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+    draft.chief_complaint = "Sore throat"
+    draft.save(update_fields=["chief_complaint"])
+
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("encounter-submit", args=[draft.id]))
+    assert resp.status_code == 200
+    assert resp.data["status"] == EncounterStatus.SUBMITTED
 
 
 def test_manager_cannot_edit_draft_encounter(api, manager, patient, doctor_profile, future_slot):
@@ -122,6 +206,8 @@ def test_manager_cannot_submit_or_amend_encounter(api, manager, patient, doctor_
     resp = api.post(reverse("encounter-submit", args=[draft.id]))
     assert resp.status_code == 403
 
+    draft.chief_complaint = "Headache"
+    draft.save(update_fields=["chief_complaint"])
     encounter_services.submit_encounter(draft)
     draft.refresh_from_db()
     resp = api.post(reverse("encounter-amend", args=[draft.id]))

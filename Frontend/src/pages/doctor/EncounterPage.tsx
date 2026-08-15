@@ -576,21 +576,34 @@ export function EncounterPage() {
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
+  const refreshEncounter = () => qc.invalidateQueries({ queryKey: ['encounter', encounterId] })
+
+  if (!encounter || !form) return <CenteredSpinner />
+
+  // Mirrors the backend's _has_clinical_content check (services.py) — a
+  // submitted encounter must record more than pure bookkeeping.
+  const missingClinicalContent =
+    !complaint &&
+    !diagnosis &&
+    !form.diagnosis_notes.trim() &&
+    !form.treatment_plan.trim() &&
+    !form.examination_findings.trim()
+
   const handleSubmit = async () => {
+    if (missingClinicalContent) {
+      showToast(t('encounters.missingContentToast'), 'error')
+      return
+    }
     const ok = await confirm({
       title: t('encounters.submitConfirmTitle'),
       message: t('encounters.submitConfirmMessage'),
     })
     if (ok) {
       // Flush any pending field edits before submitting.
-      if (form) await save.mutateAsync(buildPayload(form))
+      await save.mutateAsync(buildPayload(form))
       submit.mutate()
     }
   }
-
-  const refreshEncounter = () => qc.invalidateQueries({ queryKey: ['encounter', encounterId] })
-
-  if (!encounter || !form) return <CenteredSpinner />
 
   const set = (key: keyof FormState, value: string | string[]) => {
     hasEdited.current = true
@@ -762,11 +775,27 @@ export function EncounterPage() {
           </div>
 
           {!readOnly && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-              <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('encounters.savedDraftHint')}</span>
-              <button type="button" disabled={submit.isPending} onClick={handleSubmit} className={BTN_PRIMARY}>
-                {submit.isPending && <Spinner size={14} />}{t('encounters.submit')}
-              </button>
+            <div className="flex flex-col gap-3">
+              {missingClinicalContent && (
+                <div
+                  role="alert"
+                  className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 sm:text-sm"
+                >
+                  {t('encounters.missingContentWarning')}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{t('encounters.savedDraftHint')}</span>
+                <button
+                  type="button"
+                  disabled={submit.isPending || missingClinicalContent}
+                  title={missingClinicalContent ? t('encounters.missingContentWarning') : undefined}
+                  onClick={handleSubmit}
+                  className={BTN_PRIMARY}
+                >
+                  {submit.isPending && <Spinner size={14} />}{t('encounters.submit')}
+                </button>
+              </div>
             </div>
           )}
         </div>

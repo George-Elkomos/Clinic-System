@@ -26,6 +26,23 @@ _CLINICAL_FIELDS = (
 )
 
 
+# A submitted encounter must record more than pure bookkeeping — at least one
+# of these signals the doctor actually documented the visit. Also consulted by
+# apps.appointments.views.AppointmentViewSet.complete() so the direct queue
+# "Complete Visit" action can't bypass this same guarantee (see submit_encounter).
+_MIN_CONTENT_TEXT_FIELDS = (
+    "chief_complaint", "diagnosis_notes", "treatment_plan", "examination_findings",
+)
+
+
+def encounter_has_clinical_content(encounter):
+    if encounter is None:
+        return False
+    if encounter.diagnosis_id is not None:
+        return True
+    return any((getattr(encounter, field) or "").strip() for field in _MIN_CONTENT_TEXT_FIELDS)
+
+
 def get_or_create_draft(*, appointment, doctor):
     """Return the encounter already attached to `appointment`, or create a DRAFT.
 
@@ -51,6 +68,12 @@ def submit_encounter(encounter):
     """DRAFT -> SUBMITTED. Completes the appointment and mirrors a MedicalRecord."""
     if encounter.status != EncounterStatus.DRAFT:
         raise ValidationError({"status": "Only a draft encounter can be submitted."})
+
+    if not encounter_has_clinical_content(encounter):
+        raise ValidationError({
+            "detail": "Cannot complete a visit with no clinical content. Record at least "
+                      "a chief complaint, diagnosis, or clinical notes before submitting.",
+        })
 
     encounter.status = EncounterStatus.SUBMITTED
     encounter.save(update_fields=["status", "updated_at"])
