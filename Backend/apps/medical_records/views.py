@@ -385,7 +385,7 @@ class LabOrderViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only lab staff can start processing.")
         order = self.get_object()
         result = lab_order_service.start_processing(order)
-        return Response(LabOrderSerializer(result).data)
+        return Response(LabOrderSerializer(result, context={"request": request}).data)
 
     @action(detail=True, methods=["patch"], url_path="send-to-lab")
     def send_to_lab(self, request, pk=None):
@@ -509,6 +509,10 @@ class LabOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path=r"results/(?P<result_pk>\d+)/download")
     def download_result_file(self, request, pk=None, result_pk=None):
         from .models import LabOrderResult
+        # CW-9: the file is clinical content (often the full scanned report) —
+        # downloading it would bypass the redaction in LabOrderSerializer.get_results().
+        if request.user.role == RoleChoices.SECRETARY:
+            raise PermissionDenied("Secretaries cannot access clinical result files.")
         order = self.get_object()
         try:
             lab_result = order.results.get(pk=result_pk)

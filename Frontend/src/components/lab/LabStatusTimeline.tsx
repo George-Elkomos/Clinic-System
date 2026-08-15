@@ -15,7 +15,8 @@ export function LabStatusTimeline({ status }: LabStatusTimelineProps) {
   const currentIndex = STEPS.indexOf(status)
 
   return (
-    <div className="mb-5 flex min-w-max items-center overflow-x-auto pb-1" role="list" aria-label={t('lab.status')}>
+    <div className="mb-5 overflow-x-auto pb-1" role="list" aria-label={t('lab.status')}>
+      <div className="flex w-max items-center">
       {STEPS.map((step, i) => {
         const isDone = i < currentIndex
         const isActive = i === currentIndex
@@ -47,6 +48,7 @@ export function LabStatusTimeline({ status }: LabStatusTimelineProps) {
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

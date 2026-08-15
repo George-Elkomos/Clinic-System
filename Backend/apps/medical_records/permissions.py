@@ -100,6 +100,13 @@ class LabOrderPermission(BasePermission):
     Read:   PATIENT (own), DOCTOR (ordering/treating), SECRETARY+MANAGER (all).
     Transition actions: role-specific (enforced in view actions + service layer).
     Delete: DRAFT status only; DOCTOR (ordering) or MANAGER.
+
+    CW-9: Secretary read access is order/sample *logistics* only — the object
+    itself is visible (status, priority, items, sample tracking) so the desk
+    workflow works, but clinical result content (values, ranges, units,
+    abnormal/critical flags, interpretation, result files) is stripped out at
+    the serializer layer (LabOrderSerializer.get_results/get_has_critical) and
+    the raw file-download action is blocked outright for this role.
     """
 
     def has_permission(self, request, view):

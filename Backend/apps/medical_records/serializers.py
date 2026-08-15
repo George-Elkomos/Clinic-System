@@ -259,6 +259,21 @@ class LabOrderResultSerializer(serializers.ModelSerializer):
         return value
 
 
+class LabOrderResultSecretarySerializer(serializers.ModelSerializer):
+    """CW-9: logistical-only view of a lab result for Secretary — deliberately
+    excludes result_value, unit, reference_range, is_abnormal, is_critical,
+    interpretation, and the result file itself (a scanned report would just
+    re-expose the same clinical content), matching the 403 a secretary gets
+    from the standalone /api/lab-results/ endpoint."""
+
+    entered_by_name = serializers.CharField(source="entered_by.get_full_name", read_only=True, default="")
+
+    class Meta:
+        model = LabOrderResult
+        fields = ["id", "order", "order_item", "test_name", "result_date", "entered_by", "entered_by_name"]
+        read_only_fields = fields
+
+
 class LabOrderCancelSerializer(serializers.Serializer):
     cancellation_reason = serializers.CharField(min_length=5, max_length=500)
 
@@ -296,17 +311,28 @@ class LabOrderSerializer(serializers.ModelSerializer):
         # numerical values.
         if request and hasattr(request, "user"):
             user = request.user
-            if (
-                user.is_authenticated
-                and user.role == RoleChoices.PATIENT
-                and obj.status != LabOrderStatus.REVIEWED
-            ):
-                return []
+            if user.is_authenticated:
+                if user.role == RoleChoices.PATIENT and obj.status != LabOrderStatus.REVIEWED:
+                    return []
+                # CW-9: Secretaries handle sample/order logistics, not clinical
+                # interpretation — strip values/ranges/units/flags/interpretation
+                # (and the result file, which could carry the same content).
+                if user.role == RoleChoices.SECRETARY:
+                    return LabOrderResultSecretarySerializer(
+                        obj.results.all(), many=True, context=self.context
+                    ).data
         return LabOrderResultSerializer(
             obj.results.all(), many=True, context=self.context
         ).data
 
     def get_has_critical(self, obj):
+        request = self.context.get("request")
+        # CW-9: the critical-flag rollup is itself a clinical-severity signal —
+        # withhold it from Secretaries along with the per-result flags above.
+        if request and hasattr(request, "user"):
+            user = request.user
+            if user.is_authenticated and user.role == RoleChoices.SECRETARY:
+                return False
         return obj.results.filter(is_critical=True).exists()
 
     def create(self, validated_data):

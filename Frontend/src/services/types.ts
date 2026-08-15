@@ -567,16 +567,18 @@ export interface LabOrderResult {
   order: number
   order_item: number | null
   test_name: string
-  result_value: string
-  unit: string
-  reference_range: string
-  is_abnormal: boolean
-  is_critical: boolean
+  // CW-9: the backend strips these clinical fields from a Secretary's view of
+  // an order's results (logistics-only), so they're absent rather than empty.
+  result_value?: string
+  unit?: string
+  reference_range?: string
+  is_abnormal?: boolean
+  is_critical?: boolean
   result_date: string
   entered_by: number | null
   entered_by_name: string
-  file: string | null
-  interpretation: string
+  file?: string | null
+  interpretation?: string
 }
 
 export interface LabOrder {

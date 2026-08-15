@@ -227,7 +227,10 @@ export function LabOrderDetailsPage() {
           <div><span className="patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{t('appointments.when')}: </span>{formatDate(order.created_at, language)}</div>
         </div>
         {order.clinical_notes && <p className="patient-text-body mb-4" style={{ color: 'var(--text-primary)' }}>{order.clinical_notes}</p>}
-        {order.has_critical && (
+        {/* CW-9: has_critical is a clinical-severity signal — the backend
+           already omits it for Secretary (always false), but role-gate the
+           badge here too so this stays correct even if that ever changes. */}
+        {!isSecretary && order.has_critical && (
           <div className="mb-3 inline-block rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
             ⚠ {t('lab.hasCritical')}
           </div>
@@ -245,41 +248,69 @@ export function LabOrderDetailsPage() {
           </ul>
         )}
 
-        {/* Results table */}
+        {/* Results table — CW-9: Secretary only ever receives logistics-only
+           result rows from the backend (no value/unit/range/flags/file), so
+           render a matching restricted table rather than the clinical one. */}
         {order.results.length > 0 && (
           <>
             <h3 className="patient-text-card-title mb-2" style={{ color: 'var(--text-primary)' }}>{t('lab.results')}</h3>
+            {isSecretary && (
+              <p className="patient-text-body-secondary mb-3" style={{ color: 'var(--text-muted)' }}>
+                {t('lab.resultsRestricted')}
+              </p>
+            )}
             <div className="mb-4 overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b-2 border-slate-100">
-                    {[t('lab.testName'), t('lab.resultValue'), t('lab.unit'), t('lab.referenceRange'), t('lab.resultDate'), ''].map((h) => (
-                      <th key={h || 'actions'} className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.results.map((r) => (
-                    <tr
-                      key={r.id}
-                      className={`border-b border-slate-100 ${r.is_critical ? 'bg-rose-50/60' : r.is_abnormal ? 'bg-amber-50/60' : ''}`}
-                    >
-                      <td className="px-3 py-2.5">{r.test_name}</td>
-                      <td className="px-3 py-2.5 font-semibold">{r.result_value}</td>
-                      <td className="px-3 py-2.5">{r.unit}</td>
-                      <td className="px-3 py-2.5" style={{ color: 'var(--text-muted)' }}>{r.reference_range}</td>
-                      <td className="px-3 py-2.5" style={{ color: 'var(--text-muted)' }}>{formatDate(r.result_date, language)}</td>
-                      <td className="px-3 py-2.5">
-                        {r.file && (
-                          <button type="button" onClick={() => download(r)} className={BTN_SECONDARY_SM}>
-                            {t('lab.download')}
-                          </button>
-                        )}
-                      </td>
+              {isSecretary ? (
+                <table className="w-full min-w-[420px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-slate-100">
+                      {[t('lab.testName'), t('lab.resultDate'), t('lab.enteredBy')].map((h) => (
+                        <th key={h} className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {order.results.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-100">
+                        <td className="px-3 py-2.5">{r.test_name}</td>
+                        <td className="px-3 py-2.5" style={{ color: 'var(--text-muted)' }}>{formatDate(r.result_date, language)}</td>
+                        <td className="px-3 py-2.5" style={{ color: 'var(--text-muted)' }}>{r.entered_by_name}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full min-w-[640px] border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-slate-100">
+                      {[t('lab.testName'), t('lab.resultValue'), t('lab.unit'), t('lab.referenceRange'), t('lab.resultDate'), ''].map((h) => (
+                        <th key={h || 'actions'} className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.results.map((r) => (
+                      <tr
+                        key={r.id}
+                        className={`border-b border-slate-100 ${r.is_critical ? 'bg-rose-50/60' : r.is_abnormal ? 'bg-amber-50/60' : ''}`}
+                      >
+                        <td className="px-3 py-2.5">{r.test_name}</td>
+                        <td className="px-3 py-2.5 font-semibold">{r.result_value}</td>
+                        <td className="px-3 py-2.5">{r.unit}</td>
+                        <td className="px-3 py-2.5" style={{ color: 'var(--text-muted)' }}>{r.reference_range}</td>
+                        <td className="px-3 py-2.5" style={{ color: 'var(--text-muted)' }}>{formatDate(r.result_date, language)}</td>
+                        <td className="px-3 py-2.5">
+                          {r.file && (
+                            <button type="button" onClick={() => download(r)} className={BTN_SECONDARY_SM}>
+                              {t('lab.download')}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </>
         )}
