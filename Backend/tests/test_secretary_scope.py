@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.enums import RoleChoices
-from apps.doctors.models import DoctorAbsence, WorkingSchedule
+from apps.doctors.models import DoctorAbsence, DoctorPatient, DoctorProfile, WorkingSchedule
 from apps.medical_records.models import LabOrder, Prescription
 
 pytestmark = pytest.mark.django_db
@@ -66,7 +66,7 @@ def test_secretary_cannot_create_absence(api, secretary, doctor_profile):
     assert resp.status_code == 403
 
 
-# --- Lab results: entering values is manager-exclusive ----------------------
+# --- Lab results: entering values is the ordering doctor's or a manager's ---
 
 def test_secretary_cannot_enter_lab_results(api, secretary, doctor_profile, patient):
     order = LabOrder.objects.create(doctor=doctor_profile, patient=patient.patient_profile, status="PROCESSING")
@@ -80,6 +80,35 @@ def test_manager_can_enter_lab_results(api, manager, doctor_profile, patient):
     api.force_authenticate(manager)
     resp = api.post(reverse("lab-order-enter-results", args=[order.id]), {"results": []}, format="json")
     assert resp.status_code == 200
+
+
+def test_ordering_doctor_can_enter_lab_results(api, doctor_profile, patient):
+    order = LabOrder.objects.create(doctor=doctor_profile, patient=patient.patient_profile, status="PROCESSING")
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("lab-order-enter-results", args=[order.id]), {"results": []}, format="json")
+    assert resp.status_code == 200
+    assert resp.data["status"] == "COMPLETED"
+
+
+def test_treating_but_not_ordering_doctor_cannot_enter_lab_results(api, doctor_profile, patient, make_user):
+    order = LabOrder.objects.create(doctor=doctor_profile, patient=patient.patient_profile, status="PROCESSING")
+    treating = make_user("doc-lab-treating@test.dev", RoleChoices.DOCTOR)
+    treating_profile = DoctorProfile.objects.create(user=treating, license_number="LIC-LAB-TREAT")
+    DoctorPatient.objects.create(doctor=treating_profile, patient=patient.patient_profile)
+
+    api.force_authenticate(treating)
+    resp = api.post(reverse("lab-order-enter-results", args=[order.id]), {"results": []}, format="json")
+    assert resp.status_code == 403
+
+
+def test_unrelated_doctor_cannot_enter_lab_results(api, doctor_profile, patient, make_user):
+    order = LabOrder.objects.create(doctor=doctor_profile, patient=patient.patient_profile, status="PROCESSING")
+    other = make_user("doc-lab-unrelated@test.dev", RoleChoices.DOCTOR)
+    DoctorProfile.objects.create(user=other, license_number="LIC-LAB-OTHER")
+
+    api.force_authenticate(other)
+    resp = api.post(reverse("lab-order-enter-results", args=[order.id]), {"results": []}, format="json")
+    assert resp.status_code == 404
 
 
 # --- Prescriptions: secretary is read-only (view/print) ---------------------

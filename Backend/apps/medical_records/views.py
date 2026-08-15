@@ -470,12 +470,10 @@ class LabOrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="enter-results",
             parser_classes=[MultiPartParser, FormParser, JSONParser])
     def enter_results(self, request, pk=None):
-        # Entering result values is clinical data entry, unlike the sample
-        # logistics actions above — Manager-exclusive, matching how
-        # RadiologyOrderViewSet.report() locks out secretaries.
-        if request.user.role != RoleChoices.MANAGER:
-            raise PermissionDenied("Only a manager can enter lab results.")
         order = self.get_object()
+        is_ordering_doctor = order.doctor.user_id == request.user.id
+        if request.user.role != RoleChoices.MANAGER and not is_ordering_doctor:
+            raise PermissionDenied("Only the ordering doctor or a manager can enter lab results.")
         results_data = request.data.get("results", [])
         if not isinstance(results_data, list):
             raise ValidationError({"results": "Expected a list of result objects."})
