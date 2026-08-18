@@ -1,25 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { CalendarCheck, Phone, UserRound, Users } from 'lucide-react'
 import { useState, type ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
-import { InvoiceGeneratedModal } from '../../components/billing/InvoiceGeneratedModal'
 import { InvoiceViewModal } from '../../components/billing/InvoiceViewModal'
-import { useConfirm } from '../../components/primitives/ConfirmDialog'
-import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
-import { useToast } from '../../components/primitives/Toast'
+import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useDoctorQueueSocket } from '../../hooks/useDoctorQueueSocket'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatTime } from '../../lib/format'
-import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
-import type { AppointmentBilling, QueueAppointment } from '../../services/types'
+import type { QueueAppointment } from '../../services/types'
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
 const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
-const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60 sm:text-sm'
 
 function ageFromDob(dob: string | null): string {
   if (!dob) return ''
@@ -46,6 +41,36 @@ function QueuePanelEmptyState({ icon: Icon, text }: { icon: ComponentType<{ clas
   )
 }
 
+function HistoryBadge() {
+  const { t } = useTranslation()
+  return (
+    <span
+      title={t('queue.hasHistory')}
+      className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700"
+    >
+      ★ {t('queue.hasHistory')}
+    </span>
+  )
+}
+
+// Follow-ups get their own color so the doctor spots them at a glance —
+// they're the ones that carry a previous-visit summary into the encounter.
+const TYPE_BADGE: Record<string, string> = {
+  FOLLOW_UP: 'bg-indigo-50 text-indigo-700 border-indigo-200/60',
+  EMERGENCY: 'bg-rose-50 text-rose-700 border-rose-200/60',
+  WALK_IN: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  SCHEDULED: 'bg-slate-50 text-slate-600 border-slate-200/60',
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const { t } = useTranslation()
+  return (
+    <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${TYPE_BADGE[type] ?? TYPE_BADGE.SCHEDULED}`}>
+      {t(`appointments.type.${type}`)}
+    </span>
+  )
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   if (!value) return null
   return (
@@ -65,17 +90,7 @@ function AllergyBanner({ allergies }: { allergies: string }) {
   )
 }
 
-function CurrentPanel({
-  appt,
-  onComplete,
-  onNoShow,
-  isPending,
-}: {
-  appt: QueueAppointment | null
-  onComplete: (appt: QueueAppointment) => void
-  onNoShow: (id: number) => void
-  isPending: boolean
-}) {
+function CurrentPanel({ appt }: { appt: QueueAppointment | null }) {
   const { t } = useTranslation()
   const { language } = useLanguage()
 
@@ -101,7 +116,8 @@ function CurrentPanel({
         {chips.map((c) => (
           <span key={c} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">{c}</span>
         ))}
-        <span className="patient-text-body-secondary" style={{ color: 'var(--text-secondary)' }}>{appt.type_display}</span>
+        {appt.has_history && <HistoryBadge />}
+        <TypeBadge type={appt.appointment_type} />
       </div>
 
       {appt.patient_phone && (
@@ -127,36 +143,16 @@ function CurrentPanel({
         <InfoRow label={t('queue.currentMedications')} value={appt.patient_current_medications} />
       )}
 
-      {appt.status === 'IN_PROGRESS' && (
-        <Link to={`/doctor/encounters/${appt.id}`} className="mb-3 block">
-          <button type="button" className={`${BTN_PRIMARY} w-full`}>🩻 {t('encounters.open')}</button>
-        </Link>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={isPending} onClick={() => onComplete(appt)} className={BTN_PRIMARY}>
-          {isPending && <Spinner size={14} />}{t('queue.complete')}
-        </button>
-        <Link to={`/doctor/patients?patient=${appt.patient_profile_id}`}>
-          <button type="button" className={BTN_SECONDARY}>{t('queue.openRecord')}</button>
-        </Link>
-        <button type="button" disabled={isPending} onClick={() => onNoShow(appt.id)} className={BTN_DANGER}>
-          {t('queue.noShow')}
-        </button>
-      </div>
+      {/* The only action left here — check-in/no-show are front-desk's job, and
+          completion happens inside the encounter via "Submit & Close Encounter". */}
+      <Link to={`/doctor/encounters/${appt.id}`} className="mt-auto block pt-3">
+        <button type="button" className={`${BTN_PRIMARY} w-full`}>🩻 {t('encounters.open')}</button>
+      </Link>
     </div>
   )
 }
 
-function NextPanel({
-  appt,
-  onCallNext,
-  isPending,
-}: {
-  appt: QueueAppointment | null
-  onCallNext: (id: number) => void
-  isPending: boolean
-}) {
+function NextPanel({ appt }: { appt: QueueAppointment | null }) {
   const { t } = useTranslation()
   const { language } = useLanguage()
 
@@ -170,17 +166,19 @@ function NextPanel({
 
   return (
     <PanelShell title={t('queue.next')}>
-      <h3 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{appt.patient_name}</h3>
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <h3 className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{appt.patient_name}</h3>
+        {appt.has_history && <HistoryBadge />}
+        <TypeBadge type={appt.appointment_type} />
+      </div>
       <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{formatTime(appt.scheduled_start, language)}</div>
       {appt.reason && (
         <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>{appt.reason}</div>
       )}
-      <div className="mt-1 patient-text-body-secondary" style={{ color: 'var(--text-muted)' }}>{appt.type_display}</div>
-      <div className="mt-4">
-        <button type="button" disabled={isPending} onClick={() => onCallNext(appt.id)} className={BTN_PRIMARY}>
-          {isPending && <Spinner size={14} />}{t('queue.callNext')}
-        </button>
-      </div>
+      {/* Opening the chart is what starts the visit now — no separate "Call Next" click. */}
+      <Link to={`/doctor/encounters/${appt.id}`} className="mt-4 block">
+        <button type="button" className={`${BTN_PRIMARY} w-full`}>🩻 {t('queue.openNext')}</button>
+      </Link>
     </PanelShell>
   )
 }
@@ -234,9 +232,6 @@ function PreviousPanel({
 export function DoctorQueuePage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
-  const { showToast } = useToast()
-  const confirm = useConfirm()
-  const qc = useQueryClient()
 
   // Real-time: a WebSocket push (see apps/appointments/consumers.py) invalidates
   // ['doctor-queue'] / ['doctor-queue-in-progress'] whenever this doctor's queue
@@ -256,59 +251,7 @@ export function DoctorQueuePage() {
     enabled: data !== undefined && data.current === null,
   })
 
-  const [billingResult, setBillingResult] = useState<AppointmentBilling | null>(null)
   const [viewInvoiceId, setViewInvoiceId] = useState<number | null>(null)
-
-  const complete = useMutation({
-    mutationFn: (id: number) => appointmentsApi.complete(id),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
-      qc.invalidateQueries({ queryKey: ['invoices'] })
-      // Billing pop-up (Phase 12): invoice generated / free follow-up used.
-      if (data.billing) setBillingResult(data.billing)
-    },
-    onError: (err) => showToast(errorMessage(err), 'error'),
-  })
-
-  const noShow = useMutation({
-    mutationFn: (id: number) => appointmentsApi.noShow(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
-    },
-    onError: (err) => showToast(errorMessage(err), 'error'),
-  })
-
-  const callNext = useMutation({
-    mutationFn: (id: number) => appointmentsApi.start(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
-      qc.invalidateQueries({ queryKey: ['appointments'] })
-    },
-    onError: (err) => showToast(errorMessage(err), 'error'),
-  })
-
-  const handleNoShow = async (id: number) => {
-    const ok = await confirm({
-      title: t('queue.noShow'),
-      message: t('queue.noShowConfirm'),
-      confirmLabel: t('queue.noShow'),
-      danger: true,
-    })
-    if (ok) noShow.mutate(id)
-  }
-
-  const handleComplete = (appt: QueueAppointment) => {
-    // The backend rejects completing a visit with no documented clinical
-    // encounter (Finding #3) — catch the common case client-side so the
-    // doctor gets a clear pointer instead of a raw error after clicking.
-    if (appt.encounter_id == null) {
-      showToast(t('queue.completeNoEncounterBlocked'), 'error')
-      return
-    }
-    complete.mutate(appt.id)
-  }
 
   if (isLoading) return <CenteredSpinner />
 
@@ -347,19 +290,10 @@ export function DoctorQueuePage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="order-2 md:order-1"><PreviousPanel appt={previous ?? null} onViewInvoice={setViewInvoiceId} /></div>
         <div className="order-1 md:order-2">
-          <CurrentPanel
-            appt={current ?? null}
-            onComplete={handleComplete}
-            onNoShow={handleNoShow}
-            isPending={complete.isPending || noShow.isPending}
-          />
+          <CurrentPanel appt={current ?? null} />
         </div>
         <div className="order-3 md:order-3">
-          <NextPanel
-            appt={next ?? null}
-            onCallNext={(id) => callNext.mutate(id)}
-            isPending={callNext.isPending}
-          />
+          <NextPanel appt={next ?? null} />
         </div>
       </div>
 
@@ -367,9 +301,6 @@ export function DoctorQueuePage() {
         {t('queue.autoRefresh')}
       </p>
 
-      {billingResult && (
-        <InvoiceGeneratedModal billing={billingResult} onClose={() => setBillingResult(null)} />
-      )}
       {viewInvoiceId != null && (
         <InvoiceViewModal invoiceId={viewInvoiceId} onClose={() => setViewInvoiceId(null)} />
       )}

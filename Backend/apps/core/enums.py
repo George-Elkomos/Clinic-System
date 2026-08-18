@@ -22,8 +22,6 @@ class LanguageChoices(models.TextChoices):
 class GenderChoices(models.TextChoices):
     MALE = "MALE", _("Male")
     FEMALE = "FEMALE", _("Female")
-    OTHER = "OTHER", _("Other")
-    UNDISCLOSED = "UNDISCLOSED", _("Prefer not to say")
 
 
 class BloodType(models.TextChoices):
@@ -62,6 +60,11 @@ class AppointmentStatus(models.TextChoices):
     COMPLETED = "COMPLETED", _("Completed")
     CANCELLED = "CANCELLED", _("Cancelled")
     NO_SHOW = "NO_SHOW", _("No show")
+    # A PENDING booking nobody confirmed before the grace window past its
+    # scheduled_start passed — distinct from NO_SHOW (which only applies to
+    # appointments that *were* confirmed) so reliability scoring can tell
+    # "never engaged" apart from "confirmed then didn't show up".
+    EXPIRED = "EXPIRED", _("Expired")
 
 
 class AppointmentType(models.TextChoices):
@@ -161,6 +164,9 @@ class NotificationVerb(models.TextChoices):
     RADIOLOGY_ORDER_REPORTED = "RADIOLOGY_ORDER_REPORTED", _("Radiology report available")
     RADIOLOGY_ORDER_CANCELLED = "RADIOLOGY_ORDER_CANCELLED", _("Radiology order cancelled")
     PATIENT_SCAN_UPLOADED = "PATIENT_SCAN_UPLOADED", _("Patient uploaded a scan")
+    # Auto-expiry / no-show sweep — secretary-facing only, never sent to the patient.
+    APPT_EXPIRED = "APPT_EXPIRED", _("Booking expired")
+    APPT_NO_SHOW = "APPT_NO_SHOW", _("Marked as no-show")
 
 
 class LabOrderStatus(models.TextChoices):

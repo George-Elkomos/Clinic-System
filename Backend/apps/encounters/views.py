@@ -69,7 +69,22 @@ class EncounterViewSet(viewsets.ModelViewSet):
     def submit(self, request, pk=None):
         encounter = self.get_object()
         result = services.submit_encounter(encounter)
-        return Response(EncounterReadSerializer(result).data)
+        data = EncounterReadSerializer(result).data
+        # Billing outcome (Phase 12): "Submit & Close Encounter" is now the doctor's
+        # only path to completing a visit (the queue's old direct "Complete Visit"
+        # button is gone), so it has to surface the same invoice/free-follow-up
+        # outcome that button used to show.
+        appointment = result.appointment
+        if appointment is not None:
+            invoice = getattr(appointment, "billing_invoice", None)
+            validity = getattr(appointment, "billing_fee_validity", None)
+            data["billing"] = {
+                "invoice_id": invoice.id if invoice else None,
+                "invoice_number": invoice.number if invoice else None,
+                "invoice_total": str(invoice.total) if invoice else None,
+                "free_followup_used": invoice is None and validity is not None,
+            }
+        return Response(data)
 
     @action(detail=True, methods=["post"])
     def amend(self, request, pk=None):

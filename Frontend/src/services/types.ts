@@ -18,6 +18,7 @@ export interface PatientProfile {
   current_medications: string
   insurance_provider: string
   insurance_policy_number: string
+  reliability: Reliability
 }
 
 export interface StaffProfile {
@@ -113,7 +114,14 @@ export interface TimeSlot {
 
 export type AppointmentStatus =
   | 'PENDING' | 'CONFIRMED' | 'CHECKED_IN' | 'IN_PROGRESS'
-  | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+  | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED'
+
+export type ReliabilityLabel = 'GOOD' | 'WATCH' | 'HIGH_RISK'
+
+export interface Reliability {
+  score: number
+  label: ReliabilityLabel
+}
 
 export interface Appointment {
   id: number
@@ -138,6 +146,7 @@ export interface Appointment {
   encounter_id: number | null
   is_manual_override: boolean
   override_reason: string
+  patient_reliability: Reliability
 }
 
 export interface QueueAppointment extends Appointment {
@@ -150,6 +159,7 @@ export interface QueueAppointment extends Appointment {
   patient_chronic_conditions: string
   patient_current_medications: string
   invoice_id: number | null
+  has_history: boolean
 }
 
 export interface DoctorQueue {
@@ -254,6 +264,7 @@ export interface PatientSummary {
   phone: string
   date_of_birth: string | null
   blood_type: string
+  reliability: Reliability
 }
 
 export interface MedicalRecord {
@@ -782,6 +793,24 @@ export interface Encounter {
   procedures: ClinicalProcedureSummary[]
   radiology_orders: RadiologyOrderSummary[]
   created_at: string
+  appointment_type: string
+  appointment_type_display: string
+  appointment_reason: string
+  patient_allergies: string
+  patient_chronic_conditions: string
+  patient_current_medications: string
+  previous_encounter: PreviousEncounterSummary | null
+}
+
+export interface PreviousEncounterSummary {
+  id: number
+  encounter_date: string
+  doctor_name: string
+  chief_complaint: string
+  diagnosis_detail: Diagnosis | null
+  diagnosis_notes: string
+  treatment_plan: string
+  prescriptions: Prescription[]
 }
 
 export interface UpdateEncounterPayload {

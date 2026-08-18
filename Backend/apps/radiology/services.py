@@ -35,7 +35,9 @@ def notify_ordered(order: RadiologyOrder) -> None:
         recipient=order.patient.user,
         verb=NotificationVerb.RADIOLOGY_ORDER_CREATED,
         title="Radiology order created",
+        title_ar="تم إنشاء طلب أشعة",
         body=f"A radiology study '{order.study_name}' has been ordered for you.",
+        body_ar=f"تم طلب أشعة '{order.study_name_ar or order.study_name}' لك.",
         related=order,
     )
 
@@ -63,7 +65,9 @@ def complete_order(order: RadiologyOrder, *, file, uploaded_by, description: str
         recipient=order.patient.user,
         verb=NotificationVerb.RADIOLOGY_ORDER_COMPLETED,
         title="Radiology scan completed",
+        title_ar="تم إجراء الأشعة",
         body=f"Your radiology study '{order.study_name}' has been completed.",
+        body_ar=f"تم إجراء أشعة '{order.study_name_ar or order.study_name}' الخاصة بك.",
         related=order,
     )
     return order
@@ -81,7 +85,9 @@ def report_order(order: RadiologyOrder, *, findings: str, impression: str) -> Ra
         recipient=order.patient.user,
         verb=NotificationVerb.RADIOLOGY_ORDER_REPORTED,
         title="Radiology report available",
+        title_ar="تقرير الأشعة متاح",
         body=f"The report for your '{order.study_name}' study is now available.",
+        body_ar=f"تقرير أشعة '{order.study_name_ar or order.study_name}' الخاصة بك متاح الآن.",
         related=order,
     )
     return order
@@ -98,7 +104,9 @@ def cancel_order(order: RadiologyOrder, reason: str, cancelled_by) -> RadiologyO
         recipient=order.patient.user,
         verb=NotificationVerb.RADIOLOGY_ORDER_CANCELLED,
         title="Radiology order cancelled",
+        title_ar="تم إلغاء طلب الأشعة",
         body=f"Your radiology order '{order.study_name}' has been cancelled.",
+        body_ar=f"تم إلغاء طلب أشعة '{order.study_name_ar or order.study_name}' الخاص بك.",
         related=order,
     )
     return order

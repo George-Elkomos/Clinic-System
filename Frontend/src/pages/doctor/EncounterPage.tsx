@@ -14,10 +14,12 @@ import { useToast } from '../../components/primitives/Toast'
 import { VitalSignsForm } from '../../components/vitals/VitalSignsForm'
 import { MedicationItemRow } from '../../components/medical/MedicationItemRow'
 import { CreateReferralModal } from '../../components/referrals/CreateReferralModal'
+import { InvoiceGeneratedModal } from '../../components/billing/InvoiceGeneratedModal'
 import { useAuth } from '../../hooks/useAuth'
 import { useInteractionCheck } from '../../hooks/useInteractionCheck'
 import { useLanguage } from '../../hooks/useLanguage'
 import { errorMessage } from '../../services/apiClient'
+import { appointmentsApi } from '../../services/appointments.api'
 import { complaintsApi, diagnosesApi, encountersApi } from '../../services/encounters.api'
 import { labOrdersApi } from '../../services/labOrders.api'
 import { medicalApi } from '../../services/medical.api'
@@ -25,8 +27,8 @@ import { proceduresApi } from '../../services/procedures.api'
 import { radiologyApi } from '../../services/radiology.api'
 import { ProcedureDetailModal } from '../../components/medical/ProcedureDetailModal'
 import { RadiologyOrderDetailModal } from '../../components/medical/RadiologyOrderDetailModal'
-import { localizedName } from '../../lib/format'
-import type { Complaint, Encounter, EncounterStatus, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
+import { formatDate, localizedName } from '../../lib/format'
+import type { AppointmentBilling, Complaint, Encounter, EncounterStatus, Prescription, PrescriptionItem, UpdateEncounterPayload } from '../../services/types'
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
@@ -39,6 +41,15 @@ const ENCOUNTER_STATUS_BADGE: Record<EncounterStatus, string> = {
   DRAFT: 'bg-amber-50 text-amber-700 border-amber-200/60',
   SUBMITTED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
   AMENDED: 'bg-sky-50 text-sky-700 border-sky-200/60',
+}
+
+// Mirrors the Live Queue's type badge (DoctorQueuePage) so a Follow-up reads
+// the same color wherever the doctor sees it.
+const TYPE_BADGE: Record<string, string> = {
+  FOLLOW_UP: 'bg-indigo-50 text-indigo-700 border-indigo-200/60',
+  EMERGENCY: 'bg-rose-50 text-rose-700 border-rose-200/60',
+  WALK_IN: 'bg-amber-50 text-amber-700 border-amber-200/60',
+  SCHEDULED: 'bg-slate-50 text-slate-600 border-slate-200/60',
 }
 
 function StatusPill({ text, className }: { text: string; className: string }) {
@@ -434,6 +445,48 @@ function PrescriptionSidebarItem({
   )
 }
 
+// Follow-up context: the prior visit's diagnosis/treatment/prescriptions,
+// so the doctor has it without leaving the encounter (see backend
+// EncounterReadSerializer.get_previous_encounter — populated for FOLLOW_UP
+// appointments only, resolved through the FollowUp record's origin visit).
+function PreviousVisitCard({ previous }: { previous: NonNullable<Encounter['previous_encounter']> }) {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
+  const drugNames = previous.prescriptions
+    .flatMap((p) => (p.items ?? []).map((i) => i.drug_name))
+    .filter(Boolean)
+
+  return (
+    <div className={CARD}>
+      <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.previousVisit')}</h2>
+      <p className="patient-text-body-secondary mb-2" style={{ color: 'var(--text-secondary)' }}>
+        {formatDate(previous.encounter_date, language)}{previous.doctor_name ? ` · ${previous.doctor_name}` : ''}
+      </p>
+      {previous.chief_complaint && (
+        <p className="patient-text-body mb-2" style={{ color: 'var(--text-primary)' }}>{previous.chief_complaint}</p>
+      )}
+      {previous.diagnosis_detail && (
+        <p className="patient-text-body mb-2" style={{ color: 'var(--text-primary)' }}>
+          <strong>{t('encounters.diagnosis')}:</strong> {diagnosisLabel(previous.diagnosis_detail)}
+        </p>
+      )}
+      {previous.diagnosis_notes && (
+        <p className="patient-text-body-secondary mb-2" style={{ color: 'var(--text-secondary)' }}>{previous.diagnosis_notes}</p>
+      )}
+      {previous.treatment_plan && (
+        <p className="patient-text-body mb-2" style={{ color: 'var(--text-primary)' }}>
+          <strong>{t('encounters.treatmentPlan')}:</strong> {previous.treatment_plan}
+        </p>
+      )}
+      {drugNames.length > 0 && (
+        <p className="patient-text-body" style={{ color: 'var(--text-primary)' }}>
+          <strong>{t('encounters.linkedPrescriptions')}:</strong> {drugNames.join(', ')}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function EncounterPage() {
   const { t } = useTranslation()
   const { appointmentId } = useParams<{ appointmentId: string }>()
@@ -457,8 +510,10 @@ export function EncounterPage() {
   const [openRadiologyOrderId, setOpenRadiologyOrderId] = useState<number | null>(null)
   const [replacingVitals, setReplacingVitals] = useState(false)
   const [editingVitals, setEditingVitals] = useState(false)
+  const [billingResult, setBillingResult] = useState<AppointmentBilling | null>(null)
   const hydrated = useRef(false)
   const hasEdited = useRef(false)
+  const autoStarted = useRef(false)
 
   // Symptom options come from the active complaints list.
   const { data: symptomOptions = [] } = useQuery({
@@ -499,6 +554,27 @@ export function EncounterPage() {
     if (appointmentId && !draft.isPending && encounterId === null) draft.mutate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentId])
+
+  // The doctor no longer clicks a manual "Start" button — opening a confirmed/
+  // checked-in patient's chart is itself what moves the visit to IN_PROGRESS.
+  // Best-effort: if the appointment is already IN_PROGRESS or further along
+  // (re-opening an existing visit), the backend 400s and we just ignore it.
+  const autoStart = useMutation({
+    mutationFn: () => appointmentsApi.start(Number(appointmentId)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+      qc.invalidateQueries({ queryKey: ['doctor-queue'] })
+    },
+    onError: () => {},
+  })
+
+  useEffect(() => {
+    if (encounterId != null && !autoStarted.current) {
+      autoStarted.current = true
+      autoStart.mutate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encounterId])
 
   const { data: encounter } = useQuery({
     queryKey: ['encounter', encounterId],
@@ -558,7 +634,12 @@ export function EncounterPage() {
       showToast(t('encounters.submitted'), 'success')
       qc.setQueryData(['encounter', encounterId], updated)
       qc.invalidateQueries({ queryKey: ['appointments'] })
-      navigate('/doctor/queue')
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      // Submitting is the doctor's only completion path now (the queue's old
+      // direct "Complete Visit" button is gone) — show the same billing
+      // pop-up that button used to, then navigate once it's dismissed.
+      if (updated.billing) setBillingResult(updated.billing)
+      else navigate('/doctor/queue')
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
@@ -641,8 +722,42 @@ export function EncounterPage() {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>{t('encounters.title')} — {encounter.patient_name}</h1>
           <StatusPill text={t(`encounters.status.${encounter.status}`)} className={ENCOUNTER_STATUS_BADGE[encounter.status] ?? ENCOUNTER_STATUS_BADGE.DRAFT} />
+          {encounter.appointment_type && (
+            <StatusPill
+              text={t(`appointments.type.${encounter.appointment_type}`)}
+              className={TYPE_BADGE[encounter.appointment_type] ?? TYPE_BADGE.SCHEDULED}
+            />
+          )}
         </div>
       </div>
+
+      {/* Patient snapshot: reason, allergies, chronic conditions, current meds —
+          so the doctor never has to leave this page to see why the patient is
+          here or what to watch out for (previously only shown on the queue card). */}
+      {(encounter.appointment_reason || encounter.patient_allergies || encounter.patient_chronic_conditions || encounter.patient_current_medications) && (
+        <div className={CARD}>
+          {encounter.appointment_reason && (
+            <p className="patient-text-body mb-2" style={{ color: 'var(--text-primary)' }}>
+              <strong>{t('appointments.reason')}:</strong> {encounter.appointment_reason}
+            </p>
+          )}
+          {encounter.patient_allergies && (
+            <div className="mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              <strong>⚠ {encounter.patient_allergies}</strong>
+            </div>
+          )}
+          {encounter.patient_chronic_conditions && (
+            <p className="patient-text-body mb-2" style={{ color: 'var(--text-primary)' }}>
+              <strong>{t('queue.chronicConditions')}:</strong> {encounter.patient_chronic_conditions}
+            </p>
+          )}
+          {encounter.patient_current_medications && (
+            <p className="patient-text-body" style={{ color: 'var(--text-primary)' }}>
+              <strong>{t('queue.currentMedications')}:</strong> {encounter.patient_current_medications}
+            </p>
+          )}
+        </div>
+      )}
 
       {readOnly && (
         <div className={CARD}>
@@ -813,6 +928,8 @@ export function EncounterPage() {
             version (scrolling away 1:1 with the page) is easy to misread as
             "sticky isn't applying at all". */}
         <aside className="flex flex-col gap-4 lg:sticky lg:top-24 lg:col-span-4 lg:self-start">
+          {encounter.previous_encounter && <PreviousVisitCard previous={encounter.previous_encounter} />}
+
           <div className={CARD}>
             <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.sidebarTitle')}</h2>
             <div className="flex flex-col gap-2">
@@ -906,6 +1023,9 @@ export function EncounterPage() {
           onClose={() => setOpenRadiologyOrderId(null)}
           onChanged={refreshEncounter}
         />
+      )}
+      {billingResult && (
+        <InvoiceGeneratedModal billing={billingResult} onClose={() => { setBillingResult(null); navigate('/doctor/queue') }} />
       )}
     </div>
   )

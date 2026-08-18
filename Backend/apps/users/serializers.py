@@ -64,6 +64,13 @@ class MeUpdateSerializer(serializers.ModelSerializer):
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
+    reliability = serializers.SerializerMethodField()
+
+    def get_reliability(self, obj):
+        from .services import patient_reliability
+
+        return patient_reliability(obj)
+
     class Meta:
         model = PatientProfile
         fields = [
@@ -71,6 +78,7 @@ class PatientProfileSerializer(serializers.ModelSerializer):
             "address", "emergency_contact_name", "emergency_contact_phone",
             "allergies_summary", "chronic_conditions", "previous_surgeries",
             "current_medications", "insurance_provider", "insurance_policy_number",
+            "reliability",
         ]
 
 

@@ -25,7 +25,13 @@ AUDITED_MODELS = [
     "radiology.RadiologyOrder",
 ]
 
-IGNORED_FIELDS = {"created_at", "updated_at", "last_login", "password"}
+# cancelled_at/cancelled_by are excluded too: they're redundant with what an
+# audit row already carries for free (its own timestamp = when, its own actor
+# = who), and cancelled_by only ever diffs to a raw FK id, not a name.
+IGNORED_FIELDS = {
+    "created_at", "updated_at", "last_login", "password",
+    "cancelled_at", "cancelled_by",
+}
 
 
 def _serialize(value):

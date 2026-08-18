@@ -2,11 +2,16 @@ import { Check, ChevronDown, Plus, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import type { Reliability } from '../../services/types'
 import { Spinner } from './Spinner'
 
 export interface ComboOption {
   value: number
   label: string
+  // Optional per-option metadata a specific fetcher can attach (e.g. the
+  // patient combobox on the booking page carries reliability here so the
+  // page can show a warning banner once a patient is picked).
+  reliability?: Reliability
 }
 
 interface AsyncComboboxProps {

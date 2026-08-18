@@ -24,6 +24,7 @@ const STATUS_PILL: Record<AppointmentStatus, { bg: string; border: string; text:
   COMPLETED: { bg: '#ECFDF5', border: '#A7F3D0', text: '#059669' },
   CANCELLED: { bg: '#F1F5F9', border: '#E2E8F0', text: '#475569' },
   NO_SHOW: { bg: '#F1F5F9', border: '#E2E8F0', text: '#475569' },
+  EXPIRED: { bg: '#F1F5F9', border: '#E2E8F0', text: '#475569' },
 }
 
 function avatarUrl(name: string, background = 'E2E8F0', color = '1E293B') {
@@ -400,7 +401,7 @@ export function PatientDashboard() {
                         <div className="patient-text-card-title truncate" style={{ color: 'var(--text-primary)' }}>
                           {a.doctor_name}
                         </div>
-                        <div className="truncate text-xs font-medium text-slate-500">{a.type_display}</div>
+                        <div className="truncate text-xs font-medium text-slate-500">{t(`appointments.type.${a.appointment_type}`)}</div>
                       </div>
                     </div>
                     {badge('md:hidden')}

@@ -346,3 +346,29 @@ def test_complete_rejected_from_non_in_progress(api, patient, doctor_profile, fu
     assert resp.status_code == 400
     appt.refresh_from_db()
     assert appt.status == bad_status  # unchanged
+
+
+# --- No-show is front-desk/background-only, not the doctor's job -------------
+# The doctor's live-queue "No Show" button was removed in favor of the
+# secretary's queue board and the automated overdue sweep
+# (services.mark_overdue_no_shows) -- the API must enforce that too, not just
+# hide the button.
+
+def test_no_show_forbidden_for_doctor(api, patient, doctor_profile, future_slot):
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(doctor_profile.user)
+    resp = api.post(reverse("appointment-no-show", args=[appt.id]))
+    assert resp.status_code == 403
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.CONFIRMED
+
+
+def test_no_show_allowed_for_secretary(api, patient, doctor_profile, future_slot, secretary):
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(secretary)
+    resp = api.post(reverse("appointment-no-show", args=[appt.id]))
+    assert resp.status_code == 200
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.NO_SHOW

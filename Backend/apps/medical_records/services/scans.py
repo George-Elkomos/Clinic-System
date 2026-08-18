@@ -47,6 +47,8 @@ def notify_nearest_doctor_of_scan_upload(scan) -> None:
         recipient=doctor.user,
         verb=NotificationVerb.PATIENT_SCAN_UPLOADED,
         title="Patient uploaded a scan",
+        title_ar="قام المريض برفع أشعة",
         body=f"{scan.patient.user.get_full_name()} uploaded a new {scan.get_category_display()} scan.",
+        body_ar=f"قام {scan.patient.user.get_full_name()} برفع أشعة {scan.get_category_display()} جديدة.",
         related=scan,
     )

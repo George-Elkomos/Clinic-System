@@ -1,5 +1,6 @@
 import { api } from './apiClient'
 import type {
+  AppointmentBilling,
   Complaint,
   Diagnosis,
   Encounter,
@@ -17,8 +18,11 @@ export const encountersApi = {
   update: (id: number, data: UpdateEncounterPayload) =>
     api.patch<Encounter>(`/encounters/${id}/`, data).then((r) => r.data),
 
+  // "Submit & Close Encounter" is the doctor's only completion path now (the
+  // queue's direct "Complete Visit" button was removed) — the billing outcome
+  // that button used to show now rides along on this response instead.
   submit: (id: number) =>
-    api.post<Encounter>(`/encounters/${id}/submit/`).then((r) => r.data),
+    api.post<Encounter & { billing?: AppointmentBilling }>(`/encounters/${id}/submit/`).then((r) => r.data),
 
   amend: (id: number) =>
     api.post<Encounter>(`/encounters/${id}/amend/`).then((r) => r.data),

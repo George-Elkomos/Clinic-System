@@ -139,3 +139,27 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
   if (messages.length > 0) return messages.join('\n')
   return typeof d.detail === 'string' ? d.detail : fallback
 }
+
+/**
+ * Extracts per-field validation messages so a form can show each error next to
+ * the input it actually belongs to, instead of lumping everything onto one field.
+ * Only reads the plain_language_exception_handler's `fields` breakdown — a bare
+ * {detail: "…"} (e.g. wrong password) has no field to attach to.
+ */
+export function fieldErrors(error: unknown): Record<string, string> {
+  if (!axios.isAxiosError(error)) return {}
+  const data = error.response?.data
+  if (!data || typeof data !== 'object') return {}
+  const fields = (data as Record<string, unknown>).fields
+  if (!fields || typeof fields !== 'object') return {}
+
+  const result: Record<string, string> = {}
+  for (const [field, value] of Object.entries(fields as Record<string, unknown>)) {
+    if (Array.isArray(value) && typeof value[0] === 'string') {
+      result[field] = value[0]
+    } else if (typeof value === 'string') {
+      result[field] = value
+    }
+  }
+  return result
+}

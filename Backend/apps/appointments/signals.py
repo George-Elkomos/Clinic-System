@@ -8,6 +8,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from apps.core.enums import AppointmentStatus, NotificationVerb
+from apps.core.text import doctor_display_name, format_when_bilingual
 
 from .models import Appointment
 
@@ -53,15 +54,18 @@ def notify_on_status_change(sender, instance, created, **kwargs):
     from apps.notifications.services import notify
 
     recipient = instance.patient.user
-    when = instance.scheduled_start.strftime("%d %b %Y, %H:%M")
+    when, when_ar = format_when_bilingual(instance.scheduled_start)
     doctor = str(instance.doctor)
+    doctor_ar = doctor_display_name(instance.doctor, arabic=True)
 
     if created:
         notify(
             recipient=recipient,
             verb=NotificationVerb.APPT_BOOKED,
             title="Appointment requested",
+            title_ar="طلب حجز موعد",
             body=f"Your appointment with {doctor} on {when} is awaiting confirmation.",
+            body_ar=f"موعدك مع {doctor_ar} في {when_ar} بانتظار التأكيد.",
             related=instance,
         )
         return
@@ -75,7 +79,9 @@ def notify_on_status_change(sender, instance, created, **kwargs):
             recipient=recipient,
             verb=NotificationVerb.APPT_CONFIRMED,
             title="Appointment confirmed",
+            title_ar="تم تأكيد الموعد",
             body=f"Your appointment with {doctor} on {when} is confirmed.",
+            body_ar=f"تم تأكيد موعدك مع {doctor_ar} في {when_ar}.",
             related=instance,
         )
     elif instance.status == AppointmentStatus.CANCELLED:
@@ -83,11 +89,14 @@ def notify_on_status_change(sender, instance, created, **kwargs):
         if getattr(instance, "_skip_cancel_notification", False):
             return
         reason = f" Reason: {instance.cancellation_reason}" if instance.cancellation_reason else ""
+        reason_ar = f" السبب: {instance.cancellation_reason}" if instance.cancellation_reason else ""
         notify(
             recipient=recipient,
             verb=NotificationVerb.APPT_CANCELLED,
             title="Appointment cancelled",
+            title_ar="تم إلغاء الموعد",
             body=f"Your appointment with {doctor} on {when} was cancelled.{reason}",
+            body_ar=f"تم إلغاء موعدك مع {doctor_ar} في {when_ar}.{reason_ar}",
             related=instance,
         )
     elif instance.status == AppointmentStatus.COMPLETED:
@@ -95,6 +104,8 @@ def notify_on_status_change(sender, instance, created, **kwargs):
             recipient=recipient,
             verb=NotificationVerb.REVIEW,
             title="How was your visit?",
+            title_ar="كيف كانت زيارتك؟",
             body=f"Your visit with {doctor} is complete. We'd love your feedback — please leave a review.",
+            body_ar=f"انتهت زيارتك مع {doctor_ar}. يسعدنا معرفة رأيك — يرجى ترك تقييم.",
             related=instance,
         )

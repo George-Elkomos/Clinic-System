@@ -22,7 +22,9 @@ def notify_scheduled(procedure: ClinicalProcedure) -> None:
         recipient=procedure.patient.user,
         verb=NotificationVerb.PROCEDURE_SCHEDULED,
         title="Procedure scheduled",
+        title_ar="تم تحديد موعد الإجراء",
         body=f"A procedure '{procedure.procedure_name}' has been scheduled for you.",
+        body_ar=f"تم تحديد موعد إجراء '{procedure.procedure_name_ar or procedure.procedure_name}' لك.",
         related=procedure,
     )
 
@@ -57,7 +59,9 @@ def complete_procedure(procedure: ClinicalProcedure, post_procedure_notes=None, 
         recipient=procedure.patient.user,
         verb=NotificationVerb.PROCEDURE_COMPLETED,
         title="Procedure completed",
+        title_ar="تم إجراء العملية",
         body=f"Your procedure '{procedure.procedure_name}' has been completed.",
+        body_ar=f"تم إجراء '{procedure.procedure_name_ar or procedure.procedure_name}' الخاص بك.",
         related=procedure,
     )
     return procedure
@@ -74,7 +78,9 @@ def cancel_procedure(procedure: ClinicalProcedure, reason: str, cancelled_by) ->
         recipient=procedure.patient.user,
         verb=NotificationVerb.PROCEDURE_CANCELLED,
         title="Procedure cancelled",
+        title_ar="تم إلغاء الإجراء",
         body=f"Your procedure '{procedure.procedure_name}' has been cancelled.",
+        body_ar=f"تم إلغاء '{procedure.procedure_name_ar or procedure.procedure_name}' الخاص بك.",
         related=procedure,
     )
     return procedure

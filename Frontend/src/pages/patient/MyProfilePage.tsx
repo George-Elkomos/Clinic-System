@@ -24,8 +24,6 @@ const GENDER_OPTIONS = [
   { value: '', label: '-' },
   { value: 'MALE', label: 'patients.genderMale' },
   { value: 'FEMALE', label: 'patients.genderFemale' },
-  { value: 'OTHER', label: 'patients.genderOther' },
-  { value: 'UNDISCLOSED', label: 'patients.genderUndisclosed' },
 ]
 
 const BLOOD_OPTIONS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((value) => ({

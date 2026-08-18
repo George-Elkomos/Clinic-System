@@ -33,7 +33,9 @@ def submit_order(order: LabOrder) -> LabOrder:
         recipient=order.patient.user,
         verb=NotificationVerb.LAB_ORDER_CREATED,
         title="Lab order submitted",
+        title_ar="تم إرسال طلب التحليل",
         body=f"Your lab order {order.order_number} has been submitted.",
+        body_ar=f"تم إرسال طلب التحليل الخاص بك {order.order_number}.",
         related=order,
     )
     return order
@@ -137,14 +139,18 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
         recipient=order.patient.user,
         verb=NotificationVerb.LAB_RESULT_AVAILABLE,
         title="Lab results available",
+        title_ar="نتائج التحليل متاحة",
         body=f"Results for order {order.order_number} are ready.",
+        body_ar=f"نتائج طلب التحليل {order.order_number} جاهزة الآن.",
         related=order,
     )
     notify(
         recipient=order.doctor.user,
         verb=NotificationVerb.LAB_RESULT_AVAILABLE,
         title="Lab results ready for review",
+        title_ar="نتائج التحليل جاهزة للمراجعة",
         body=f"Results for {order.patient.user.get_full_name()} ({order.order_number}) are ready.",
+        body_ar=f"نتائج {order.patient.user.get_full_name()} ({order.order_number}) جاهزة الآن.",
         related=order,
     )
     if has_critical:
@@ -154,7 +160,9 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
             recipient=order.doctor.user,
             verb=NotificationVerb.LAB_RESULT_CRITICAL,
             title="CRITICAL lab result",
+            title_ar="نتيجة تحليل حرجة",
             body=f"Critical value in order {order.order_number} — immediate review required.",
+            body_ar=f"قيمة حرجة في طلب التحليل {order.order_number} — يتطلب مراجعة فورية.",
             related=order,
             channels=["sms", "whatsapp"],
         )
@@ -164,9 +172,14 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
             recipient=order.patient.user,
             verb=NotificationVerb.LAB_RESULT_CRITICAL,
             title="Urgent: critical lab result",
+            title_ar="عاجل: نتيجة تحليل حرجة",
             body=(
                 f"A critical value was detected in your lab order {order.order_number}. "
                 "Please contact the clinic immediately."
+            ),
+            body_ar=(
+                f"تم رصد قيمة حرجة في طلب التحليل الخاص بك {order.order_number}. "
+                "يرجى التواصل مع العيادة فورًا."
             ),
             related=order,
         )
@@ -183,7 +196,9 @@ def review_order(order: LabOrder) -> LabOrder:
         recipient=order.patient.user,
         verb=NotificationVerb.LAB_RESULT_REVIEWED,
         title="Lab results reviewed",
+        title_ar="تمت مراجعة نتائج التحليل",
         body=f"Your doctor has reviewed the results for order {order.order_number}.",
+        body_ar=f"قام طبيبك بمراجعة نتائج طلب التحليل {order.order_number}.",
         related=order,
     )
     return order
@@ -207,7 +222,9 @@ def cancel_order(order: LabOrder, reason: str, cancelled_by) -> LabOrder:
         recipient=order.patient.user,
         verb=NotificationVerb.LAB_ORDER_CANCELLED,
         title="Lab order cancelled",
+        title_ar="تم إلغاء طلب التحليل",
         body=f"Your lab order {order.order_number} has been cancelled.",
+        body_ar=f"تم إلغاء طلب التحليل الخاص بك {order.order_number}.",
         related=order,
     )
     return order

@@ -7,9 +7,10 @@ resolve `/doctor/encounters/<appointmentId>` to the right version.
 """
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.appointments import services as appt_services
-from apps.core.enums import AppointmentStatus, RoleChoices
+from apps.core.enums import AppointmentStatus, AppointmentType, RoleChoices
 from apps.encounters import services as encounter_services
 from apps.encounters.models import Diagnosis, Encounter, EncounterStatus
 
@@ -227,3 +228,62 @@ def test_doctor_can_still_edit_own_draft_encounter(api, doctor_profile, patient,
     )
     assert resp.status_code == 200
     assert resp.data["chief_complaint"] == "Headache"
+
+
+# --- Follow-up context: previous_encounter -----------------------------------
+# A Follow-up encounter should carry the origin visit's diagnosis/treatment/
+# notes forward (EncounterReadSerializer.get_previous_encounter), resolved
+# through the FollowUp record's origin_appointment -- so the doctor has it
+# without leaving the encounter page. A plain scheduled visit never does.
+
+def test_previous_encounter_surfaces_on_followup_only(api, patient, doctor_profile, future_slot, diagnosis):
+    origin = _completed_appointment(patient, doctor_profile, future_slot)
+    origin_draft = encounter_services.get_or_create_draft(appointment=origin, doctor=doctor_profile)
+    origin_draft.chief_complaint = "Sore throat"
+    origin_draft.diagnosis = diagnosis
+    origin_draft.treatment_plan = "Rest and fluids"
+    origin_draft.save(update_fields=["chief_complaint", "diagnosis", "treatment_plan"])
+    encounter_services.submit_encounter(origin_draft)
+
+    followup = appt_services.create_followup(
+        origin_appointment=origin, recommended_date=timezone.localdate(),
+    )
+    resulting = appt_services.confirm_followup(followup)
+    assert resulting.appointment_type == AppointmentType.FOLLOW_UP
+
+    followup_draft = encounter_services.get_or_create_draft(appointment=resulting, doctor=doctor_profile)
+
+    api.force_authenticate(doctor_profile.user)
+    resp = api.get(reverse("encounter-detail", args=[followup_draft.id]))
+    assert resp.status_code == 200
+    assert resp.data["appointment_type"] == AppointmentType.FOLLOW_UP
+    previous = resp.data["previous_encounter"]
+    assert previous is not None
+    assert previous["chief_complaint"] == "Sore throat"
+    assert previous["treatment_plan"] == "Rest and fluids"
+    assert previous["diagnosis_detail"]["id"] == diagnosis.id
+
+
+def test_previous_encounter_absent_for_non_followup(api, patient, doctor_profile, future_slot):
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+
+    api.force_authenticate(doctor_profile.user)
+    resp = api.get(reverse("encounter-detail", args=[draft.id]))
+    assert resp.status_code == 200
+    assert resp.data["previous_encounter"] is None
+
+
+def test_submit_response_includes_billing_outcome(api, doctor_profile, patient, future_slot):
+    """"Submit & Close Encounter" is the doctor's only completion path now (the
+    queue's direct "Complete Visit" button was removed) -- its response has to
+    carry the same billing outcome that button used to return."""
+    appt = _completed_appointment(patient, doctor_profile, future_slot)
+    draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
+
+    api.force_authenticate(doctor_profile.user)
+    api.patch(reverse("encounter-detail", args=[draft.id]), {"chief_complaint": "Headache"}, format="json")
+    resp = api.post(reverse("encounter-submit", args=[draft.id]))
+    assert resp.status_code == 200
+    assert "billing" in resp.data
+    assert "invoice_id" in resp.data["billing"]

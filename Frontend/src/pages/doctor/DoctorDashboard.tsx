@@ -25,6 +25,7 @@ const STATUS_BADGE: Record<AppointmentStatus, string> = {
   COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
   CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200/60',
   NO_SHOW: 'bg-slate-50 text-slate-500 border-slate-200/60',
+  EXPIRED: 'bg-slate-50 text-slate-500 border-slate-200/60',
 }
 
 const LAB_STATUS_BADGE: Record<LabOrderStatus, string> = {
@@ -97,21 +98,16 @@ export function DoctorDashboard() {
     retry: 1,
   })
 
-  const transition = useMutation({
-    mutationFn: ({ id, action }: { id: number; action: 'checkIn' | 'start' | 'complete' }) =>
-      appointmentsApi[action](id),
+  // The doctor's only manual transition left is "Complete" — check-in/start
+  // now happen automatically when the chart is opened (see EncounterPage).
+  const complete = useMutation({
+    mutationFn: (id: number) => appointmentsApi.complete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
   const rows = (data?.results ?? []).filter((a) => a.status !== 'CANCELLED')
-
-  const nextAction = (a: Appointment) => {
-    if (a.status === 'CONFIRMED') return { action: 'checkIn' as const, label: t('appointments.checkIn') }
-    if (a.status === 'CHECKED_IN') return { action: 'start' as const, label: t('appointments.start') }
-    if (a.status === 'IN_PROGRESS') return { action: 'complete' as const, label: t('appointments.complete') }
-    return null
-  }
+  const isOpenable = (a: Appointment) => a.status === 'CONFIRMED' || a.status === 'CHECKED_IN' || a.status === 'IN_PROGRESS'
 
   return (
     <div className="flex flex-col gap-6">
@@ -191,8 +187,7 @@ export function DoctorDashboard() {
         ) : (
           <div className="flex flex-col gap-3">
             {rows.map((a) => {
-              const action = nextAction(a)
-              const pending = transition.isPending && transition.variables?.id === a.id
+              const pending = complete.isPending && complete.variables === a.id
               return (
                 <div
                   key={a.id}
@@ -206,15 +201,23 @@ export function DoctorDashboard() {
                     <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[a.status] ?? STATUS_BADGE.CANCELLED}`}>
                       {t(`status.${a.status}`)}
                     </span>
-                    {action && (
+                    {isOpenable(a) && (
+                      <Link
+                        to={`/doctor/encounters/${a.id}`}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all"
+                      >
+                        🩻 {t('encounters.open')}
+                      </Link>
+                    )}
+                    {a.status === 'IN_PROGRESS' && (
                       <button
                         type="button"
                         disabled={pending}
-                        onClick={() => transition.mutate({ id: a.id, action: action.action })}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60"
+                        onClick={() => complete.mutate(a.id)}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-all disabled:opacity-60"
                       >
                         {pending && <Spinner size={14} />}
-                        {action.label}
+                        {t('appointments.complete')}
                       </button>
                     )}
                   </div>

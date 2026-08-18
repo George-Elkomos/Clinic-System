@@ -15,9 +15,17 @@ class AppointmentSerializer(serializers.ModelSerializer):
     # the appointment id -- null when no encounter was ever opened for this
     # visit (e.g. completed straight from the queue with no clinical note).
     encounter_id = serializers.SerializerMethodField()
+    # Patient no-show reliability ({"score": 0-100, "label": GOOD/WATCH/HIGH_RISK}),
+    # surfaced wherever an appointment card is shown (queue, desk, booking).
+    patient_reliability = serializers.SerializerMethodField()
 
     def get_encounter_id(self, obj):
         return obj.encounter.id if hasattr(obj, "encounter") else None
+
+    def get_patient_reliability(self, obj):
+        from apps.users.services import patient_reliability
+
+        return patient_reliability(obj.patient)
 
     class Meta:
         model = Appointment
@@ -27,6 +35,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "appointment_type", "type_display", "priority", "reason",
             "cancellation_reason", "checked_in_at", "started_at", "completed_at",
             "created_at", "encounter_id", "is_manual_override", "override_reason",
+            "patient_reliability",
         ]
         read_only_fields = fields
 
@@ -45,6 +54,9 @@ class AppointmentQueueSerializer(AppointmentSerializer):
     # Lets the "previous patient" card offer a "View Invoice" link (Phase 12)
     # without depending on the one-shot post-completion pop-up.
     invoice_id = serializers.SerializerMethodField()
+    # Flags a returning patient so the doctor notices before starting the exam,
+    # even if this particular appointment has no encounter of its own yet.
+    has_history = serializers.SerializerMethodField()
 
     def get_invoice_id(self, obj):
         from apps.billing.models import InvoiceItem
@@ -58,11 +70,16 @@ class AppointmentQueueSerializer(AppointmentSerializer):
             .first()
         )
 
+    def get_has_history(self, obj):
+        from apps.encounters.models import Encounter
+
+        return Encounter.objects.filter(patient=obj.patient).exclude(appointment=obj).exists()
+
     class Meta(AppointmentSerializer.Meta):
         fields = AppointmentSerializer.Meta.fields + [
             "patient_profile_id", "patient_phone", "patient_dob", "patient_gender",
             "patient_blood_type", "patient_allergies", "patient_chronic_conditions",
-            "patient_current_medications", "invoice_id",
+            "patient_current_medications", "invoice_id", "has_history",
         ]
         read_only_fields = fields
 

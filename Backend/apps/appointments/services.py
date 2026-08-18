@@ -10,8 +10,10 @@ from rest_framework.exceptions import ValidationError
 from apps.core.enums import (
     AppointmentStatus,
     AppointmentType,
+    NotificationVerb,
     SlotStatus,
 )
+from apps.core.text import doctor_display_name, format_when_bilingual
 from apps.doctors.models import TimeSlot
 
 from .models import Appointment
@@ -123,6 +125,130 @@ def cancel_appointment(appointment, *, cancelled_by, reason="", enforce_window=F
     return appointment
 
 
+def _notify_secretaries(*, verb, title, body, title_ar="", body_ar="", related):
+    """In-app-only alert to every active secretary. Never reaches the patient —
+    these two sweeps are deliberately silent to the patient (see auto-cancel /
+    reliability-score spec)."""
+    from apps.core.enums import RoleChoices
+    from apps.notifications.services import notify
+    from apps.users.models import User
+
+    for secretary in User.objects.filter(role=RoleChoices.SECRETARY, is_active=True):
+        notify(
+            recipient=secretary, verb=verb, title=title, body=body,
+            title_ar=title_ar, body_ar=body_ar,
+            related=related, channels=["in_app"],
+        )
+
+
+@transaction.atomic
+def expire_pending_appointment(appointment):
+    """A PENDING booking nobody confirmed before the grace window passed.
+    Frees its slot (same as cancel_appointment) so it can be rebooked."""
+    if appointment.status != AppointmentStatus.PENDING:
+        return appointment
+
+    appointment.status = AppointmentStatus.EXPIRED
+    appointment.cancellation_reason = "Not confirmed before appointment time."
+    appointment.save(update_fields=["status", "cancellation_reason", "updated_at"])
+
+    slot = appointment.time_slot
+    if slot:
+        slot = TimeSlot.objects.select_for_update().get(pk=slot.pk)
+        slot.status = (
+            SlotStatus.AVAILABLE
+            if slot.start_datetime >= timezone.now()
+            else SlotStatus.PAST
+        )
+        slot.save(update_fields=["status"])
+        appointment.time_slot = None
+        appointment.save(update_fields=["time_slot", "updated_at"])
+        if slot.status == SlotStatus.AVAILABLE:
+            notify_waitlist_for_slot(slot)
+
+    return appointment
+
+
+def expire_due_appointments(now=None):
+    """Sweep: PENDING appointments still unconfirmed PENDING_EXPIRY_GRACE_MINUTES
+    past their scheduled_start. Meant to run periodically (management command),
+    not on-request. Silent to the patient; logs an in-app alert for the desk."""
+    now = now or timezone.now()
+    cutoff = now - timedelta(minutes=settings.PENDING_EXPIRY_GRACE_MINUTES)
+    qs = Appointment.objects.select_related("patient__user", "doctor__user").filter(
+        status=AppointmentStatus.PENDING, scheduled_start__lte=cutoff,
+    )
+    count = 0
+    for appt in qs:
+        expire_pending_appointment(appt)
+        when, when_ar = format_when_bilingual(appt.scheduled_start)
+        _notify_secretaries(
+            verb=NotificationVerb.APPT_EXPIRED,
+            title="Booking expired",
+            title_ar="انتهت صلاحية الحجز",
+            body=(
+                f"{appt.patient.user.get_full_name()}'s booking with {appt.doctor} on "
+                f"{when} expired unconfirmed."
+            ),
+            body_ar=(
+                f"انتهت صلاحية حجز {appt.patient.user.get_full_name()} مع "
+                f"{doctor_display_name(appt.doctor, arabic=True)} في {when_ar} دون تأكيد."
+            ),
+            related=appt,
+        )
+        count += 1
+    return count
+
+
+@transaction.atomic
+def mark_no_show(appointment):
+    """Shared by the manual staff action and the automated overdue sweep."""
+    active = (
+        AppointmentStatus.CONFIRMED, AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_PROGRESS,
+    )
+    if appointment.status not in active:
+        raise ValidationError({"detail": "Cannot mark as no-show from this status."})
+    appointment.status = AppointmentStatus.NO_SHOW
+    appointment.save(update_fields=["status", "updated_at"])
+    return appointment
+
+
+def mark_overdue_no_shows(now=None):
+    """Sweep: CONFIRMED appointments (patient never checked in) past whichever
+    comes first — scheduled_end, or NO_SHOW_GRACE_MINUTES after scheduled_start.
+    Only CONFIRMED is auto-transitioned; CHECKED_IN/IN_PROGRESS mean the patient
+    did show up, so those stay manual-only (see the `no-show` view action)."""
+    now = now or timezone.now()
+    candidates = Appointment.objects.select_related("patient__user", "doctor__user").filter(
+        status=AppointmentStatus.CONFIRMED, scheduled_start__lte=now,
+    )
+    count = 0
+    for appt in candidates:
+        cutoff = min(
+            appt.scheduled_end, appt.scheduled_start + timedelta(minutes=settings.NO_SHOW_GRACE_MINUTES),
+        )
+        if now < cutoff:
+            continue
+        mark_no_show(appt)
+        when, when_ar = format_when_bilingual(appt.scheduled_start)
+        _notify_secretaries(
+            verb=NotificationVerb.APPT_NO_SHOW,
+            title="Patient marked no-show",
+            title_ar="تم تسجيل غياب المريض",
+            body=(
+                f"{appt.patient.user.get_full_name()} did not check in for their "
+                f"{when} appointment with {appt.doctor}."
+            ),
+            body_ar=(
+                f"لم يحضر {appt.patient.user.get_full_name()} لموعده مع "
+                f"{doctor_display_name(appt.doctor, arabic=True)} في {when_ar}."
+            ),
+            related=appt,
+        )
+        count += 1
+    return count
+
+
 @transaction.atomic
 def complete_appointment(appointment):
     """Mark completed, record the doctor↔patient link, and trigger billing.
@@ -182,12 +308,14 @@ def notify_waitlist_for_slot(slot):
     entry.notify_expires_at = now + timedelta(hours=settings.WAITLIST_HOLD_HOURS)
     entry.save(update_fields=["status", "notified_at", "notify_expires_at", "updated_at"])
 
-    when = slot.start_datetime.strftime("%d %b %Y, %H:%M")
+    when, when_ar = format_when_bilingual(slot.start_datetime)
     notify(
         recipient=entry.patient.user,
         verb=NotificationVerb.WAITLIST_OPEN,
         title="A slot just opened",
+        title_ar="أصبح هناك موعد متاح",
         body=f"A time with {slot.doctor} on {when} is now available. Please book it soon.",
+        body_ar=f"أصبح هناك موعد متاح مع {doctor_display_name(slot.doctor, arabic=True)} في {when_ar}. يرجى الحجز في أقرب وقت.",
         related=entry,
     )
     return entry
@@ -300,12 +428,17 @@ def create_followup(*, origin_appointment, recommended_date, notes="", created_b
         notes=notes,
         created_by=created_by,
     )
-    when = slot.start_datetime.strftime("%d %b %Y, %H:%M") if slot else "a time soon"
+    if slot:
+        when, when_ar = format_when_bilingual(slot.start_datetime)
+    else:
+        when, when_ar = "a time soon", "وقت قريب"
     notify(
         recipient=origin_appointment.patient.user,
         verb=NotificationVerb.FOLLOWUP,
         title="Follow-up suggested",
+        title_ar="اقتراح موعد متابعة",
         body=f"{origin_appointment.doctor} suggests a follow-up around {when}. Please confirm or dismiss.",
+        body_ar=f"يقترح {doctor_display_name(origin_appointment.doctor, arabic=True)} موعد متابعة حوالي {when_ar}. يرجى التأكيد أو الرفض.",
         related=followup,
     )
     return followup
@@ -329,7 +462,9 @@ def confirm_followup(followup, *, created_by=None):
     appointment = book_slot(
         patient=followup.patient,
         slot_id=followup.suggested_slot_id,
-        reason="Follow-up visit",
+        # No hardcoded English reason text -- the appointment_type=FOLLOW_UP
+        # badge already conveys this, in whatever language the UI is in;
+        # a free-text `reason` can't be localized after the fact.
         created_by=created_by,
         appointment_type=AppointmentType.FOLLOW_UP,
         bypass_accepting_gate=True,

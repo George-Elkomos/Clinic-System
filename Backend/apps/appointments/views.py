@@ -129,8 +129,9 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="check-in")
     def check_in(self, request, pk=None):
+        if request.user.role not in STAFF_ROLES:
+            raise PermissionDenied("Only the front desk can check in patients.")
         appointment = self.get_object()
-        self._staff_or_owning_doctor(appointment)
         if appointment.status != AppointmentStatus.CONFIRMED:
             raise ValidationError({"detail": "Only a confirmed appointment can be checked in."})
         appointment.status = AppointmentStatus.CHECKED_IN
@@ -214,13 +215,13 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="no-show")
     def no_show(self, request, pk=None):
+        # Front-desk/manager only (matches the automated overdue sweep in
+        # services.mark_overdue_no_shows) — the doctor's job is the exam, not
+        # attendance bookkeeping.
+        if request.user.role not in STAFF_ROLES:
+            raise PermissionDenied("Only the front desk can mark a patient as no-show.")
         appointment = self.get_object()
-        self._staff_or_owning_doctor(appointment)
-        active = [AppointmentStatus.CONFIRMED, AppointmentStatus.CHECKED_IN, AppointmentStatus.IN_PROGRESS]
-        if appointment.status not in active:
-            raise ValidationError({"detail": "Cannot mark as no-show from this status."})
-        appointment.status = AppointmentStatus.NO_SHOW
-        appointment.save(update_fields=["status", "updated_at"])
+        services.mark_no_show(appointment)
         return Response(AppointmentSerializer(appointment).data)
 
     @action(detail=False, methods=["get"], url_path="my-queue")

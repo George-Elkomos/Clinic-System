@@ -36,6 +36,7 @@ def create_referral(*, encounter, doctor, **data):
             title="New patient referral",
             title_ar="إحالة مريض جديدة",
             body=f"Dr. {doctor.user.get_full_name()} referred {referral.patient.user.get_full_name()} to you.",
+            body_ar=f"أحال إليك د. {doctor.user.get_full_name()} المريض {referral.patient.user.get_full_name()}.",
             related=referral,
         )
     return referral
@@ -65,6 +66,7 @@ def accept_referral(referral, doctor):
             title="Referral accepted",
             title_ar="تم قبول الإحالة",
             body=f"Dr. {doctor.user.get_full_name()} accepted your referral for {referral.patient.user.get_full_name()}.",
+            body_ar=f"وافق د. {doctor.user.get_full_name()} على إحالتك للمريض {referral.patient.user.get_full_name()}.",
             related=referral,
         )
     return referral
@@ -96,6 +98,7 @@ def complete_referral(referral, doctor):
             title="Referral completed",
             title_ar="تم إتمام الإحالة",
             body=f"Dr. {doctor.user.get_full_name()} completed your referral for {referral.patient.user.get_full_name()}.",
+            body_ar=f"أتم د. {doctor.user.get_full_name()} إحالتك للمريض {referral.patient.user.get_full_name()}.",
             related=referral,
         )
     return referral
@@ -124,6 +127,7 @@ def cancel_referral(referral, user):
             title="Referral cancelled",
             title_ar="تم إلغاء الإحالة",
             body=f"The referral for {referral.patient.user.get_full_name()} was cancelled.",
+            body_ar=f"تم إلغاء الإحالة الخاصة بالمريض {referral.patient.user.get_full_name()}.",
             related=referral,
         )
     if notify_recipient is not None and notify_recipient.user_id != user.id:
@@ -133,6 +137,7 @@ def cancel_referral(referral, user):
             title="Referral cancelled",
             title_ar="تم إلغاء الإحالة",
             body=f"The referral for {referral.patient.user.get_full_name()} was cancelled.",
+            body_ar=f"تم إلغاء الإحالة الخاصة بالمريض {referral.patient.user.get_full_name()}.",
             related=referral,
         )
     return referral

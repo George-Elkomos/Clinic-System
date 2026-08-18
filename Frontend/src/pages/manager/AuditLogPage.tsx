@@ -54,6 +54,7 @@ const CHECKLIST_LINE_STYLE: Record<string, string> = {
 }
 
 // "room_number" -> "Room Number" — the backend diff stores raw Python field names.
+// Used as a last-resort fallback for any field not yet in audit.fields.*.
 function humanizeField(field: string): string {
   return field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -96,11 +97,11 @@ function diffChecklist(oldList: ChecklistStep[], newList: ChecklistStep[]): Chec
 // instead of dumping String(value) (which for objects/arrays of objects is
 // either "[object Object]" or, coming from the backend's old str()-repr path,
 // an unreadable single-quoted Python dump).
-function formatGenericItem(value: unknown): string {
+function formatGenericItem(value: unknown, translateField: (field: string) => string): string {
   if (value === null || value === undefined) return '—'
   if (typeof value === 'object') {
     return Object.entries(value as Record<string, unknown>)
-      .map(([k, v]) => `${humanizeField(k)}: ${v === null || v === undefined || v === '' ? '—' : String(v)}`)
+      .map(([k, v]) => `${translateField(k)}: ${v === null || v === undefined || v === '' ? '—' : String(v)}`)
       .join(', ')
   }
   return String(value)
@@ -117,6 +118,13 @@ export function AuditLogPage() {
   const { language } = useLanguage()
   const [search, setSearch] = useState('')
   const [action, setAction] = useState('')
+
+  const translateField = (field: string) =>
+    t(`audit.fields.${field}`, { defaultValue: humanizeField(field) })
+  const translateModel = (modelName: string) =>
+    t(`audit.models.${modelName}`, { defaultValue: modelName })
+  const translateAction = (actionCode: string, fallback: string) =>
+    t(`audit.actions.${actionCode}`, { defaultValue: fallback })
 
   // Backend diff values are already real null/boolean/string/number (see
   // apps/audit/signals.py's _serialize) — render them for a non-technical reader
@@ -137,10 +145,10 @@ export function AuditLogPage() {
   const renderComplexSide = (value: unknown) => {
     if (Array.isArray(value)) {
       if (value.length === 0) return <span className="text-slate-400">{t('common.none')}</span>
-      return <ul className="list-disc space-y-0.5 ps-4">{value.map((v, i) => <li key={i}>{formatGenericItem(v)}</li>)}</ul>
+      return <ul className="list-disc space-y-0.5 ps-4">{value.map((v, i) => <li key={i}>{formatGenericItem(v, translateField)}</li>)}</ul>
     }
     if (typeof value === 'object' && value !== null) {
-      return <ul className="list-disc space-y-0.5 ps-4"><li>{formatGenericItem(value)}</li></ul>
+      return <ul className="list-disc space-y-0.5 ps-4"><li>{formatGenericItem(value, translateField)}</li></ul>
     }
     return <span>{formatDiffValue(value)}</span>
   }
@@ -176,7 +184,7 @@ export function AuditLogPage() {
                 id={p.id}
                 options={[
                   { value: '', label: t('appointments.filterAll') },
-                  ...ACTIONS.map((a) => ({ value: a, label: a })),
+                  ...ACTIONS.map((a) => ({ value: a, label: translateAction(a, a) })),
                 ]}
                 value={action}
                 onChange={(v) => setAction(Array.isArray(v) ? '' : String(v))}
@@ -196,8 +204,8 @@ export function AuditLogPage() {
             <div key={e.id} className={ENTRY_CARD}>
               <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                 <div className="flex flex-wrap items-center gap-3">
-                  <ActionBadge action={e.action} text={e.action_display} />
-                  <span className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{e.model_name}</span>
+                  <ActionBadge action={e.action} text={translateAction(e.action, e.action_display)} />
+                  <span className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{translateModel(e.model_name)}</span>
                 </div>
                 <span className="shrink-0 text-xs font-medium text-slate-500">{formatDateTime(e.timestamp, language)}</span>
               </div>
@@ -216,7 +224,7 @@ export function AuditLogPage() {
                       )
                       return (
                         <div key={field} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                          <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{humanizeField(field)}</span>
+                          <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{translateField(field)}</span>
                           {lines.length === 0 ? (
                             <span className="patient-text-body-secondary ms-2" style={{ color: 'var(--text-muted)' }}>{t('audit.checklistNoStepChange')}</span>
                           ) : (
@@ -237,7 +245,7 @@ export function AuditLogPage() {
                     if (isComplex) {
                       return (
                         <div key={field} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                          <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{humanizeField(field)}</span>
+                          <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{translateField(field)}</span>
                           <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                               <span className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{t('audit.before')}</span>
@@ -254,7 +262,7 @@ export function AuditLogPage() {
 
                     return (
                       <div key={field} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3 patient-text-body-secondary">
-                        <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{humanizeField(field)}</span>
+                        <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{translateField(field)}</span>
                         <span className="text-slate-400 line-through">{formatDiffValue(diff.old)}</span>
                         <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>→</span>
                         <span className="font-semibold" style={{ color: 'var(--brand-teal-start)' }}>{formatDiffValue(diff.new)}</span>

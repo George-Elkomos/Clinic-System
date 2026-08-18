@@ -49,16 +49,22 @@ def block_slots_for_absence(sender, instance, created, **kwargs):
 
 def _notify_absence(appt):
     from apps.core.enums import NotificationVerb
+    from apps.core.text import doctor_display_name, format_when_bilingual
     from apps.notifications.services import notify
 
-    when = appt.scheduled_start.strftime("%d %b %Y, %H:%M")
+    when, when_ar = format_when_bilingual(appt.scheduled_start)
     notify(
         recipient=appt.patient.user,
         verb=NotificationVerb.ABSENCE,
         title="Appointment cancelled — doctor unavailable",
+        title_ar="تم إلغاء الموعد — الطبيب غير متاح",
         body=(
             f"Your appointment with {appt.doctor} on {when} was cancelled because "
             f"the doctor is unavailable. Please rebook at a time that suits you."
+        ),
+        body_ar=(
+            f"تم إلغاء موعدك مع {doctor_display_name(appt.doctor, arabic=True)} في {when_ar} "
+            f"بسبب عدم توفر الطبيب. يرجى إعادة الحجز في وقت يناسبك."
         ),
         related=appt,
     )

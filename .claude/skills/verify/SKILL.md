@@ -51,10 +51,21 @@ of walking registration → booking → check-in → queue every time):
   no frontend page exists yet, so drive it via the API (see
   `Backend/tests/test_radiology.py`), e.g. `POST /api/radiology-orders/{id}/complete/`
   (multipart, `file` field) and `POST /api/radiology-orders/{id}/report/`.
+- `seed_queue_workflow_e2e` — doctor Live Queue cleanup + Follow-up "previous visit"
+  context (2026-08-18 refactor): a clean CHECKED_IN walk-in for **e2e.patient5**
+  (Layla Fahmy — deliberately not e2e.patient/2/3/4) whose profile has
+  allergies/chronic conditions/current medications set, ready to click the single
+  "Open Clinical Encounter"/"See Patient" button and watch it auto-flip to
+  IN_PROGRESS with no manual Start; and **e2e.patient6** (Karim Adel) with a
+  SUBMITTED origin encounter (diagnosis + treatment + a prescription) plus a
+  CONFIRMED Follow-up appointment resulting from it, so opening its encounter shows
+  the "Follow-up" badge and a "Previous Visit" sidebar card carrying that origin
+  content forward.
 
 E2E accounts (password `E2eTest123!`, created by past verification runs, safe to reuse):
 `e2e.patient@test.dev`, `e2e.patient2@test.dev`, `e2e.patient3@test.dev`,
-`e2e.patient4@test.dev`, `e2e.doctor@test.dev` (DoctorProfile id 4),
+`e2e.patient4@test.dev`, `e2e.patient5@test.dev`, `e2e.patient6@test.dev`,
+`e2e.doctor@test.dev` (DoctorProfile id 4),
 `e2e.doctor2@test.dev` (Cardiology — referral target), `e2e.secretary@test.dev`,
 `e2e.manager@test.dev`.
 
@@ -65,7 +76,8 @@ No Playwright browsers are cached, but **Edge + Chrome are installed** — use
 npm module in the scratchpad (`npm i playwright`), never in Frontend/.
 
 Gotchas:
-- Login form: `input[type=email]`, `input[type=password]`, `button[type=submit]`.
+- Login form: `input[autocomplete=username]` (type="text", not type="email" — it
+  doubles as email-or-phone), `input[type=password]`, `button[type=submit]`.
 - The `Select` primitive is a **custom combobox**, not `<select>`:
   click `[role=combobox]`, then `[role=option]` by text.
 - "Logout" between roles: `context().clearCookies()` + `localStorage.clear()`.
@@ -76,7 +88,11 @@ Gotchas:
 
 ## Flows worth driving
 
-- Doctor: `/doctor/queue` → "Call Next Patient" → "Complete Visit" → billing popup.
+- Doctor (2026-08-18+): `/doctor/queue` → "Open Clinical Encounter"/"See Patient"
+  (single button now — no Call Next/Check-in/No-show/Complete on the queue card;
+  opening the chart auto-flips CONFIRMED/CHECKED_IN → IN_PROGRESS) → fill at least
+  a chief complaint/diagnosis/notes → "Submit & Close Encounter" → billing popup.
+  See `seed_queue_workflow_e2e` above for a ready-made walk-in + follow-up fixture.
 - Secretary: `/secretary/billing` tabs + "Record Payment" modal (overpay → field-level error toast).
 - Patient: `/patient/invoices`; isolation: patient2 sees empty; `/secretary/billing` → /403.
 - Manager: `/manager/billing` KPIs + revenue table.

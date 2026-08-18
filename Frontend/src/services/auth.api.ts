@@ -52,6 +52,7 @@ export const authApi = {
     first_name: string
     last_name: string
     phone?: string
+    preferred_language?: 'en' | 'ar'
   }) => api.post<User>('/auth/register/', data).then((r) => r.data),
 
   patientProfile: () =>

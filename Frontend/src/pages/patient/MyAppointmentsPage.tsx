@@ -30,6 +30,7 @@ const STATUS_BADGE: Record<AppointmentStatus, string> = {
   COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
   CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200/60',
   NO_SHOW: 'bg-slate-50 text-slate-500 border-slate-200/60',
+  EXPIRED: 'bg-slate-50 text-slate-500 border-slate-200/60',
 }
 
 // Doctor initials for the avatar fallback circle — strips a leading "Dr."
@@ -349,7 +350,7 @@ export function MyAppointmentsPage() {
                   </span>
                   <div className="min-w-0">
                     <div className="truncate text-base font-semibold text-slate-800">{a.doctor_name}</div>
-                    <div className="truncate text-xs text-slate-500">{a.type_display}</div>
+                    <div className="truncate text-xs text-slate-500">{t(`appointments.type.${a.appointment_type}`)}</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 sm:gap-6">

@@ -17,7 +17,6 @@ from apps.core.enums import (
     AppointmentStatus,
     AppointmentType,
     BloodType,
-    GenderChoices,
     LabCategory,
     RoleChoices,
     SlotStatus,
@@ -147,7 +146,6 @@ class Command(BaseCommand):
         profile = user.patient_profile  # created by signal
         if not profile.date_of_birth:
             profile.date_of_birth = timezone.localdate() - timedelta(days=365 * 60)
-            profile.gender = GenderChoices.UNDISCLOSED
             profile.blood_type = BloodType.O_POS
             profile.emergency_contact_name = "Next of Kin"
             profile.emergency_contact_phone = "+10000000000"

@@ -88,6 +88,7 @@ def _reminder_window(now, hours, window_min, flag_field, pref_field):
     Idempotent: each appointment is flagged once it's been considered."""
     from apps.appointments.models import Appointment
     from apps.core.enums import AppointmentStatus, NotificationVerb
+    from apps.core.text import doctor_display_name, format_when_bilingual
 
     center = now + timedelta(hours=hours)
     lo = center - timedelta(minutes=window_min)
@@ -99,18 +100,21 @@ def _reminder_window(now, hours, window_min, flag_field, pref_field):
         **{flag_field: False},
     )
     when_label = "tomorrow" if hours >= 24 else "in 1 hour"
+    when_label_ar = "غدًا" if hours >= 24 else "خلال ساعة"
     sent = 0
     for appt in qs:
         recipient = appt.patient.user
         prefs = getattr(recipient, "notification_preference", None)
         wants = prefs is None or getattr(prefs, pref_field, True)
         if wants:
-            when = appt.scheduled_start.strftime("%d %b %Y, %H:%M")
+            when, when_ar = format_when_bilingual(appt.scheduled_start)
             notify(
                 recipient=recipient,
                 verb=NotificationVerb.APPT_REMINDER,
                 title=f"Appointment reminder ({when_label})",
+                title_ar=f"تذكير بموعدك ({when_label_ar})",
                 body=f"Reminder: your appointment with {appt.doctor} is on {when}.",
+                body_ar=f"تذكير: موعدك مع {doctor_display_name(appt.doctor, arabic=True)} في {when_ar}.",
                 related=appt,
             )
             sent += 1

@@ -30,13 +30,22 @@ def _e164(phone: str) -> str:
     return '+20' + digits                  # bare number → assume Egypt
 
 
+def _localized_text(notification):
+    """Pick the recipient's preferred-language title/body, falling back to
+    English when no Arabic translation was recorded for this notification."""
+    if notification.recipient.preferred_language == "ar" and notification.title_ar:
+        return notification.title_ar, notification.body_ar or notification.body
+    return notification.title, notification.body
+
+
 def send_email(notification):
     recipient = notification.recipient
     if not recipient.email:
         return False
+    title, body = _localized_text(notification)
     send_mail(
-        subject=notification.title,
-        message=notification.body,
+        subject=title,
+        message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[recipient.email],
         fail_silently=True,
@@ -67,9 +76,10 @@ def send_sms(notification):
     if not (phone and settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN):
         return False
     try:  # imported lazily so Twilio is not a hard dependency
+        title, body = _localized_text(notification)
         client = _twilio_client()
         client.messages.create(
-            body=f"{notification.title}: {notification.body}",
+            body=f"{title}: {body}",
             from_=settings.TWILIO_FROM_NUMBER,
             to=_e164(phone),
         )
@@ -92,9 +102,10 @@ def send_whatsapp(notification):
             and settings.TWILIO_WHATSAPP_FROM):
         return False
     try:
+        title, body = _localized_text(notification)
         client = _twilio_client()
         client.messages.create(
-            body=f"*{notification.title}*\n{notification.body}",
+            body=f"*{title}*\n{body}",
             from_=f"whatsapp:{settings.TWILIO_WHATSAPP_FROM}",
             to=f"whatsapp:{_e164(phone)}",
         )

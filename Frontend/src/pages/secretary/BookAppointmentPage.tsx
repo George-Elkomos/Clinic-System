@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { OverrideWarningModal } from '../../components/OverrideWarningModal'
+import { HighRiskWarningBanner, ReliabilityBadge } from '../../components/ReliabilityBadge'
 import { AsyncCombobox, type ComboOption } from '../../components/primitives/AsyncCombobox'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
@@ -27,7 +28,11 @@ function todayISO() {
 
 const patientFetcher = (query: string): Promise<ComboOption[]> =>
   appointmentsApi.patients(query || undefined).then((results) =>
-    results.map((pt) => ({ value: pt.id, label: pt.full_name || pt.email || String(pt.id) })),
+    results.map((pt) => ({
+      value: pt.id,
+      label: pt.full_name || pt.email || String(pt.id),
+      reliability: pt.reliability,
+    })),
   )
 
 export function BookAppointmentPage() {
@@ -116,7 +121,15 @@ export function BookAppointmentPage() {
             onCreateNew={() => setRegisteringPatient(true)}
             createNewLabel={t('patients.register')}
           />
+          {patientOption?.reliability && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{t('reliability.title')}</span>
+              <ReliabilityBadge reliability={patientOption.reliability} />
+            </div>
+          )}
         </div>
+
+        {patientOption?.reliability && <HighRiskWarningBanner reliability={patientOption.reliability} />}
 
         <FormField label={t('booking.chooseDoctor')}>
           {(p) => (

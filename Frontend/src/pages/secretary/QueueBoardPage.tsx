@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { OverrideWarningModal } from '../../components/OverrideWarningModal'
+import { ReliabilityBadge } from '../../components/ReliabilityBadge'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
@@ -202,6 +203,7 @@ export function QueueBoardPage() {
                     <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                       <div>
                         <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{a.patient_name}</span>
+                        <ReliabilityBadge reliability={a.patient_reliability} className="ms-2" />
                         {a.appointment_type === 'EMERGENCY' && (
                           <span className="ms-2 rounded-full border border-rose-200/60 bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">{t('queue.emergency')}</span>
                         )}

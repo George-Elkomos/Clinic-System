@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { HighRiskWarningBanner, ReliabilityBadge } from '../../components/ReliabilityBadge'
 import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
@@ -24,8 +25,6 @@ const GENDER_OPTIONS = [
   { value: '', label: '-' },
   { value: 'MALE', label: 'Male' },
   { value: 'FEMALE', label: 'Female' },
-  { value: 'OTHER', label: 'Other' },
-  { value: 'UNDISCLOSED', label: 'Prefer not to say' },
 ]
 
 const BLOOD_OPTIONS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((value) => ({
@@ -75,6 +74,12 @@ function ProfileForm({
         save.mutate()
       }}
     >
+      <div className="mb-4 flex items-center gap-2">
+        <span className="patient-text-overline" style={{ color: 'var(--text-muted)' }}>{t('reliability.title')}</span>
+        <ReliabilityBadge reliability={initial.reliability} />
+      </div>
+      <HighRiskWarningBanner reliability={initial.reliability} />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField label={t('patients.dateOfBirth')}>
           {(p) => (

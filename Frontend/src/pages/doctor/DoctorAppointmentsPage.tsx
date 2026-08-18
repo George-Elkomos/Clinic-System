@@ -17,6 +17,9 @@ import { followupsApi } from '../../services/followups.api'
 import type { Appointment, AppointmentStatus } from '../../services/types'
 
 const STATUSES: AppointmentStatus[] = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+// Opening the chart from any of these statuses is what starts the visit — the
+// doctor no longer clicks a separate manual check-in/start button.
+const OPENABLE_STATUSES: AppointmentStatus[] = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS']
 
 const STATUS_BADGE: Record<AppointmentStatus, string> = {
   PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -26,6 +29,7 @@ const STATUS_BADGE: Record<AppointmentStatus, string> = {
   COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200',
   NO_SHOW: 'bg-slate-50 text-slate-500 border-slate-200',
+  EXPIRED: 'bg-slate-50 text-slate-500 border-slate-200',
 }
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
@@ -94,26 +98,21 @@ export function DoctorAppointmentsPage() {
   const pinnedRows = inProgressData?.results ?? []
   const pinnedIds = new Set(pinnedRows.map((a) => a.id))
 
-  const transition = useMutation({
-    mutationFn: ({ id, action }: { id: number; action: 'checkIn' | 'start' | 'complete' }) =>
-      appointmentsApi[action](id),
+  // The doctor's only manual transition left is "Complete" — check-in/start
+  // now happen automatically when the chart is opened (see EncounterPage).
+  const complete = useMutation({
+    mutationFn: (id: number) => appointmentsApi.complete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
-
-  const nextAction = (a: Appointment) => {
-    if (a.status === 'CONFIRMED') return { action: 'checkIn' as const, label: t('appointments.checkIn') }
-    if (a.status === 'CHECKED_IN') return { action: 'start' as const, label: t('appointments.start') }
-    if (a.status === 'IN_PROGRESS') return { action: 'complete' as const, label: t('appointments.complete') }
-    return null
-  }
 
   // Exclude appointments already shown in the pinned section to avoid duplication.
   const rows = (data?.results ?? []).filter((a) => !pinnedIds.has(a.id))
 
   const AppointmentCard = ({ a, pinned }: { a: Appointment; pinned?: boolean }) => {
-    const action = nextAction(a)
-    const pending = transition.isPending && transition.variables?.id === a.id
+    const isOpenable = OPENABLE_STATUSES.includes(a.status)
+    const canOpenEncounter = isOpenable || a.encounter_id != null
+    const pending = complete.isPending && complete.variables === a.id
     return (
       <div className={pinned ? 'overflow-hidden rounded-2xl border-l-4 border-[#1AB5B3]' : undefined}>
         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
@@ -124,16 +123,16 @@ export function DoctorAppointmentsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={a.status} />
-              {a.encounter_id != null && (
+              {canOpenEncounter && (
                 <Link to={`/doctor/encounters/${a.id}`}>
-                  <button type="button" className={a.status === 'IN_PROGRESS' ? BTN_PRIMARY : BTN_SECONDARY}>
-                    🩻 {t(a.status === 'IN_PROGRESS' ? 'encounters.open' : 'encounters.view')}
+                  <button type="button" className={isOpenable ? BTN_PRIMARY : BTN_SECONDARY}>
+                    🩻 {t(isOpenable ? 'encounters.open' : 'encounters.view')}
                   </button>
                 </Link>
               )}
-              {action && (
-                <button type="button" disabled={pending} onClick={() => transition.mutate({ id: a.id, action: action.action })} className={BTN_PRIMARY}>
-                  {pending && <Spinner size={14} />}{action.label}
+              {a.status === 'IN_PROGRESS' && (
+                <button type="button" disabled={pending} onClick={() => complete.mutate(a.id)} className={BTN_PRIMARY}>
+                  {pending && <Spinner size={14} />}{t('appointments.complete')}
                 </button>
               )}
               {a.status === 'COMPLETED' && followUpId !== a.id && (

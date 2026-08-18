@@ -203,12 +203,18 @@ class PatientSummarySerializer(serializers.Serializer):
     phone = serializers.CharField(source="user.phone")
     date_of_birth = serializers.DateField()
     blood_type = serializers.CharField()
+    reliability = serializers.SerializerMethodField()
 
     def get_email(self, obj):
         email = obj.user.email
         if email.endswith("@noemail.clinic"):
             return None
         return email
+
+    def get_reliability(self, obj):
+        from apps.users.services import patient_reliability
+
+        return patient_reliability(obj)
 
 
 # ---------------------------------------------------------------------------

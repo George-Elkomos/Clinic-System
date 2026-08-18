@@ -24,6 +24,7 @@ const STATUS_BADGE: Record<AppointmentStatus, string> = {
   COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
   CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200/60',
   NO_SHOW: 'bg-slate-50 text-slate-500 border-slate-200/60',
+  EXPIRED: 'bg-slate-50 text-slate-500 border-slate-200/60',
 }
 
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
