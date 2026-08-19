@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.core.enums import NotificationVerb, ProcedureStatus
+from apps.core.text import bidi_isolate
 from apps.notifications.services import notify
 
 from .models import ClinicalProcedure, ProcedureTemplate
@@ -24,7 +25,7 @@ def notify_scheduled(procedure: ClinicalProcedure) -> None:
         title="Procedure scheduled",
         title_ar="تم تحديد موعد الإجراء",
         body=f"A procedure '{procedure.procedure_name}' has been scheduled for you.",
-        body_ar=f"تم تحديد موعد إجراء '{procedure.procedure_name_ar or procedure.procedure_name}' لك.",
+        body_ar=f"تم تحديد موعد إجراء '{bidi_isolate(procedure.procedure_name_ar or procedure.procedure_name)}' لك.",
         related=procedure,
     )
 
@@ -61,7 +62,7 @@ def complete_procedure(procedure: ClinicalProcedure, post_procedure_notes=None, 
         title="Procedure completed",
         title_ar="تم إجراء العملية",
         body=f"Your procedure '{procedure.procedure_name}' has been completed.",
-        body_ar=f"تم إجراء '{procedure.procedure_name_ar or procedure.procedure_name}' الخاص بك.",
+        body_ar=f"تم إجراء '{bidi_isolate(procedure.procedure_name_ar or procedure.procedure_name)}' الخاص بك.",
         related=procedure,
     )
     return procedure
@@ -80,7 +81,7 @@ def cancel_procedure(procedure: ClinicalProcedure, reason: str, cancelled_by) ->
         title="Procedure cancelled",
         title_ar="تم إلغاء الإجراء",
         body=f"Your procedure '{procedure.procedure_name}' has been cancelled.",
-        body_ar=f"تم إلغاء '{procedure.procedure_name_ar or procedure.procedure_name}' الخاص بك.",
+        body_ar=f"تم إلغاء '{bidi_isolate(procedure.procedure_name_ar or procedure.procedure_name)}' الخاص بك.",
         related=procedure,
     )
     return procedure

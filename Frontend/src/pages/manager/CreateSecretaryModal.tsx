@@ -22,8 +22,8 @@ export function CreateSecretaryModal({ onClose, onCreated }: CreateSecretaryModa
   const { showToast } = useToast()
   const [created, setCreated] = useState<CreateSecretaryResponse | null>(null)
   const [form, setForm] = useState({
-    first_name: '',
-    last_name: '',
+    name_ar: '',
+    name_en: '',
     email: '',
     phone: '',
     password: '',
@@ -76,11 +76,11 @@ export function CreateSecretaryModal({ onClose, onCreated }: CreateSecretaryModa
               createSecretary.mutate()
             }}
           >
-            <FormField label={t('auth.firstName')}>
-              {(p) => <input {...p} className="patient-field" value={form.first_name} onChange={(e) => update('first_name', e.target.value)} required />}
+            <FormField label={t('auth.nameAr')} hint={t('auth.nameArHint')}>
+              {(p) => <input {...p} dir="rtl" className="patient-field" value={form.name_ar} onChange={(e) => update('name_ar', e.target.value)} required />}
             </FormField>
-            <FormField label={t('auth.lastName')}>
-              {(p) => <input {...p} className="patient-field" value={form.last_name} onChange={(e) => update('last_name', e.target.value)} required />}
+            <FormField label={t('auth.nameEn')} hint={t('auth.nameEnHint')}>
+              {(p) => <input {...p} className="patient-field" value={form.name_en} onChange={(e) => update('name_en', e.target.value)} />}
             </FormField>
             <FormField label={t('auth.email')}>
               {(p) => (

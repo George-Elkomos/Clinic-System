@@ -13,7 +13,7 @@ from apps.core.enums import (
     NotificationVerb,
     SlotStatus,
 )
-from apps.core.text import doctor_display_name, format_when_bilingual
+from apps.core.text import bidi_name, doctor_display_name, format_when_bilingual
 from apps.doctors.models import TimeSlot
 
 from .models import Appointment
@@ -191,7 +191,7 @@ def expire_due_appointments(now=None):
                 f"{when} expired unconfirmed."
             ),
             body_ar=(
-                f"انتهت صلاحية حجز {appt.patient.user.get_full_name()} مع "
+                f"انتهت صلاحية حجز {bidi_name(appt.patient.user)} مع "
                 f"{doctor_display_name(appt.doctor, arabic=True)} في {when_ar} دون تأكيد."
             ),
             related=appt,
@@ -240,7 +240,7 @@ def mark_overdue_no_shows(now=None):
                 f"{when} appointment with {appt.doctor}."
             ),
             body_ar=(
-                f"لم يحضر {appt.patient.user.get_full_name()} لموعده مع "
+                f"لم يحضر {bidi_name(appt.patient.user)} لموعده مع "
                 f"{doctor_display_name(appt.doctor, arabic=True)} في {when_ar}."
             ),
             related=appt,

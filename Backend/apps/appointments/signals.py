@@ -8,7 +8,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from apps.core.enums import AppointmentStatus, NotificationVerb
-from apps.core.text import doctor_display_name, format_when_bilingual
+from apps.core.text import bidi_isolate, doctor_display_name, format_when_bilingual
 
 from .models import Appointment
 
@@ -89,7 +89,10 @@ def notify_on_status_change(sender, instance, created, **kwargs):
         if getattr(instance, "_skip_cancel_notification", False):
             return
         reason = f" Reason: {instance.cancellation_reason}" if instance.cancellation_reason else ""
-        reason_ar = f" السبب: {instance.cancellation_reason}" if instance.cancellation_reason else ""
+        reason_ar = (
+            f" السبب: {bidi_isolate(instance.cancellation_reason)}"
+            if instance.cancellation_reason else ""
+        )
         notify(
             recipient=recipient,
             verb=NotificationVerb.APPT_CANCELLED,

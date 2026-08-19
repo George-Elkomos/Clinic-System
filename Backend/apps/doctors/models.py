@@ -65,7 +65,6 @@ class DoctorProfile(TimeStampedModel):
     license_number = models.CharField(max_length=64, unique=True)
     bio = models.TextField(blank=True)
     bio_ar = models.TextField(blank=True)
-    full_name_ar = models.CharField(max_length=150, blank=True)
     education = models.TextField(blank=True)
     languages_spoken = models.CharField(max_length=255, blank=True)
     years_experience = models.PositiveIntegerField(default=0)

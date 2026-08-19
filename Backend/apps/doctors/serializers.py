@@ -43,6 +43,8 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     """Full read representation used across staff + patient booking screens."""
 
     full_name = serializers.CharField(source="user.get_full_name", read_only=True)
+    name_ar = serializers.CharField(source="user.name_ar", read_only=True)
+    name_en = serializers.CharField(source="user.name_en", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
     phone = serializers.CharField(source="user.phone", read_only=True)
     specialties_detail = SpecialtySerializer(source="specialties", many=True, read_only=True)
@@ -51,7 +53,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            "id", "full_name", "full_name_ar", "email", "phone",
+            "id", "full_name", "name_ar", "name_en", "email", "phone",
             "license_number", "bio", "bio_ar", "education", "languages_spoken",
             "years_experience", "consultation_fee", "avg_appointment_duration",
             "room_number", "photo", "accepts_walk_ins", "is_accepting_patients",
@@ -72,10 +74,16 @@ class DoctorProfileWriteSerializer(serializers.ModelSerializer):
     caller simply leaves them unchanged.
     """
 
+    # These live on `user`, not `DoctorProfile` — declared plain (no `source=`)
+    # so DRF hands them back flat in validated_data instead of nesting them
+    # under a "user" key, and written through manually in update() below.
+    name_ar = serializers.CharField(required=False, allow_blank=True)
+    name_en = serializers.CharField(required=False, allow_blank=True)
+
     class Meta:
         model = DoctorProfile
         fields = [
-            "bio", "bio_ar", "full_name_ar", "education", "languages_spoken",
+            "bio", "bio_ar", "name_ar", "name_en", "education", "languages_spoken",
             "years_experience", "consultation_fee", "avg_appointment_duration",
             "room_number", "photo", "accepts_walk_ins", "is_accepting_patients",
             "specialties",
@@ -93,6 +101,15 @@ class DoctorProfileWriteSerializer(serializers.ModelSerializer):
             self.fields["photo"].read_only = True
 
     def update(self, instance, validated_data):
+        name_ar = validated_data.pop("name_ar", None)
+        name_en = validated_data.pop("name_en", None)
+        if name_ar is not None or name_en is not None:
+            user = instance.user
+            if name_ar is not None:
+                user.name_ar = name_ar
+            if name_en is not None:
+                user.name_en = name_en
+            user.save()
         old_duration = instance.avg_appointment_duration
         doctor = super().update(instance, validated_data)
         if doctor.avg_appointment_duration != old_duration:
@@ -116,6 +133,8 @@ class PublicDoctorSerializer(serializers.ModelSerializer):
     """No-login doctor card: identity + specialty + aggregate rating + availability."""
 
     full_name = serializers.CharField(source="user.get_full_name", read_only=True)
+    name_ar = serializers.CharField(source="user.name_ar", read_only=True)
+    name_en = serializers.CharField(source="user.name_en", read_only=True)
     specialties_detail = SpecialtySerializer(source="specialties", many=True, read_only=True)
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
@@ -124,7 +143,7 @@ class PublicDoctorSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            "id", "full_name", "full_name_ar", "bio", "bio_ar", "photo", "room_number",
+            "id", "full_name", "name_ar", "name_en", "bio", "bio_ar", "photo", "room_number",
             "years_experience", "languages_spoken", "avg_appointment_duration",
             "consultation_fee", "accepts_walk_ins", "is_accepting_patients",
             "specialties_detail", "average_rating", "review_count", "next_available_date",

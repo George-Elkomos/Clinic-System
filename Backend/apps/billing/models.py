@@ -80,7 +80,7 @@ class Invoice(TimeStampedModel):
     )
     # Always derived: never written directly, recomputed on every save().
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
-    currency = models.CharField(max_length=8, default="USD")
+    currency = models.CharField(max_length=8, default="EGP")
     notes = models.TextField(blank=True)
 
     class Meta:

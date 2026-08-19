@@ -24,6 +24,13 @@ class User(AbstractUser):
     email = models.EmailField(_("email address"), unique=True)
     role = models.CharField(max_length=20, choices=RoleChoices.choices, db_index=True)
     phone = models.CharField(max_length=32, blank=True)
+    # Dual-language display name. Required (at the serializer level, not here)
+    # for staff/patient creation; name_en falls back to name_ar when omitted.
+    # first_name/last_name (below) are still derived from these on save() so
+    # every existing consumer (admin, PDFs, notifications, JWT claim, ...)
+    # keeps working unchanged.
+    name_ar = models.CharField(max_length=150, blank=True)
+    name_en = models.CharField(max_length=150, blank=True)
     preferred_language = models.CharField(
         max_length=5, choices=LanguageChoices.choices, default=LanguageChoices.EN
     )
@@ -47,8 +54,18 @@ class User(AbstractUser):
         return f"{self.get_full_name() or self.email} ({self.role})"
 
     def save(self, *args, **kwargs):
+        if not self.name_en:
+            self.name_en = self.name_ar
+        display_name = self.name_en or self.name_ar
+        if display_name:
+            first, _, rest = display_name.partition(" ")
+            self.first_name, self.last_name = first, rest
         self.first_name = capitalize_first(self.first_name)
         self.last_name = capitalize_first(self.last_name)
+        if "update_fields" in kwargs and kwargs["update_fields"] is not None:
+            kwargs["update_fields"] = list(
+                set(kwargs["update_fields"]) | {"name_en", "first_name", "last_name"}
+            )
         super().save(*args, **kwargs)
 
     @property

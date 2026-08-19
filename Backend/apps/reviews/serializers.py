@@ -2,13 +2,14 @@ from rest_framework import serializers
 
 from apps.appointments.models import Appointment
 from apps.core.enums import AppointmentStatus
+from apps.core.i18n import get_request_locale, localized_name
 
 from .models import Review
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True)
-    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True)
+    patient_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -17,6 +18,14 @@ class ReviewSerializer(serializers.ModelSerializer):
             "rating", "comment", "is_hidden", "created_at",
         ]
         read_only_fields = fields
+
+    def get_patient_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.patient.user, locale)
+
+    def get_doctor_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor.user, locale)
 
 
 class ReviewWriteSerializer(serializers.ModelSerializer):
@@ -46,8 +55,8 @@ class ReviewWriteSerializer(serializers.ModelSerializer):
 class ReviewModerationSerializer(serializers.ModelSerializer):
     """Manager view — includes moderation fields + reviewer/doctor names."""
 
-    patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True)
-    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True)
+    patient_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -56,6 +65,14 @@ class ReviewModerationSerializer(serializers.ModelSerializer):
             "rating", "comment", "is_hidden", "hidden_reason", "created_at",
         ]
         read_only_fields = fields
+
+    def get_patient_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.patient.user, locale)
+
+    def get_doctor_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor.user, locale)
 
 
 class HideReviewSerializer(serializers.Serializer):

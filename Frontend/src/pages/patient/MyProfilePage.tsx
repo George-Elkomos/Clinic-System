@@ -42,8 +42,8 @@ export function MyProfilePage() {
     queryFn: authApi.patientProfile,
   })
 
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
+  const [nameAr, setNameAr] = useState('')
+  const [nameEn, setNameEn] = useState('')
   const [phone, setPhone] = useState('')
   const [avatarValue, setAvatarValue] = useState<File | null | undefined>(undefined)
   const [form, setForm] = useState<Partial<PatientProfile>>({})
@@ -51,8 +51,8 @@ export function MyProfilePage() {
 
   useEffect(() => {
     if (user) {
-      setFirstName(user.first_name)
-      setLastName(user.last_name)
+      setNameAr(user.name_ar)
+      setNameEn(user.name_en)
       setPhone(user.phone)
     }
   }, [user])
@@ -82,8 +82,8 @@ export function MyProfilePage() {
     try {
       await Promise.all([
         authApi.updateMe({
-          first_name: firstName,
-          last_name: lastName,
+          name_ar: nameAr,
+          name_en: nameEn,
           phone,
           ...(avatarValue !== undefined ? { avatar: avatarValue } : {}),
         }),
@@ -124,11 +124,11 @@ export function MyProfilePage() {
         />
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label={t('auth.firstName')}>
-            {(p) => <input {...p} className={FIELD_CLASS} value={firstName} onChange={(e) => setFirstName(e.target.value)} />}
+          <FormField label={t('auth.nameAr')} hint={t('auth.nameArHint')}>
+            {(p) => <input {...p} dir="rtl" className={FIELD_CLASS} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />}
           </FormField>
-          <FormField label={t('auth.lastName')}>
-            {(p) => <input {...p} className={FIELD_CLASS} value={lastName} onChange={(e) => setLastName(e.target.value)} />}
+          <FormField label={t('auth.nameEn')} hint={t('auth.nameEnHint')}>
+            {(p) => <input {...p} className={FIELD_CLASS} value={nameEn} onChange={(e) => setNameEn(e.target.value)} />}
           </FormField>
           <FormField label={t('auth.email')}>
             {(p) => <input {...p} className={FIELD_CLASS} value={user.email} disabled />}

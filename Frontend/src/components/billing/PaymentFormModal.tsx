@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatMoney } from '../../lib/format'
+import { formatCurrency } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { billingApi } from '../../services/billing.api'
 import type { Invoice, PaymentMethod } from '../../services/types'
@@ -58,7 +58,7 @@ export function PaymentFormModal({ invoice, onClose }: PaymentFormModalProps) {
         {invoice.number} · {invoice.patient_name}
         <br />
         <span style={{ color: 'var(--text-muted)' }}>
-          {t('billing.balance')}: <strong>{formatMoney(invoice.balance, invoice.currency, language)}</strong>
+          {t('billing.balance')}: <strong>{formatCurrency(invoice.balance, language)}</strong>
         </span>
       </p>
       <form

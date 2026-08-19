@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
+import { MetaLine } from '../../components/primitives/BidiText'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
@@ -57,8 +58,12 @@ export function ReviewModerationPage() {
                 <div>
                   <StarRating value={r.rating} readOnly />
                   <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    {r.doctor_name} · {r.patient_name} · {formatDate(r.created_at, language)}
-                    {r.is_hidden ? ` · ${t('reviews.hidden')}` : ''}
+                    <MetaLine parts={[
+                      { node: formatDate(r.created_at, language), dir: 'ltr' },
+                      `${t('reviews.doctorTitle')}${r.doctor_name}`,
+                      r.patient_name,
+                      r.is_hidden ? t('reviews.hidden') : t('reviews.visible'),
+                    ]} />
                   </div>
                 </div>
                 {r.is_hidden

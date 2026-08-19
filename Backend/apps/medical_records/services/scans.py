@@ -8,7 +8,21 @@ upcoming appointment is with, falling back to whoever their most recently
 completed appointment was with. If neither exists, nobody is notified.
 """
 from apps.core.enums import AppointmentStatus, NotificationVerb
+from apps.core.text import bidi_name
 from apps.notifications.services import notify
+
+# ScanCategory.get_category_display() always renders in the process's default
+# LANGUAGE_CODE ("en") since nothing ever activates a per-request Django
+# locale — using it directly in an Arabic notification body would leak an
+# English category name (e.g. "X-Ray") into the Arabic sentence.
+_CATEGORY_LABEL_AR = {
+    "XRAY": "أشعة سينية",
+    "MRI": "رنين مغناطيسي",
+    "CT": "أشعة مقطعية",
+    "ULTRASOUND": "موجات فوق صوتية",
+    "DICOM": "DICOM",
+    "OTHER": "أخرى",
+}
 
 UPCOMING_STATUSES = (
     AppointmentStatus.PENDING,
@@ -43,12 +57,13 @@ def notify_nearest_doctor_of_scan_upload(scan) -> None:
     doctor = _nearest_doctor_for_patient(scan.patient)
     if doctor is None:
         return
+    category_ar = _CATEGORY_LABEL_AR.get(scan.category, scan.get_category_display())
     notify(
         recipient=doctor.user,
         verb=NotificationVerb.PATIENT_SCAN_UPLOADED,
         title="Patient uploaded a scan",
         title_ar="قام المريض برفع أشعة",
         body=f"{scan.patient.user.get_full_name()} uploaded a new {scan.get_category_display()} scan.",
-        body_ar=f"قام {scan.patient.user.get_full_name()} برفع أشعة {scan.get_category_display()} جديدة.",
+        body_ar=f"قام {bidi_name(scan.patient.user)} برفع أشعة {category_ar} جديدة.",
         related=scan,
     )

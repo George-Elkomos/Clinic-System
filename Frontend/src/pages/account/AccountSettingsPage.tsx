@@ -65,8 +65,8 @@ export function AccountSettingsPage() {
     queryFn: authApi.notificationPreference,
   })
 
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
+  const [nameAr, setNameAr] = useState('')
+  const [nameEn, setNameEn] = useState('')
   const [staffId, setStaffId] = useState('')
   const [assignedRoom, setAssignedRoom] = useState('')
   const [avatarValue, setAvatarValue] = useState<File | null | undefined>(undefined)
@@ -75,8 +75,8 @@ export function AccountSettingsPage() {
 
   useEffect(() => {
     if (user) {
-      setFirstName(user.first_name)
-      setLastName(user.last_name)
+      setNameAr(user.name_ar)
+      setNameEn(user.name_en)
     }
   }, [user])
 
@@ -98,8 +98,8 @@ export function AccountSettingsPage() {
     try {
       await Promise.all([
         authApi.updateMe({
-          first_name: firstName,
-          last_name: lastName,
+          name_ar: nameAr,
+          name_en: nameEn,
           ...(avatarValue !== undefined ? { avatar: avatarValue } : {}),
         }),
         authApi.updateStaffProfile({ staff_id: staffId, assigned_room: assignedRoom }),
@@ -138,11 +138,11 @@ export function AccountSettingsPage() {
         />
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label={t('auth.firstName')}>
-            {(p) => <input {...p} className={FIELD_CLASS} value={firstName} onChange={(e) => setFirstName(e.target.value)} />}
+          <FormField label={t('auth.nameAr')} hint={t('auth.nameArHint')}>
+            {(p) => <input {...p} dir="rtl" className={FIELD_CLASS} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />}
           </FormField>
-          <FormField label={t('auth.lastName')}>
-            {(p) => <input {...p} className={FIELD_CLASS} value={lastName} onChange={(e) => setLastName(e.target.value)} />}
+          <FormField label={t('auth.nameEn')} hint={t('auth.nameEnHint')}>
+            {(p) => <input {...p} className={FIELD_CLASS} value={nameEn} onChange={(e) => setNameEn(e.target.value)} />}
           </FormField>
           <FormField label={t('settings.roleTitle')}>
             {(p) => <input {...p} className={FIELD_CLASS} value={t(`roles.${user.role}`)} disabled />}

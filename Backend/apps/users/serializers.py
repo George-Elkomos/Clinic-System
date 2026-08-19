@@ -14,8 +14,8 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "email", "role", "first_name", "last_name", "full_name",
-            "phone", "preferred_language", "is_active", "date_joined",
-            "must_change_password",
+            "name_ar", "name_en", "phone", "preferred_language", "is_active",
+            "date_joined", "must_change_password",
         ]
         read_only_fields = ["id", "role", "is_active", "date_joined", "must_change_password"]
 
@@ -60,7 +60,7 @@ class MeUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "phone", "preferred_language", "avatar"]
+        fields = ["name_ar", "name_en", "phone", "preferred_language", "avatar"]
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -98,16 +98,21 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
-    """Public self-registration — patients only (staff are created by a manager)."""
+    """Public self-registration — patients only (staff are created by a manager).
+
+    Fast/flexible registration: only the Arabic name is required; the English
+    name is optional and falls back to it server-side (see User.save())."""
 
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
+    name_ar = serializers.CharField()
+    name_en = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User
         fields = [
             "email", "password", "password_confirm",
-            "first_name", "last_name", "phone", "preferred_language",
+            "name_ar", "name_en", "phone", "preferred_language",
         ]
 
     def validate(self, attrs):

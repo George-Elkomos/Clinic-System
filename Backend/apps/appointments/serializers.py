@@ -1,13 +1,14 @@
 from rest_framework import serializers
 
 from apps.core.enums import WaitlistStatus
+from apps.core.i18n import get_request_locale, localized_name
 
 from .models import Appointment, FollowUp, WaitlistEntry
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
-    patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True)
-    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True)
+    patient_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     type_display = serializers.CharField(source="get_appointment_type_display", read_only=True)
     # Lets the frontend link back to a DRAFT or already-SUBMITTED encounter
@@ -18,6 +19,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
     # Patient no-show reliability ({"score": 0-100, "label": GOOD/WATCH/HIGH_RISK}),
     # surfaced wherever an appointment card is shown (queue, desk, booking).
     patient_reliability = serializers.SerializerMethodField()
+
+    def get_patient_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.patient.user, locale)
+
+    def get_doctor_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor.user, locale)
 
     def get_encounter_id(self, obj):
         return obj.encounter.id if hasattr(obj, "encounter") else None

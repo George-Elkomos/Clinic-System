@@ -12,8 +12,8 @@ from .models import PatientProfile, User
 
 class CreateDoctorSerializer(serializers.Serializer):
     # User fields
-    first_name = serializers.CharField(max_length=150)
-    last_name = serializers.CharField(max_length=150)
+    name_ar = serializers.CharField(max_length=150)
+    name_en = serializers.CharField(max_length=150, required=False, allow_blank=True)
     email = serializers.EmailField()
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
     preferred_language = serializers.ChoiceField(
@@ -50,8 +50,8 @@ class CreateDoctorSerializer(serializers.Serializer):
 
 
 class CreateSecretarySerializer(serializers.Serializer):
-    first_name = serializers.CharField(max_length=150)
-    last_name = serializers.CharField(max_length=150)
+    name_ar = serializers.CharField(max_length=150)
+    name_en = serializers.CharField(max_length=150, required=False, allow_blank=True)
     email = serializers.EmailField()
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
     preferred_language = serializers.ChoiceField(
@@ -68,8 +68,9 @@ class CreateSecretarySerializer(serializers.Serializer):
 
 
 class CreatePatientSerializer(serializers.Serializer):
-    first_name = serializers.CharField(max_length=150)
-    last_name = serializers.CharField(max_length=150)
+    # Fast/flexible registration: only the Arabic name is required.
+    name_ar = serializers.CharField(max_length=150)
+    name_en = serializers.CharField(max_length=150, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
     email = serializers.EmailField(required=False, allow_blank=True, default="")
     national_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default="")
@@ -102,7 +103,7 @@ class UserManagementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "phone", "email"]
+        fields = ["name_ar", "name_en", "phone", "email"]
 
     def validate_email(self, value):
         qs = User.objects.filter(email=value).exclude(pk=self.instance.pk if self.instance else None)

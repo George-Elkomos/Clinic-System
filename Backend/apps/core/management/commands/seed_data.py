@@ -47,8 +47,9 @@ class Command(BaseCommand):
         self.stdout.write("Seeding clinic data...")
 
         manager = self._user("manager@clinic.test", "Maya", "Manager", RoleChoices.MANAGER,
-                              is_staff=True, is_superuser=True)
-        self._user("secretary@clinic.test", "Sam", "Secretary", RoleChoices.SECRETARY)
+                              is_staff=True, is_superuser=True, name_ar="مايا المديرة")
+        self._user("secretary@clinic.test", "Sam", "Secretary", RoleChoices.SECRETARY,
+                   name_ar="سام السكرتير")
 
         categories = {
             name: SpecialtyCategory.objects.get_or_create(
@@ -69,18 +70,21 @@ class Command(BaseCommand):
 
         doctors = []
         doctor_specs = [
-            ("dr.adams@clinic.test", "Alice", "Adams", "Cardiology", 15, "101"),
-            ("dr.benali@clinic.test", "Bilal", "Ben Ali", "Dermatology", 20, "102"),
-            ("dr.chen@clinic.test", "Chao", "Chen", "General Practice", 15, "103"),
+            ("dr.adams@clinic.test", "Alice", "Adams", "منى عدلي", "Cardiology", 15, "101"),
+            ("dr.benali@clinic.test", "Bilal", "Ben Ali", "بلال بن علي", "Dermatology", 20, "102"),
+            ("dr.chen@clinic.test", "Chao", "Chen", "تشاو تشين", "General Practice", 15, "103"),
         ]
-        for email, first, last, spec, duration, room in doctor_specs:
-            doctor = self._doctor(email, first, last, specialties[spec], duration, room)
+        for email, first, last, name_ar, spec, duration, room in doctor_specs:
+            doctor = self._doctor(email, first, last, specialties[spec], duration, room, name_ar=name_ar)
             doctors.append(doctor)
             self._weekday_schedule(doctor)
 
+        patient_names_ar = ["عمر حسن", "مريم علي", "كريم سعيد", "نور محمد"]
         patients = []
         for i in range(1, 5):
-            patients.append(self._patient(f"patient{i}@clinic.test", f"Pat{i}", "Visitor"))
+            patients.append(self._patient(
+                f"patient{i}@clinic.test", f"Pat{i}", "Visitor", name_ar=patient_names_ar[i - 1],
+            ))
 
         created = slot_generator.generate_all()
         self.stdout.write(f"  generated {created} slots")
@@ -99,12 +103,16 @@ class Command(BaseCommand):
         self.stdout.write("  Patients:  patient1@clinic.test ... patient4@clinic.test")
 
     # --- helpers ----------------------------------------------------------
-    def _user(self, email, first, last, role, is_staff=False, is_superuser=False):
+    def _user(self, email, first, last, role, is_staff=False, is_superuser=False, name_ar=""):
+        # name_en mirrors first/last so User.save()'s first/last-name derivation
+        # round-trips back to exactly what was passed in, even though name_ar
+        # (the new required-at-input field) is what actually drives it.
         user, created = User.objects.get_or_create(
             email=email,
             defaults={
                 "first_name": first, "last_name": last, "role": role,
                 "is_staff": is_staff, "is_superuser": is_superuser,
+                "name_ar": name_ar, "name_en": f"{first} {last}".strip(),
             },
         )
         if created:
@@ -117,8 +125,8 @@ class Command(BaseCommand):
             name=name, defaults={"name_ar": name_ar, "category": category}
         )[0]
 
-    def _doctor(self, email, first, last, specialty, duration, room):
-        user = self._user(email, first, last, RoleChoices.DOCTOR)
+    def _doctor(self, email, first, last, specialty, duration, room, name_ar=""):
+        user = self._user(email, first, last, RoleChoices.DOCTOR, name_ar=name_ar)
         profile, _ = DoctorProfile.objects.get_or_create(
             user=user,
             defaults={
@@ -141,8 +149,8 @@ class Command(BaseCommand):
                 defaults={"end_time": time(13, 0)},
             )
 
-    def _patient(self, email, first, last):
-        user = self._user(email, first, last, RoleChoices.PATIENT)
+    def _patient(self, email, first, last, name_ar=""):
+        user = self._user(email, first, last, RoleChoices.PATIENT, name_ar=name_ar)
         profile = user.patient_profile  # created by signal
         if not profile.date_of_birth:
             profile.date_of_birth = timezone.localdate() - timedelta(days=365 * 60)
@@ -241,11 +249,22 @@ class Command(BaseCommand):
                 result_value="Within normal range", result_date=timezone.localdate(),
             )
 
+    # Reviews are patient-submitted free text (no comment_ar column — a real
+    # review isn't pre-translated), so the fix here is simply seeding realistic
+    # Arabic feedback instead of one repeated English sentence.
+    _REVIEW_COMMENTS_AR = [
+        "طبيب متعاون وشرح لي كل حاجة كويس أوي.",
+        "انتظار قليل واهتمام كبير بالمريض، تجربة ممتازة.",
+        "دكتورة محترمة جدًا وبتسمع للمريض كويس.",
+        "خدمة سريعة والعيادة نظيفة ومنظمة.",
+    ]
+
     def _sample_reviews(self, doctors, patients):
         if Review.objects.exists():
             return
         for i, doctor in enumerate(doctors):
             Review.objects.create(
                 patient=patients[i % len(patients)], doctor=doctor,
-                rating=5 - (i % 2), comment="Very kind and helpful.",
+                rating=5 - (i % 2),
+                comment=self._REVIEW_COMMENTS_AR[i % len(self._REVIEW_COMMENTS_AR)],
             )

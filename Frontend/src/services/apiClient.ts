@@ -4,6 +4,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios'
 
+import i18n from '../i18n'
 import { tokenStore } from '../lib/tokenStore'
 
 // Authenticated client. withCredentials so the httpOnly refresh cookie is sent
@@ -15,6 +16,17 @@ export const api = axios.create({
 
 // Public, auth-free client for the no-login kiosk display.
 export const publicApi = axios.create({ baseURL: '/api' })
+
+// Backend serializers (Encounters/Invoices/AuditLogs/Reviews/Appointments) pick
+// the localized name field from this header — without it every request would
+// silently fall back to English regardless of the UI's current language.
+function setAcceptLanguage(config: InternalAxiosRequestConfig) {
+  config.headers['Accept-Language'] = i18n.resolvedLanguage ?? i18n.language ?? 'en'
+  return config
+}
+
+api.interceptors.request.use(setAcceptLanguage)
+publicApi.interceptors.request.use(setAcceptLanguage)
 
 // AuthContext registers a callback so the app can react to a hard session loss.
 let onAuthExpired: (() => void) | null = null

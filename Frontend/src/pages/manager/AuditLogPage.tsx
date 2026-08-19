@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BidiText } from '../../components/primitives/BidiText'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { FormField } from '../../components/primitives/FormField'
 import { SearchInput } from '../../components/primitives/SearchInput'
@@ -113,6 +114,18 @@ function formatGenericItem(value: unknown, translateField: (field: string) => st
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/
 
+// A `status` diff's raw value (e.g. "CONFIRMED", "IN_PROGRESS") is a model-specific
+// enum whose label lives under that model's own i18n status namespace — not
+// audit.* — since the same code can mean different things per model. Falls
+// back to the shared top-level `status.*` namespace (covers Appointment/Invoice/
+// LabOrder/RadiologyOrder, whose codes were already merged there for badges
+// elsewhere in the app) when the model doesn't have its own namespace.
+const STATUS_NAMESPACE_BY_MODEL: Record<string, string> = {
+  Encounter: 'encounters.status',
+  ClinicalProcedure: 'procedures.status',
+  RadiologyOrder: 'radiology.status',
+}
+
 export function AuditLogPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
@@ -126,18 +139,40 @@ export function AuditLogPage() {
   const translateAction = (actionCode: string, fallback: string) =>
     t(`audit.actions.${actionCode}`, { defaultValue: fallback })
 
+  // "role" and "status" diff values are enum codes (e.g. "DOCTOR", "IN_PROGRESS"),
+  // not free text — translate them via the same i18n namespaces the rest of the
+  // app already uses for role labels/status badges, instead of the raw code.
+  const translateEnumValue = (field: string, modelName: string, value: string): string | null => {
+    if (field === 'role') return t(`roles.${value}`, { defaultValue: value })
+    if (field === 'status') {
+      const modelNamespace = STATUS_NAMESPACE_BY_MODEL[modelName]
+      const viaModel = modelNamespace ? t(`${modelNamespace}.${value}`, { defaultValue: '' }) : ''
+      return viaModel || t(`status.${value}`, { defaultValue: value })
+    }
+    return null
+  }
+
   // Backend diff values are already real null/boolean/string/number (see
   // apps/audit/signals.py's _serialize) — render them for a non-technical reader
   // instead of the raw `String(null)` -> "null" / `String(false)` -> "false".
-  const formatDiffValue = (value: unknown) => {
+  const formatDiffValue = (value: unknown, field = '', modelName = '') => {
     if (value === null || value === undefined || value === '') return t('common.none')
     if (typeof value === 'boolean') return value ? t('common.yes') : t('common.no')
     if (typeof value === 'string') {
+      const enumLabel = translateEnumValue(field, modelName, value)
+      if (enumLabel !== null) return enumLabel
       if (DATE_TIME_RE.test(value)) return formatDateTime(value, language)
       if (DATE_ONLY_RE.test(value)) return formatDate(value, language)
     }
     return String(value)
   }
+
+  // A formatted date/time's Arabic AM/PM marker is a strong-RTL character —
+  // under dir="auto" that flips the isolate's base direction to RTL, which
+  // then reorders its otherwise-neutral day/month/year and hour/minute groups
+  // relative to each other. Force ltr for these specifically (see BidiText.tsx).
+  const isDateLikeValue = (value: unknown) =>
+    typeof value === 'string' && (DATE_TIME_RE.test(value) || DATE_ONLY_RE.test(value))
 
   // One side (old or new) of a non-checklist array/object diff: empty array,
   // populated array, plain dict, or a bare scalar (null/primitive) each need
@@ -207,11 +242,13 @@ export function AuditLogPage() {
                   <ActionBadge action={e.action} text={translateAction(e.action, e.action_display)} />
                   <span className="patient-text-card-title" style={{ color: 'var(--text-primary)' }}>{translateModel(e.model_name)}</span>
                 </div>
-                <span className="shrink-0 text-xs font-medium text-slate-500">{formatDateTime(e.timestamp, language)}</span>
+                <span className="shrink-0 text-xs font-medium text-slate-500"><BidiText dir="ltr">{formatDateTime(e.timestamp, language)}</BidiText></span>
               </div>
               <div className="text-sm">
-                <span className="text-slate-500">{t('audit.actor')}:</span> <span className="font-medium text-slate-800">{e.actor_email || t('audit.systemActor')}</span>
-                <span className="text-slate-500"> · {t('audit.object')}:</span> <span className="font-medium text-slate-800">{e.object_repr || t('common.none')}</span>
+                <span className="text-slate-500">{t('audit.actor')}:</span>{' '}
+                <span className="font-medium text-slate-800"><BidiText>{e.actor_email || t('audit.systemActor')}</BidiText></span>
+                <span className="text-slate-500"> · {t('audit.object')}:</span>{' '}
+                <span className="font-medium text-slate-800"><BidiText>{e.object_repr || t('common.none')}</BidiText></span>
               </div>
               {Object.keys(e.changes || {}).length > 0 && (
                 <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
@@ -263,9 +300,12 @@ export function AuditLogPage() {
                     return (
                       <div key={field} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-3 patient-text-body-secondary">
                         <span className="patient-text-body font-semibold" style={{ color: 'var(--text-primary)' }}>{translateField(field)}</span>
-                        <span className="text-slate-400 line-through">{formatDiffValue(diff.old)}</span>
-                        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>→</span>
-                        <span className="font-semibold" style={{ color: 'var(--brand-teal-start)' }}>{formatDiffValue(diff.new)}</span>
+                        <span className="text-slate-400 line-through"><BidiText dir={isDateLikeValue(diff.old) ? 'ltr' : 'auto'}>{formatDiffValue(diff.old, field, e.model_name)}</BidiText></span>
+                        {/* Under RTL, the flex row's visual order reverses (old ends up on the
+                            right, new on the left) — a fixed '→' glyph would then point the
+                            wrong way relative to the old->new progression, so mirror it. */}
+                        <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>{language === 'ar' ? '←' : '→'}</span>
+                        <span className="font-semibold" style={{ color: 'var(--brand-teal-start)' }}><BidiText dir={isDateLikeValue(diff.new) ? 'ltr' : 'auto'}>{formatDiffValue(diff.new, field, e.model_name)}</BidiText></span>
                       </div>
                     )
                   })}

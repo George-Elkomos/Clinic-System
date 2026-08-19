@@ -38,8 +38,7 @@ def specialty(db):
 def test_manager_creates_doctor(api, manager, specialty):
     api.force_authenticate(manager)
     resp = api.post(reverse("staff-create-doctor"), {
-        "first_name": "Alice",
-        "last_name": "Smith",
+        "name_ar": "أليس سميث",
         "email": "dr.alice@test.dev",
         "phone": "1111",
         "license_number": "LIC-NEW",
@@ -55,8 +54,7 @@ def test_manager_creates_doctor(api, manager, specialty):
 def test_manager_creates_doctor_with_explicit_password(api, manager):
     api.force_authenticate(manager)
     resp = api.post(reverse("staff-create-doctor"), {
-        "first_name": "Bob",
-        "last_name": "Jones",
+        "name_ar": "بوب جونز",
         "email": "dr.bob@test.dev",
         "license_number": "LIC-BOB",
         "password": "SecurePass1!",
@@ -65,14 +63,39 @@ def test_manager_creates_doctor_with_explicit_password(api, manager):
     assert resp.data["temp_password"] is None  # caller supplied password → no temp
 
 
+def test_manager_creates_doctor_with_english_name(api, manager):
+    """name_en is optional but, when given, is stored alongside name_ar."""
+    api.force_authenticate(manager)
+    resp = api.post(reverse("staff-create-doctor"), {
+        "name_ar": "كارول وايت",
+        "name_en": "Carol White",
+        "email": "dr.carol@test.dev",
+        "license_number": "LIC-CAROL",
+    }, format="json")
+    assert resp.status_code == 201
+    user = User.objects.get(email="dr.carol@test.dev")
+    assert user.name_ar == "كارول وايت"
+    assert user.name_en == "Carol White"
+
+
+def test_manager_creates_doctor_missing_name_ar_rejected(api, manager):
+    api.force_authenticate(manager)
+    resp = api.post(reverse("staff-create-doctor"), {
+        "email": "dr.noname@test.dev",
+        "license_number": "LIC-NONAME",
+    }, format="json")
+    assert resp.status_code == 400
+    assert "name_ar" in resp.data["fields"]
+
+
 def test_duplicate_email_rejected(api, manager):
     api.force_authenticate(manager)
     api.post(reverse("staff-create-doctor"), {
-        "first_name": "X", "last_name": "Y",
+        "name_ar": "س ص",
         "email": "dup@test.dev", "license_number": "LIC-X1",
     }, format="json")
     resp = api.post(reverse("staff-create-doctor"), {
-        "first_name": "X2", "last_name": "Y2",
+        "name_ar": "س٢ ص٢",
         "email": "dup@test.dev", "license_number": "LIC-X2",
     }, format="json")
     assert resp.status_code == 400
@@ -81,11 +104,11 @@ def test_duplicate_email_rejected(api, manager):
 def test_duplicate_license_rejected(api, manager):
     api.force_authenticate(manager)
     api.post(reverse("staff-create-doctor"), {
-        "first_name": "A", "last_name": "B",
+        "name_ar": "أ ب",
         "email": "dr.a@test.dev", "license_number": "LIC-SAME",
     }, format="json")
     resp = api.post(reverse("staff-create-doctor"), {
-        "first_name": "C", "last_name": "D",
+        "name_ar": "ج د",
         "email": "dr.c@test.dev", "license_number": "LIC-SAME",
     }, format="json")
     assert resp.status_code == 400
@@ -94,7 +117,7 @@ def test_duplicate_license_rejected(api, manager):
 def test_patient_cannot_create_doctor(api, patient):
     api.force_authenticate(patient)
     resp = api.post(reverse("staff-create-doctor"), {
-        "first_name": "E", "last_name": "F",
+        "name_ar": "ه و",
         "email": "dr.e@test.dev", "license_number": "LIC-E",
     }, format="json")
     assert resp.status_code == 403
@@ -105,8 +128,7 @@ def test_patient_cannot_create_doctor(api, patient):
 def test_manager_creates_secretary(api, manager):
     api.force_authenticate(manager)
     resp = api.post(reverse("staff-create-secretary"), {
-        "first_name": "Sara",
-        "last_name": "Admin",
+        "name_ar": "سارة الإدارية",
         "email": "sara@test.dev",
     }, format="json")
     assert resp.status_code == 201
@@ -117,7 +139,7 @@ def test_manager_creates_secretary(api, manager):
 def test_secretary_cannot_create_secretary(api, secretary):
     api.force_authenticate(secretary)
     resp = api.post(reverse("staff-create-secretary"), {
-        "first_name": "T", "last_name": "T", "email": "t@test.dev",
+        "name_ar": "ت ت", "email": "t@test.dev",
     }, format="json")
     assert resp.status_code == 403
 
@@ -144,7 +166,7 @@ def test_quick_created_specialty_is_searchable_and_selectable(api, manager):
     assert any(row["id"] == specialty_id for row in search_resp.data["results"])
 
     doctor_resp = api.post(reverse("staff-create-doctor"), {
-        "first_name": "Nora", "last_name": "Onc",
+        "name_ar": "نورا أونك",
         "email": "dr.nora@test.dev", "license_number": "LIC-ONC",
         "specialties": [specialty_id],
     }, format="json")
@@ -168,8 +190,7 @@ def test_secretary_cannot_create_specialty(api, secretary):
 def test_secretary_creates_minimal_patient(api, secretary):
     api.force_authenticate(secretary)
     resp = api.post(reverse("staff-create-patient"), {
-        "first_name": "Walk",
-        "last_name": "In",
+        "name_ar": "زائر جديد",
         "phone": "0500001111",
     }, format="json")
     assert resp.status_code == 201
@@ -181,18 +202,27 @@ def test_secretary_creates_minimal_patient(api, secretary):
 def test_patient_phone_or_email_required(api, secretary):
     api.force_authenticate(secretary)
     resp = api.post(reverse("staff-create-patient"), {
-        "first_name": "No", "last_name": "Contact",
+        "name_ar": "بلا تواصل",
     }, format="json")
     assert resp.status_code == 400
+
+
+def test_patient_missing_name_ar_rejected(api, secretary):
+    api.force_authenticate(secretary)
+    resp = api.post(reverse("staff-create-patient"), {
+        "phone": "0500002222",
+    }, format="json")
+    assert resp.status_code == 400
+    assert "name_ar" in resp.data["fields"]
 
 
 def test_duplicate_national_id_rejected(api, secretary):
     api.force_authenticate(secretary)
     api.post(reverse("staff-create-patient"), {
-        "first_name": "A", "last_name": "B", "phone": "111", "national_id": "ID123",
+        "name_ar": "أ ب", "phone": "111", "national_id": "ID123",
     }, format="json")
     resp = api.post(reverse("staff-create-patient"), {
-        "first_name": "C", "last_name": "D", "phone": "222", "national_id": "ID123",
+        "name_ar": "ج د", "phone": "222", "national_id": "ID123",
     }, format="json")
     assert resp.status_code == 400
 
@@ -200,7 +230,7 @@ def test_duplicate_national_id_rejected(api, secretary):
 def test_patient_cannot_create_staff_patient(api, patient):
     api.force_authenticate(patient)
     resp = api.post(reverse("staff-create-patient"), {
-        "first_name": "Z", "last_name": "Z", "phone": "000",
+        "name_ar": "ز ز", "phone": "000",
     }, format="json")
     assert resp.status_code == 403
 

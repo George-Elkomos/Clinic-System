@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.core.i18n import get_request_locale, localized_name
+
 from .models import FeeValidity, Invoice, InvoiceItem, Payment, ServiceItem
 
 
@@ -12,6 +14,12 @@ class ServiceItemSerializer(serializers.ModelSerializer):
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
+    # `description` is a frozen English snapshot taken at invoice-creation time
+    # (see billing/services.py) — when the line came from a catalog ServiceItem
+    # that also has an Arabic name, prefer that under an Arabic locale rather
+    # than adding a second frozen snapshot column.
+    description = serializers.SerializerMethodField()
+
     class Meta:
         model = InvoiceItem
         fields = [
@@ -19,6 +27,12 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
             "line_total", "source_type", "source_id",
         ]
         read_only_fields = ["line_total"]
+
+    def get_description(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        if locale == "ar" and obj.service_item_id and obj.service_item.name_ar:
+            return obj.service_item.name_ar
+        return obj.description
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -64,10 +78,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
         ]
 
     def get_patient_name(self, obj):
-        return obj.patient.get_full_name() or obj.patient.email
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.patient, locale)
 
     def get_doctor_name(self, obj):
-        return (obj.doctor.get_full_name() or obj.doctor.email) if obj.doctor else None
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor, locale)
 
 
 class FeeValiditySerializer(serializers.ModelSerializer):

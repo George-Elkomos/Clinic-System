@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { queryClient } from '../lib/queryClient'
 import type { Language } from '../services/types'
 
 interface LanguageContextValue {
@@ -32,6 +33,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       void i18n.changeLanguage(lng)
       setLanguageState(lng)
       applyDocument(lng)
+      // Several backend serializers (Encounters/Invoices/AuditLogs/Reviews/
+      // Appointments) return a locale-dependent name via Accept-Language —
+      // without this, already-fetched data keeps showing the old language
+      // until something else happens to trigger a refetch. `invalidateQueries`
+      // (not `clear`) refetches active queries in the background while still
+      // showing the current data, instead of flashing an empty state.
+      void queryClient.invalidateQueries()
     },
     [i18n],
   )

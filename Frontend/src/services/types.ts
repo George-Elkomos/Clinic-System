@@ -43,6 +43,8 @@ export interface User {
   first_name: string
   last_name: string
   full_name: string
+  name_ar: string
+  name_en: string
   phone: string
   preferred_language: Language
   must_change_password: boolean
@@ -64,7 +66,8 @@ export interface Specialty {
 export interface Doctor {
   id: number
   full_name: string
-  full_name_ar: string
+  name_ar: string
+  name_en: string
   email: string
   phone: string
   bio: string
@@ -85,7 +88,8 @@ export interface Doctor {
 export interface PublicDoctor {
   id: number
   full_name: string
-  full_name_ar: string
+  name_ar: string
+  name_en: string
   bio: string
   bio_ar: string
   photo: string | null
@@ -435,8 +439,8 @@ export interface Report {
 // --- Staff management (new) ---
 
 export interface CreateDoctorPayload {
-  first_name: string
-  last_name: string
+  name_ar: string
+  name_en?: string
   email: string
   phone?: string
   preferred_language?: string
@@ -455,8 +459,8 @@ export interface CreateDoctorResponse {
 }
 
 export interface CreateSecretaryPayload {
-  first_name: string
-  last_name: string
+  name_ar: string
+  name_en?: string
   email: string
   phone?: string
   preferred_language?: string
@@ -469,8 +473,8 @@ export interface CreateSecretaryResponse {
 }
 
 export interface CreatePatientPayload {
-  first_name: string
-  last_name: string
+  name_ar: string
+  name_en?: string
   phone?: string
   email?: string
   national_id?: string
@@ -490,6 +494,8 @@ export interface UserManagementEntry {
   first_name: string
   last_name: string
   full_name: string
+  name_ar: string
+  name_en: string
   phone: string
   preferred_language: Language
   is_active: boolean
@@ -497,8 +503,8 @@ export interface UserManagementEntry {
 }
 
 export interface UserEditPayload {
-  first_name?: string
-  last_name?: string
+  name_ar?: string
+  name_en?: string
   phone?: string
   email?: string
 }

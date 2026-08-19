@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useLanguage } from '../../hooks/useLanguage'
+import { pickLocalized, toIntlLocale } from '../../lib/format'
 import { notificationsApi } from '../../services/notifications.api'
 
 type NotificationCategory = 'confirmed' | 'pending' | 'feedback' | 'record' | 'neutral'
@@ -141,8 +142,8 @@ export function HeaderBell() {
               list.slice(0, 20).map((n) => {
                 const style = CATEGORY_STYLE[categoryForVerb(n.verb)]
                 const Icon = style.icon
-                const title = language === 'ar' && n.title_ar ? n.title_ar : n.title
-                const body = language === 'ar' && n.body_ar ? n.body_ar : n.body
+                const title = pickLocalized(n.title, n.title_ar, language)
+                const body = pickLocalized(n.body, n.body_ar, language)
                 return (
                   <button
                     key={n.id}
@@ -166,14 +167,14 @@ export function HeaderBell() {
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-semibold" style={{ color: '#1E293B' }}>
-                          {title}
+                          <bdi>{title}</bdi>
                         </span>
                         <span className="shrink-0 text-[11px]" style={{ color: '#94A3B8' }}>
-                          {relativeTime(n.created_at, language)}
+                          {relativeTime(n.created_at, toIntlLocale(language))}
                         </span>
                       </span>
                       <span className="text-xs leading-relaxed" style={{ color: '#475569' }}>
-                        {body}
+                        <bdi>{body}</bdi>
                       </span>
                     </span>
                   </button>

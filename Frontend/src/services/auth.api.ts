@@ -8,7 +8,7 @@ export interface LoginResponse {
 
 // null means "remove the current photo", a File means "upload this one",
 // undefined/omitted means "leave it alone".
-export type UpdateMePayload = Partial<Pick<User, 'first_name' | 'last_name' | 'phone'>> & {
+export type UpdateMePayload = Partial<Pick<User, 'name_ar' | 'name_en' | 'phone'>> & {
   preferred_language?: Language
   avatar?: File | null
 }
@@ -49,8 +49,8 @@ export const authApi = {
     email: string
     password: string
     password_confirm: string
-    first_name: string
-    last_name: string
+    name_ar: string
+    name_en?: string
     phone?: string
     preferred_language?: 'en' | 'ar'
   }) => api.post<User>('/auth/register/', data).then((r) => r.data),

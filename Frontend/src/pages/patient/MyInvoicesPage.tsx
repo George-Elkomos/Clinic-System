@@ -5,10 +5,11 @@ import { useTranslation } from 'react-i18next'
 
 import { InvoiceViewer } from '../../components/billing/InvoiceViewer'
 import { printInvoice } from '../../components/billing/print'
+import { BidiText, MetaLine } from '../../components/primitives/BidiText'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatDate, formatMoney } from '../../lib/format'
+import { formatCurrency, formatDate } from '../../lib/format'
 import { billingApi } from '../../services/billing.api'
 import type { Invoice, InvoiceStatus } from '../../services/types'
 
@@ -40,17 +41,17 @@ function InvoiceRow({ inv, onView }: { inv: Invoice; onView: () => void }) {
       <div className="min-w-0">
         <div className="text-base font-bold text-slate-800">{inv.number}</div>
         <div className="mt-0.5 text-xs text-slate-400">
-          {inv.doctor_name ?? '—'} · {formatDate(inv.invoice_date, language)}
+          <MetaLine parts={[inv.doctor_name ?? '—', { node: formatDate(inv.invoice_date, language), dir: 'ltr' }]} />
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-4">
         <div>
           <div className="text-sm font-semibold text-slate-700">
-            {t('billing.total')}: {formatMoney(inv.total, inv.currency, language)}
+            {t('billing.total')}: <BidiText>{formatCurrency(inv.total, language)}</BidiText>
           </div>
           {inv.status !== 'PAID' && (
             <div className="text-xs font-medium text-rose-500">
-              {t('billing.balance')}: {formatMoney(inv.balance, inv.currency, language)}
+              {t('billing.balance')}: <BidiText>{formatCurrency(inv.balance, language)}</BidiText>
             </div>
           )}
         </div>

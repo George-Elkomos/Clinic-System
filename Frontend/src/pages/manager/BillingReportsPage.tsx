@@ -7,7 +7,7 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatMoney } from '../../lib/format'
+import { formatCurrency } from '../../lib/format'
 import { billingApi } from '../../services/billing.api'
 
 type Period = 'day' | 'month' | 'year'
@@ -35,8 +35,8 @@ export function BillingReportsPage() {
     queryFn: () => billingApi.report(period),
   })
 
-  // Currency comes from backend settings; report money is all one currency.
-  const money = (v: string) => formatMoney(v, data?.currency ?? 'USD', language)
+  // System is single-currency (EGP).
+  const money = (v: string) => formatCurrency(v, language)
   const maxBilled = Math.max(
     1,
     ...(data?.revenue_by_doctor ?? []).map((d) => parseFloat(d.total_billed)),

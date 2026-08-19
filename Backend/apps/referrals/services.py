@@ -12,6 +12,7 @@ from django.db import transaction
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.core.enums import DoctorPatientSource, NotificationVerb, ReferralStatus, RoleChoices
+from apps.core.text import bidi_name, doctor_display_name
 from apps.notifications.services import notify
 
 from .models import Referral
@@ -35,8 +36,8 @@ def create_referral(*, encounter, doctor, **data):
             verb=NotificationVerb.REFERRAL_CREATED,
             title="New patient referral",
             title_ar="إحالة مريض جديدة",
-            body=f"Dr. {doctor.user.get_full_name()} referred {referral.patient.user.get_full_name()} to you.",
-            body_ar=f"أحال إليك د. {doctor.user.get_full_name()} المريض {referral.patient.user.get_full_name()}.",
+            body=f"{doctor_display_name(doctor)} referred {referral.patient.user.get_full_name()} to you.",
+            body_ar=f"أحال إليك {doctor_display_name(doctor, arabic=True)} المريض {bidi_name(referral.patient.user)}.",
             related=referral,
         )
     return referral
@@ -65,8 +66,8 @@ def accept_referral(referral, doctor):
             verb=NotificationVerb.REFERRAL_ACCEPTED,
             title="Referral accepted",
             title_ar="تم قبول الإحالة",
-            body=f"Dr. {doctor.user.get_full_name()} accepted your referral for {referral.patient.user.get_full_name()}.",
-            body_ar=f"وافق د. {doctor.user.get_full_name()} على إحالتك للمريض {referral.patient.user.get_full_name()}.",
+            body=f"{doctor_display_name(doctor)} accepted your referral for {referral.patient.user.get_full_name()}.",
+            body_ar=f"وافق {doctor_display_name(doctor, arabic=True)} على إحالتك للمريض {bidi_name(referral.patient.user)}.",
             related=referral,
         )
     return referral
@@ -97,8 +98,8 @@ def complete_referral(referral, doctor):
             verb=NotificationVerb.REFERRAL_COMPLETED,
             title="Referral completed",
             title_ar="تم إتمام الإحالة",
-            body=f"Dr. {doctor.user.get_full_name()} completed your referral for {referral.patient.user.get_full_name()}.",
-            body_ar=f"أتم د. {doctor.user.get_full_name()} إحالتك للمريض {referral.patient.user.get_full_name()}.",
+            body=f"{doctor_display_name(doctor)} completed your referral for {referral.patient.user.get_full_name()}.",
+            body_ar=f"أتم {doctor_display_name(doctor, arabic=True)} إحالتك للمريض {bidi_name(referral.patient.user)}.",
             related=referral,
         )
     return referral
@@ -127,7 +128,7 @@ def cancel_referral(referral, user):
             title="Referral cancelled",
             title_ar="تم إلغاء الإحالة",
             body=f"The referral for {referral.patient.user.get_full_name()} was cancelled.",
-            body_ar=f"تم إلغاء الإحالة الخاصة بالمريض {referral.patient.user.get_full_name()}.",
+            body_ar=f"تم إلغاء الإحالة الخاصة بالمريض {bidi_name(referral.patient.user)}.",
             related=referral,
         )
     if notify_recipient is not None and notify_recipient.user_id != user.id:
@@ -137,7 +138,7 @@ def cancel_referral(referral, user):
             title="Referral cancelled",
             title_ar="تم إلغاء الإحالة",
             body=f"The referral for {referral.patient.user.get_full_name()} was cancelled.",
-            body_ar=f"تم إلغاء الإحالة الخاصة بالمريض {referral.patient.user.get_full_name()}.",
+            body_ar=f"تم إلغاء الإحالة الخاصة بالمريض {bidi_name(referral.patient.user)}.",
             related=referral,
         )
     return referral

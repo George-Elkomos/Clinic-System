@@ -34,7 +34,7 @@ env = environ.Env(
     BILLING_FOLLOWUP_DAYS=(int, 14),
     BILLING_INVOICE_DUE_DAYS=(int, 7),
     BILLING_DEFAULT_CONSULTATION_PRICE=(str, "50.00"),
-    BILLING_CURRENCY=(str, "USD"),
+    BILLING_CURRENCY=(str, "EGP"),
 )
 
 # Read .env if present (sibling of manage.py).

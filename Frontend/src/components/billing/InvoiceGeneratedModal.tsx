@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatMoney } from '../../lib/format'
+import { formatCurrency } from '../../lib/format'
 import { billingApi } from '../../services/billing.api'
 import type { AppointmentBilling } from '../../services/types'
 import { Modal } from '../primitives/Modal'
@@ -60,7 +60,7 @@ export function InvoiceGeneratedModal({ billing, onClose }: InvoiceGeneratedModa
         {t('billing.invoiceGenerated', {
           number: billing.invoice_number,
           total: billing.invoice_total
-            ? formatMoney(billing.invoice_total, invoice?.currency ?? 'USD', language)
+            ? formatCurrency(billing.invoice_total, language)
             : '',
         })}
       </p>

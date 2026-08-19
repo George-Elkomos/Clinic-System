@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.core.enums import AppointmentType
+from apps.core.i18n import get_request_locale, localized_name
 from apps.medical_records.serializers import LabOrderListSerializer, PrescriptionSerializer
 from apps.procedures.serializers import ClinicalProcedureListSerializer
 from apps.radiology.serializers import RadiologyOrderListSerializer
@@ -37,7 +38,7 @@ class PreviousEncounterSummarySerializer(serializers.ModelSerializer):
     so the doctor has the last diagnosis/prescriptions/notes without leaving
     the page (see EncounterReadSerializer.get_previous_encounter)."""
 
-    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True, default="")
+    doctor_name = serializers.SerializerMethodField()
     diagnosis_detail = DiagnosisSerializer(source="diagnosis", read_only=True)
     prescriptions = PrescriptionSerializer(many=True, read_only=True)
 
@@ -49,10 +50,14 @@ class PreviousEncounterSummarySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def get_doctor_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor.user, locale) or ""
+
 
 class EncounterReadSerializer(serializers.ModelSerializer):
-    patient_name = serializers.CharField(source="patient.user.get_full_name", read_only=True, default="")
-    doctor_name = serializers.CharField(source="doctor.user.get_full_name", read_only=True, default="")
+    patient_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
     diagnosis_detail = DiagnosisSerializer(source="diagnosis", read_only=True)
     vitals_detail = VitalSignsReadSerializer(source="vitals", read_only=True)
     prescriptions = PrescriptionSerializer(many=True, read_only=True)
@@ -79,7 +84,15 @@ class EncounterReadSerializer(serializers.ModelSerializer):
         previous = getattr(origin_followup.origin_appointment, "encounter", None)
         if previous is None:
             return None
-        return PreviousEncounterSummarySerializer(previous).data
+        return PreviousEncounterSummarySerializer(previous, context=self.context).data
+
+    def get_patient_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.patient.user, locale) or ""
+
+    def get_doctor_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor.user, locale) or ""
 
     class Meta:
         model = Encounter

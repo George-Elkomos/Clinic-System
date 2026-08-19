@@ -4,6 +4,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.core.enums import LabOrderPriority, LabOrderStatus, NotificationVerb
+from apps.core.text import bidi_isolate, bidi_name
 from apps.notifications.services import notify
 
 from ..models import LabOrder, LabOrderResult, SampleCollection
@@ -35,7 +36,7 @@ def submit_order(order: LabOrder) -> LabOrder:
         title="Lab order submitted",
         title_ar="تم إرسال طلب التحليل",
         body=f"Your lab order {order.order_number} has been submitted.",
-        body_ar=f"تم إرسال طلب التحليل الخاص بك {order.order_number}.",
+        body_ar=f"تم إرسال طلب التحليل الخاص بك {bidi_isolate(order.order_number)}.",
         related=order,
     )
     return order
@@ -141,7 +142,7 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
         title="Lab results available",
         title_ar="نتائج التحليل متاحة",
         body=f"Results for order {order.order_number} are ready.",
-        body_ar=f"نتائج طلب التحليل {order.order_number} جاهزة الآن.",
+        body_ar=f"نتائج طلب التحليل {bidi_isolate(order.order_number)} جاهزة الآن.",
         related=order,
     )
     notify(
@@ -150,7 +151,7 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
         title="Lab results ready for review",
         title_ar="نتائج التحليل جاهزة للمراجعة",
         body=f"Results for {order.patient.user.get_full_name()} ({order.order_number}) are ready.",
-        body_ar=f"نتائج {order.patient.user.get_full_name()} ({order.order_number}) جاهزة الآن.",
+        body_ar=f"نتائج {bidi_name(order.patient.user)} ({bidi_isolate(order.order_number)}) جاهزة الآن.",
         related=order,
     )
     if has_critical:
@@ -162,7 +163,7 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
             title="CRITICAL lab result",
             title_ar="نتيجة تحليل حرجة",
             body=f"Critical value in order {order.order_number} — immediate review required.",
-            body_ar=f"قيمة حرجة في طلب التحليل {order.order_number} — يتطلب مراجعة فورية.",
+            body_ar=f"قيمة حرجة في طلب التحليل {bidi_isolate(order.order_number)} — يتطلب مراجعة فورية.",
             related=order,
             channels=["sms", "whatsapp"],
         )
@@ -178,7 +179,7 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
                 "Please contact the clinic immediately."
             ),
             body_ar=(
-                f"تم رصد قيمة حرجة في طلب التحليل الخاص بك {order.order_number}. "
+                f"تم رصد قيمة حرجة في طلب التحليل الخاص بك {bidi_isolate(order.order_number)}. "
                 "يرجى التواصل مع العيادة فورًا."
             ),
             related=order,
@@ -198,7 +199,7 @@ def review_order(order: LabOrder) -> LabOrder:
         title="Lab results reviewed",
         title_ar="تمت مراجعة نتائج التحليل",
         body=f"Your doctor has reviewed the results for order {order.order_number}.",
-        body_ar=f"قام طبيبك بمراجعة نتائج طلب التحليل {order.order_number}.",
+        body_ar=f"قام طبيبك بمراجعة نتائج طلب التحليل {bidi_isolate(order.order_number)}.",
         related=order,
     )
     return order
@@ -224,7 +225,7 @@ def cancel_order(order: LabOrder, reason: str, cancelled_by) -> LabOrder:
         title="Lab order cancelled",
         title_ar="تم إلغاء طلب التحليل",
         body=f"Your lab order {order.order_number} has been cancelled.",
-        body_ar=f"تم إلغاء طلب التحليل الخاص بك {order.order_number}.",
+        body_ar=f"تم إلغاء طلب التحليل الخاص بك {bidi_isolate(order.order_number)}.",
         related=order,
     )
     return order

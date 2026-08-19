@@ -53,8 +53,8 @@ class CreateDoctorView(APIView):
             user = User(
                 role=RoleChoices.DOCTOR,
                 email=d["email"],
-                first_name=d["first_name"],
-                last_name=d["last_name"],
+                name_ar=d["name_ar"],
+                name_en=d.get("name_en", ""),
                 phone=d.get("phone", ""),
                 preferred_language=d.get("preferred_language", "en"),
             )
@@ -108,8 +108,8 @@ class CreateSecretaryView(APIView):
             user = User(
                 role=RoleChoices.SECRETARY,
                 email=d["email"],
-                first_name=d["first_name"],
-                last_name=d["last_name"],
+                name_ar=d["name_ar"],
+                name_en=d.get("name_en", ""),
                 phone=d.get("phone", ""),
                 preferred_language=d.get("preferred_language", "en"),
             )
@@ -149,8 +149,8 @@ class CreatePatientView(APIView):
             user = User(
                 role=RoleChoices.PATIENT,
                 email=email,
-                first_name=d["first_name"],
-                last_name=d["last_name"],
+                name_ar=d["name_ar"],
+                name_en=d.get("name_en", ""),
                 phone=d.get("phone", ""),
             )
             user.set_password(temp_password)

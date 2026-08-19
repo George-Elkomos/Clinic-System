@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 
+import { BidiText, MetaLine } from '../../components/primitives/BidiText'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { FormField } from '../../components/primitives/FormField'
 import { Modal } from '../../components/primitives/Modal'
@@ -460,7 +461,7 @@ function PreviousVisitCard({ previous }: { previous: NonNullable<Encounter['prev
     <div className={CARD}>
       <h2 className="patient-text-card-title mb-3" style={{ color: 'var(--text-primary)' }}>{t('encounters.previousVisit')}</h2>
       <p className="patient-text-body-secondary mb-2" style={{ color: 'var(--text-secondary)' }}>
-        {formatDate(previous.encounter_date, language)}{previous.doctor_name ? ` · ${previous.doctor_name}` : ''}
+        <MetaLine parts={[{ node: formatDate(previous.encounter_date, language), dir: 'ltr' }, previous.doctor_name]} />
       </p>
       {previous.chief_complaint && (
         <p className="patient-text-body mb-2" style={{ color: 'var(--text-primary)' }}>{previous.chief_complaint}</p>
@@ -720,7 +721,7 @@ export function EncounterPage() {
       <div>
         <Breadcrumbs trail={[{ label: t('encounters.title') }]} />
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>{t('encounters.title')} — {encounter.patient_name}</h1>
+          <h1 className="patient-text-page-title" style={{ color: 'var(--text-primary)' }}>{t('encounters.title')} — <BidiText>{encounter.patient_name}</BidiText></h1>
           <StatusPill text={t(`encounters.status.${encounter.status}`)} className={ENCOUNTER_STATUS_BADGE[encounter.status] ?? ENCOUNTER_STATUS_BADGE.DRAFT} />
           {encounter.appointment_type && (
             <StatusPill

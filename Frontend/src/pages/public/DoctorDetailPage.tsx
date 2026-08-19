@@ -11,7 +11,7 @@ import { StarRating } from '../../components/primitives/StarRating'
 import { useToast } from '../../components/primitives/Toast'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatDate, formatMoney, formatTime } from '../../lib/format'
+import { formatCurrency, formatDate, formatTime } from '../../lib/format'
 import { appointmentsApi } from '../../services/appointments.api'
 import { errorMessage, publicApi } from '../../services/apiClient'
 import type { Paginated, PublicDoctor, Review, TimeSlot } from '../../services/types'
@@ -226,7 +226,7 @@ export function DoctorDetailPage() {
                   {t('doctors.consultationFee')}
                 </dt>
                 <dd className="mt-1 text-sm font-bold text-slate-800">
-                  {formatMoney(doctor.consultation_fee, 'USD', language)}
+                  {formatCurrency(doctor.consultation_fee, language)}
                 </dd>
               </div>
             )}

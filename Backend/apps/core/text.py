@@ -1,20 +1,39 @@
 """Small text-normalization helpers shared across apps."""
 
-_AR_MONTHS = (
-    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
-)
+# Unicode First Strong Isolate / Pop Directional Isolate. Wrapping an embedded
+# run of text in these marks tells the Unicode Bidi Algorithm to resolve that
+# run's direction from its own content, independent of the surrounding
+# sentence. Without this, a Latin-script name/code/date embedded near the end
+# of an Arabic (RTL) sentence can drag trailing punctuation (؟ . ,) to the
+# wrong visual side. Plain Unicode characters work in-string, so this fixes
+# plain-text channels (email/SMS/WhatsApp) as well as in-app HTML rendering.
+_FSI = "⁦"
+_PDI = "⁩"
+
+
+def bidi_isolate(value) -> str:
+    """Isolate a value about to be embedded inside a sentence that may run in
+    the opposite direction (a name, reference code, or date inside an Arabic
+    sentence)."""
+    text = str(value)
+    return f"{_FSI}{text}{_PDI}" if text else text
+
+
+def bidi_name(user) -> str:
+    """Full name (no honorific), isolated for embedding inside an Arabic
+    sentence."""
+    return bidi_isolate(user.get_full_name() or user.email)
 
 
 def format_when_bilingual(dt) -> tuple[str, str]:
     """Render a datetime for notification text in both languages.
 
-    Used instead of a single strftime() so an Arabic notification body never
-    ends up with an English month abbreviation stuck in the middle of it.
-    Returns (english, arabic).
+    Returns (english, arabic). The Arabic side uses the numeric ar-EG style
+    (dd/mm/yyyy, HH:MM) rather than a spelled-out month, and is pre-isolated
+    since it's always embedded inside an Arabic sentence.
     """
     en = dt.strftime("%d %b %Y, %H:%M")
-    ar = f"{dt.day} {_AR_MONTHS[dt.month - 1]} {dt.year}، {dt.strftime('%H:%M')}"
+    ar = bidi_isolate(dt.strftime("%d/%m/%Y, %H:%M"))
     return en, ar
 
 
@@ -23,9 +42,11 @@ def doctor_display_name(doctor, *, arabic: bool = False) -> str:
 
     Doesn't touch DoctorProfile.__str__ (used app-wide for admin/PDF/English
     contexts) since only bilingual notification text needs the Arabic form.
+    The Arabic form isolates just the name so a Latin-script name doesn't
+    disrupt the surrounding Arabic sentence.
     """
     name = doctor.user.get_full_name() or doctor.user.email
-    return f"د. {name}" if arabic else f"Dr. {name}"
+    return f"د. {bidi_isolate(name)}" if arabic else f"Dr. {name}"
 
 
 def capitalize_first(value: str) -> str:

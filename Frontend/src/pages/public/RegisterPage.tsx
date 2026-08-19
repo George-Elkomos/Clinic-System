@@ -23,8 +23,8 @@ export function RegisterPage() {
   const [error, setError] = useState('')
   const [fieldErrs, setFieldErrs] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
-    first_name: '',
-    last_name: '',
+    name_ar: '',
+    name_en: '',
     phone: '',
     email: '',
     password: '',
@@ -54,7 +54,7 @@ export function RegisterPage() {
       // of this form's own inputs (e.g. a network error, or a rejected
       // password_confirm — which can't happen here since both fields share
       // one value — has nothing to attach to).
-      const knownFields = ['first_name', 'last_name', 'phone', 'email', 'password']
+      const knownFields = ['name_ar', 'name_en', 'phone', 'email', 'password']
       const hasFieldError = Object.keys(errs).some((key) => knownFields.includes(key))
       setError(hasFieldError ? '' : errorMessage(err, t('auth.registerFailed')))
     } finally {
@@ -82,27 +82,27 @@ export function RegisterPage() {
               already supplies; space-y-* would be a second, inert declaration
               for the same blocked property. */}
           <form onSubmit={submit} noValidate>
-            <FormField label={t('auth.firstName')} error={fieldErrs.first_name}>
+            <FormField label={t('auth.nameAr')} hint={t('auth.nameArHint')} error={fieldErrs.name_ar}>
               {(p) => (
                 <input
                   {...p}
-                  value={form.first_name}
-                  onChange={(e) => update('first_name', e.target.value)}
-                  autoComplete="given-name"
+                  dir="rtl"
+                  value={form.name_ar}
+                  onChange={(e) => update('name_ar', e.target.value)}
+                  autoComplete="name"
                   required
                   className={AUTH_INPUT_CLASS}
                 />
               )}
             </FormField>
 
-            <FormField label={t('auth.lastName')} error={fieldErrs.last_name}>
+            <FormField label={t('auth.nameEn')} hint={t('auth.nameEnHint')} error={fieldErrs.name_en}>
               {(p) => (
                 <input
                   {...p}
-                  value={form.last_name}
-                  onChange={(e) => update('last_name', e.target.value)}
-                  autoComplete="family-name"
-                  required
+                  value={form.name_en}
+                  onChange={(e) => update('name_en', e.target.value)}
+                  autoComplete="name"
                   className={AUTH_INPUT_CLASS}
                 />
               )}
