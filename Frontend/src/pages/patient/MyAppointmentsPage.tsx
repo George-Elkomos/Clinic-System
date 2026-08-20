@@ -40,9 +40,12 @@ function doctorInitials(name: string) {
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('')
 }
 
-type ApptFilter = 'all' | 'upcoming' | 'completed'
+type ApptFilter = 'all' | 'upcoming' | 'history'
 type ApptSort = 'newest' | 'oldest' | 'doctor'
 const UPCOMING_STATUSES: AppointmentStatus[] = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS']
+// Everything past/resolved — including auto-EXPIRED bookings — belongs in
+// History, never in the active "upcoming" list.
+const HISTORY_STATUSES: AppointmentStatus[] = ['COMPLETED', 'CANCELLED', 'EXPIRED', 'NO_SHOW']
 
 function TodayStatusCard({ appt }: { appt: Appointment }) {
   const { t } = useTranslation()
@@ -231,7 +234,7 @@ export function MyAppointmentsPage() {
   )
   const filteredAppointments = appointments.filter((a) => {
     if (filter === 'upcoming') return UPCOMING_STATUSES.includes(a.status)
-    if (filter === 'completed') return a.status === 'COMPLETED'
+    if (filter === 'history') return HISTORY_STATUSES.includes(a.status)
     return true
   })
   const sortedAppointments = [...filteredAppointments].sort((a, b) => {
@@ -242,7 +245,7 @@ export function MyAppointmentsPage() {
   const FILTERS: { key: ApptFilter; label: string }[] = [
     { key: 'all', label: t('appointments.filterAll') },
     { key: 'upcoming', label: t('appointments.filterUpcoming') },
-    { key: 'completed', label: t('appointments.filterCompleted') },
+    { key: 'history', label: t('appointments.filterHistory') },
   ]
   const SORTS: { key: ApptSort; label: string }[] = [
     { key: 'newest', label: t('appointments.sortNewest') },

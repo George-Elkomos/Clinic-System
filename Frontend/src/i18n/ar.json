@@ -176,7 +176,9 @@
     "selectDoctorFirst": "يرجى اختيار طبيب لعرض الأوقات المتاحة.",
     "patientOnly": "يرجى تسجيل الدخول أو إنشاء حساب لحجز هذا الموعد.",
     "confirmBook": "تأكيد وحجز الموعد",
-    "notAcceptingBanner": "الدكتور {{name}} لا يستقبل مواعيد جديدة حاليًا."
+    "notAcceptingBanner": "الدكتور {{name}} لا يستقبل مواعيد جديدة حاليًا.",
+    "slotAlreadyBooked": "هذا الموعد محجوز بالفعل، يرجى اختيار وقت آخر.",
+    "slotBookedLabel": "محجوز"
   },
   "overrideModal": {
     "reasonLabel": "سبب تجاوز الإعداد",
@@ -211,7 +213,8 @@
     "complete": "إنهاء",
     "filterAll": "الكل",
     "filterUpcoming": "القادمة",
-    "filterCompleted": "المكتملة",
+    "filterHistory": "السجل",
+    "statusConfirmedArrived": "مؤكد / تم الوصول",
     "noResults": "لا توجد مواعيد تطابق هذا التصفية.",
     "sortLabel": "ترتيب المواعيد",
     "sortNewest": "الأحدث أولاً",

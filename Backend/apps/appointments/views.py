@@ -1,3 +1,4 @@
+import django_filters
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -32,11 +33,28 @@ from .serializers import (
 STAFF_ROLES = (RoleChoices.SECRETARY, RoleChoices.MANAGER)
 
 
+class _CharInFilter(django_filters.BaseInFilter, django_filters.CharFilter):
+    """Comma-separated exact-match list, e.g. ?status=CONFIRMED,CHECKED_IN.
+
+    Mirrors billing.views._CharInFilter — needed so the secretary desk's
+    "Confirmed / Arrived" filter bucket can span both statuses in one request
+    instead of hiding CHECKED_IN appointments from a plain single-value filter.
+    """
+
+
+class AppointmentFilter(django_filters.FilterSet):
+    status = _CharInFilter(field_name="status")
+
+    class Meta:
+        model = Appointment
+        fields = ["status", "doctor", "appointment_type"]
+
+
 class AppointmentViewSet(viewsets.ModelViewSet):
     serializer_class = AppointmentSerializer
     permission_classes = [AppointmentPermission]
     http_method_names = ["get", "post", "patch", "head", "options"]
-    filterset_fields = ["status", "doctor", "appointment_type"]
+    filterset_class = AppointmentFilter
 
     def get_queryset(self):
         qs = Appointment.objects.select_related(

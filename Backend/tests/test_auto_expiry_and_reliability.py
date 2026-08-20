@@ -137,8 +137,21 @@ def test_reliability_high_risk_below_50(patient, doctor_profile):
     assert patient_reliability(profile) == {"score": 25, "label": "HIGH_RISK"}
 
 
-def test_reliability_ignores_expired_and_cancelled(patient, doctor_profile):
+def test_reliability_ignores_cancelled(patient, doctor_profile):
     profile = patient.patient_profile
-    _past_no_show(profile, doctor_profile, status=AppointmentStatus.EXPIRED)
     _past_no_show(profile, doctor_profile, status=AppointmentStatus.CANCELLED)
     assert patient_reliability(profile) == {"score": 100, "label": "GOOD"}
+
+
+def test_reliability_drops_per_expired(patient, doctor_profile):
+    profile = patient.patient_profile
+    _past_no_show(profile, doctor_profile, status=AppointmentStatus.EXPIRED)
+    _past_no_show(profile, doctor_profile, status=AppointmentStatus.EXPIRED)
+    assert patient_reliability(profile) == {"score": 50, "label": "WATCH"}
+
+
+def test_reliability_combines_no_show_and_expired(patient, doctor_profile):
+    profile = patient.patient_profile
+    _past_no_show(profile, doctor_profile, status=AppointmentStatus.NO_SHOW)
+    _past_no_show(profile, doctor_profile, status=AppointmentStatus.EXPIRED)
+    assert patient_reliability(profile) == {"score": 50, "label": "WATCH"}

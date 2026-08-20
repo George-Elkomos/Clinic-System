@@ -12,6 +12,9 @@ export interface ComboOption {
   // patient combobox on the booking page carries reliability here so the
   // page can show a warning banner once a patient is picked).
   reliability?: Reliability
+  // The doctor combobox on the patient booking page carries this so the page
+  // can show the selected doctor's consultation fee once picked.
+  consultation_fee?: string | null
 }
 
 interface AsyncComboboxProps {

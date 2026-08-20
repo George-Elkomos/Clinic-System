@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarCheck, CalendarX, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { AsyncCombobox, type ComboOption } from '../../components/primitives/AsyncCombobox'
@@ -8,7 +8,7 @@ import { CustomDatePicker } from '../../components/primitives/CustomDatePicker'
 import { CenteredSpinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { useLanguage } from '../../hooks/useLanguage'
-import { formatTime } from '../../lib/format'
+import { formatCurrency, formatTime, localizedName, pickLocalized } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
 import { doctorsApi } from '../../services/doctors.api'
@@ -17,18 +17,6 @@ import { waitlistApi } from '../../services/waitlist.api'
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
-
-// Backend already supports `search` across the doctor's name and specialty
-// (apps/doctors/views.py DoctorProfileViewSet.search_fields) — just needed
-// a picker that surfaces it, so this reuses the shared async-search combobox
-// instead of the old plain unsearchable dropdown.
-const doctorFetcher = (query: string): Promise<ComboOption[]> =>
-  doctorsApi.list({ search: query || undefined }).then((res) =>
-    res.results.map((d) => ({
-      value: d.id,
-      label: d.full_name + (d.specialties_detail[0] ? ` · ${d.specialties_detail[0].name}` : ''),
-    })),
-  )
 
 export function BookAppointmentPage() {
   const { t } = useTranslation()
@@ -42,11 +30,40 @@ export function BookAppointmentPage() {
   const [reason, setReason] = useState('')
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
 
+  // Backend already supports `search` across the doctor's name and specialty
+  // (apps/doctors/views.py DoctorProfileViewSet.search_fields) — just needed
+  // a picker that surfaces it, so this reuses the shared async-search combobox
+  // instead of the old plain unsearchable dropdown. Depends on `language` so
+  // Arabic sessions always search/display the doctor's name_ar, never full_name.
+  const doctorFetcher = useCallback(
+    (query: string): Promise<ComboOption[]> =>
+      doctorsApi.list({ search: query || undefined }).then((res) =>
+        res.results.map((d) => ({
+          value: d.id,
+          label:
+            pickLocalized(d.full_name, d.name_ar, language) +
+            (d.specialties_detail[0] ? ` · ${localizedName(d.specialties_detail[0], language)}` : ''),
+          consultation_fee: d.consultation_fee,
+        })),
+      ),
+    [language],
+  )
+
+  // Includes already-BOOKED slots (not just AVAILABLE) so they render
+  // greyed-out/disabled instead of silently disappearing from the grid.
   const { data: slots, isLoading: slotsLoading } = useQuery({
     queryKey: ['slots', doctorId, date],
-    queryFn: () => doctorsApi.availableSlots(Number(doctorId), date),
+    queryFn: () => doctorsApi.availableSlots(Number(doctorId), date, true),
     enabled: doctorId !== '',
   })
+
+  const onPickSlot = (slot: { id: number; status: string }) => {
+    if (slot.status !== 'AVAILABLE') {
+      showToast(t('booking.slotAlreadyBooked'), 'error')
+      return
+    }
+    setSelectedSlot(slot.id)
+  }
 
   const booking = useMutation({
     mutationFn: (slot: number) => appointmentsApi.book(slot, reason),
@@ -87,6 +104,11 @@ export function BookAppointmentPage() {
                 setSelectedSlot(null)
               }}
             />
+            {doctor?.consultation_fee != null && (
+              <div className="mt-2.5 inline-flex items-center gap-2 rounded-xl border border-[#3BC9CB]/30 bg-[#3BC9CB]/10 px-3.5 py-2 text-sm font-semibold text-[#0D9488]">
+                {t('doctors.consultationFee')}: {formatCurrency(doctor.consultation_fee, language)}
+              </div>
+            )}
           </div>
 
           <div>
@@ -143,20 +165,27 @@ export function BookAppointmentPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {(slots ?? []).map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSelectedSlot(s.id)}
-                className={`flex h-11 cursor-pointer items-center justify-center rounded-xl border text-sm font-medium transition-all ${
-                  selectedSlot === s.id
-                    ? 'border-transparent bg-[#3BC9CB] font-semibold text-white shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-[#3BC9CB] hover:text-[#0D9488]'
-                }`}
-              >
-                {formatTime(s.start_datetime, language)}
-              </button>
-            ))}
+            {(slots ?? []).map((s) => {
+              const booked = s.status !== 'AVAILABLE'
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-disabled={booked}
+                  title={booked ? t('booking.slotAlreadyBooked') : undefined}
+                  onClick={() => onPickSlot(s)}
+                  className={`flex h-11 items-center justify-center rounded-xl border text-sm font-medium transition-all ${
+                    booked
+                      ? 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300 line-through'
+                      : selectedSlot === s.id
+                        ? 'cursor-pointer border-transparent bg-[#3BC9CB] font-semibold text-white shadow-sm'
+                        : 'cursor-pointer border-slate-200 bg-white text-slate-700 hover:border-[#3BC9CB] hover:text-[#0D9488]'
+                  }`}
+                >
+                  {formatTime(s.start_datetime, language)}
+                </button>
+              )
+            })}
           </div>
         )}
 

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useLanguage } from '../../hooks/useLanguage'
 import { pickLocalized, toIntlLocale } from '../../lib/format'
 import { notificationsApi } from '../../services/notifications.api'
+import { CenteredSpinner } from '../primitives/Spinner'
 
 type NotificationCategory = 'confirmed' | 'pending' | 'feedback' | 'record' | 'neutral'
 
@@ -69,7 +70,7 @@ export function HeaderBell() {
     refetchInterval: 30_000,
   })
 
-  const { data: list = [] } = useQuery({
+  const { data: list = [], isLoading: listLoading } = useQuery({
     queryKey: ['notifications', 'list'],
     queryFn: notificationsApi.list,
     enabled: open,
@@ -134,7 +135,9 @@ export function HeaderBell() {
           </div>
 
           <div className="patient-thin-scrollbar overflow-y-auto">
-            {list.length === 0 ? (
+            {listLoading ? (
+              <CenteredSpinner />
+            ) : list.length === 0 ? (
               <p className="px-5 py-6 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 {t('notifications.none')}
               </p>

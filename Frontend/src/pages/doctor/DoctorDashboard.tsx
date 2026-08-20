@@ -106,7 +106,12 @@ export function DoctorDashboard() {
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
-  const rows = (data?.results ?? []).filter((a) => a.status !== 'CANCELLED')
+  // Today's queue only shows patients ready to be seen (or already being/been
+  // seen) — PENDING bookings haven't been confirmed by the front desk yet, so
+  // they don't belong in the doctor's active view (nor do CANCELLED/EXPIRED/
+  // NO_SHOW, which never needed a doctor's attention).
+  const ACTIVE_QUEUE_STATUSES: Appointment['status'][] = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED']
+  const rows = (data?.results ?? []).filter((a) => ACTIVE_QUEUE_STATUSES.includes(a.status))
   const isOpenable = (a: Appointment) => a.status === 'CONFIRMED' || a.status === 'CHECKED_IN' || a.status === 'IN_PROGRESS'
 
   return (

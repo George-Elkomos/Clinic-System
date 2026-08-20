@@ -176,7 +176,9 @@
     "selectDoctorFirst": "Please choose a doctor to see available times.",
     "patientOnly": "Please sign in or create an account to book this appointment.",
     "confirmBook": "Confirm & Book Appointment",
-    "notAcceptingBanner": "Dr. {{name}} is not currently accepting new appointments."
+    "notAcceptingBanner": "Dr. {{name}} is not currently accepting new appointments.",
+    "slotAlreadyBooked": "This slot is already booked, please select another time.",
+    "slotBookedLabel": "Booked"
   },
   "overrideModal": {
     "reasonLabel": "Reason for override",
@@ -211,7 +213,8 @@
     "complete": "Complete",
     "filterAll": "All",
     "filterUpcoming": "Upcoming",
-    "filterCompleted": "Completed",
+    "filterHistory": "History",
+    "statusConfirmedArrived": "Confirmed / Arrived",
     "noResults": "No appointments match this filter.",
     "sortLabel": "Sort appointments",
     "sortNewest": "Newest First",

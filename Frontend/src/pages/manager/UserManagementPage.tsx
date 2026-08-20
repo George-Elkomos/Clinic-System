@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 
+import { ReliabilityBadge } from '../../components/ReliabilityBadge'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
 import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { SearchInput } from '../../components/primitives/SearchInput'
@@ -164,6 +165,9 @@ export function UserManagementPage() {
                   <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('auth.email')}</th>
                   <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('auth.phone')}</th>
                   <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('staff.status')}</th>
+                  {role === 'PATIENT' && (
+                    <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('reliability.title')}</th>
+                  )}
                   <th className="patient-text-overline hidden px-3 py-2 text-left sm:table-cell" style={{ color: 'var(--text-muted)' }}>{t('staff.joined')}</th>
                   <th className="patient-text-overline px-3 py-2 text-left" style={{ color: 'var(--text-muted)' }}>{t('common.actions')}</th>
                 </tr>
@@ -181,6 +185,11 @@ export function UserManagementPage() {
                         {user.is_active ? t('staff.active') : t('staff.inactive')}
                       </span>
                     </td>
+                    {role === 'PATIENT' && (
+                      <td className="px-3 py-2.5">
+                        {user.reliability ? <ReliabilityBadge reliability={user.reliability} /> : t('common.none')}
+                      </td>
+                    )}
                     <td className="hidden px-3 py-2.5 patient-text-body-secondary sm:table-cell" style={{ color: 'var(--text-muted)' }}>{formatDate(user.date_joined, language)}</td>
                     <td className="px-3 py-2.5">
                       <div className="flex flex-wrap gap-2">

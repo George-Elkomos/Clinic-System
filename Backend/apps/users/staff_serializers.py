@@ -8,6 +8,7 @@ from apps.core.enums import LanguageChoices, RoleChoices
 from apps.doctors.models import DoctorProfile, Specialty
 
 from .models import PatientProfile, User
+from .serializers import UserSerializer
 
 
 class CreateDoctorSerializer(serializers.Serializer):
@@ -110,3 +111,25 @@ class UserManagementSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return value
+
+
+class ManagerUserListSerializer(UserSerializer):
+    """UserListView only (manager's User Management screen). Adds the
+    no-show reliability score to PATIENT rows — deliberately not on the
+    shared UserSerializer, which also backs each user's own /auth/me, where a
+    patient must never see their own score (Secretary/Manager-only per spec)."""
+
+    reliability = serializers.SerializerMethodField()
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ["reliability"]
+
+    def get_reliability(self, obj):
+        if obj.role != RoleChoices.PATIENT:
+            return None
+        profile = getattr(obj, "patient_profile", None)
+        if profile is None:
+            return None
+        from .services import patient_reliability
+
+        return patient_reliability(profile)

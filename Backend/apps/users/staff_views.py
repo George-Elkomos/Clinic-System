@@ -18,6 +18,7 @@ from .staff_serializers import (
     CreateDoctorSerializer,
     CreatePatientSerializer,
     CreateSecretarySerializer,
+    ManagerUserListSerializer,
     UserManagementSerializer,
 )
 
@@ -187,7 +188,7 @@ class UserListView(APIView):
         role = request.query_params.get("role", "").upper()
         search = request.query_params.get("search", "").strip()
 
-        qs = User.objects.all()
+        qs = User.objects.select_related("patient_profile").all()
         if role in RoleChoices.values:
             qs = qs.filter(role=role)
         if search:
@@ -199,7 +200,7 @@ class UserListView(APIView):
                 | Q(phone__icontains=search)
             )
         qs = qs.order_by("first_name", "last_name")
-        return Response(UserSerializer(qs, many=True).data)
+        return Response(ManagerUserListSerializer(qs, many=True).data)
 
 
 # ---------------------------------------------------------------------------

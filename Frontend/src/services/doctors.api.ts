@@ -23,9 +23,11 @@ export const doctorsApi = {
   createSpecialty: (name: string) =>
     api.post<Specialty>('/specialties/', { name }).then((r) => r.data),
 
-  availableSlots: (doctorId: number, date?: string) =>
+  availableSlots: (doctorId: number, date?: string, includeBooked?: boolean) =>
     api
-      .get<TimeSlot[]>('/slots/available/', { params: { doctor: doctorId, date } })
+      .get<TimeSlot[]>('/slots/available/', {
+        params: { doctor: doctorId, date, include_booked: includeBooked ? 'true' : undefined },
+      })
       .then((r) => r.data),
 
   schedules: (doctorId?: number) =>

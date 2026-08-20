@@ -14,7 +14,19 @@ import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
 import type { Appointment, AppointmentStatus } from '../../services/types'
 
-const STATUSES: AppointmentStatus[] = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+// The desk only ever needs to filter by these five buckets — CONFIRMED and
+// CHECKED_IN collapse into one "Confirmed / Arrived" option (comma-separated
+// value -> AppointmentFilter's status__in on the backend) since front-desk
+// staff don't need to distinguish "confirmed but not yet arrived" from
+// "arrived" here. IN_PROGRESS is the doctor's live-queue concern, not the
+// desk's, so it's deliberately not offered.
+const STATUS_FILTERS: { value: string; labelKey: string }[] = [
+  { value: 'PENDING', labelKey: 'status.PENDING' },
+  { value: 'CONFIRMED,CHECKED_IN', labelKey: 'appointments.statusConfirmedArrived' },
+  { value: 'COMPLETED', labelKey: 'status.COMPLETED' },
+  { value: 'CANCELLED', labelKey: 'status.CANCELLED' },
+  { value: 'EXPIRED', labelKey: 'status.EXPIRED' },
+]
 
 const STATUS_BADGE: Record<AppointmentStatus, string> = {
   PENDING: 'bg-amber-50 text-amber-700 border-amber-200/60',
@@ -91,7 +103,7 @@ export function AppointmentDeskPage() {
               id={p.id}
               options={[
                 { value: '', label: t('appointments.filterAll') },
-                ...STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) })),
+                ...STATUS_FILTERS.map((s) => ({ value: s.value, label: t(s.labelKey) })),
               ]}
               value={status}
               onChange={(v) => setStatus(Array.isArray(v) ? '' : String(v))}

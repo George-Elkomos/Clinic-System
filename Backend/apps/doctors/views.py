@@ -118,8 +118,14 @@ class DoctorAbsenceViewSet(DoctorSelfServiceCreateMixin, viewsets.ModelViewSet):
 
 
 class AvailableSlotsView(ListAPIView):
-    """Future AVAILABLE slots for a doctor (the patient booking calendar feed).
-    Required query param: ?doctor=<id>. Optional: ?date=YYYY-MM-DD."""
+    """Future slots for a doctor (the patient booking calendar feed).
+    Required query param: ?doctor=<id>. Optional: ?date=YYYY-MM-DD.
+
+    Returns only AVAILABLE slots by default. Pass ?include_booked=true to
+    also get already-BOOKED ones (still carrying their real `status`) so a
+    caller can render them as a disabled/greyed option instead of just
+    omitting them — used by the patient booking page so a taken time doesn't
+    silently vanish from the grid."""
 
     serializer_class = TimeSlotSerializer
     permission_classes = [AllowAny]
@@ -129,8 +135,11 @@ class AvailableSlotsView(ListAPIView):
     def get_queryset(self):
         from django.utils import timezone
 
+        statuses = [SlotStatus.AVAILABLE]
+        if self.request.query_params.get("include_booked") == "true":
+            statuses.append(SlotStatus.BOOKED)
         qs = TimeSlot.objects.filter(
-            status=SlotStatus.AVAILABLE, start_datetime__gte=timezone.now()
+            status__in=statuses, start_datetime__gte=timezone.now()
         )
         doctor_id = self.request.query_params.get("doctor")
         if doctor_id:

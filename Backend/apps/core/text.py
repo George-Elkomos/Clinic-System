@@ -42,11 +42,16 @@ def doctor_display_name(doctor, *, arabic: bool = False) -> str:
 
     Doesn't touch DoctorProfile.__str__ (used app-wide for admin/PDF/English
     contexts) since only bilingual notification text needs the Arabic form.
-    The Arabic form isolates just the name so a Latin-script name doesn't
-    disrupt the surrounding Arabic sentence.
+    The Arabic form prioritizes the doctor's own name_ar (falling back to the
+    English name only if it's blank) so an Arabic notification never reads a
+    Latin-script name; it isolates whatever name it ends up with so a
+    Latin-script fallback doesn't disrupt the surrounding Arabic sentence.
     """
+    if arabic:
+        name = doctor.user.name_ar or doctor.user.get_full_name() or doctor.user.email
+        return f"د. {bidi_isolate(name)}"
     name = doctor.user.get_full_name() or doctor.user.email
-    return f"د. {bidi_isolate(name)}" if arabic else f"Dr. {name}"
+    return f"Dr. {name}"
 
 
 def capitalize_first(value: str) -> str:

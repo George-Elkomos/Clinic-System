@@ -500,6 +500,8 @@ export interface UserManagementEntry {
   preferred_language: Language
   is_active: boolean
   date_joined: string
+  // Manager-only: no-show reliability score, PATIENT rows only (null otherwise).
+  reliability: Reliability | null
 }
 
 export interface UserEditPayload {
