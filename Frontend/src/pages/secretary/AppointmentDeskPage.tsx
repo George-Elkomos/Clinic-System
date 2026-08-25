@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
-import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
@@ -42,14 +41,16 @@ const STATUS_BADGE: Record<AppointmentStatus, string> = {
 const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60'
 const BTN_DANGER = 'inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-medium text-rose-600 transition-all hover:bg-rose-100 disabled:opacity-60'
+const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
 
 export function AppointmentDeskPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const { showToast } = useToast()
-  const confirm = useConfirm()
   const qc = useQueryClient()
   const [status, setStatus] = useState<string>('PENDING')
+  const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['appointments', 'desk', status],
@@ -66,25 +67,23 @@ export function AppointmentDeskPage() {
   })
 
   const cancelAppt = useMutation({
-    mutationFn: (id: number) => appointmentsApi.cancel(id),
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => appointmentsApi.cancel(id, reason),
     onSuccess: () => {
       showToast(t('appointments.cancelled'), 'success')
       qc.invalidateQueries({ queryKey: ['appointments'] })
+      setCancelTarget(null)
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
-  const onCancel = async (a: Appointment) => {
-    const ok = await confirm({
-      title: t('appointments.cancel'),
-      message: t('appointments.cancelConfirm', {
-        name: a.patient_name,
-        when: formatDateTime(a.scheduled_start, language),
-      }),
-      confirmLabel: t('appointments.cancel'),
-      danger: true,
-    })
-    if (ok) cancelAppt.mutate(a.id)
+  const onCancel = (a: Appointment) => {
+    setCancelReason('')
+    setCancelTarget(a)
+  }
+
+  const confirmCancel = () => {
+    if (!cancelTarget) return
+    cancelAppt.mutate({ id: cancelTarget.id, reason: cancelReason.trim() })
   }
 
   const rows = data?.results ?? []
@@ -148,6 +147,48 @@ export function AppointmentDeskPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {cancelTarget && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="desk-cancel-title"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setCancelTarget(null) }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="patient-text-card-title mb-3" id="desk-cancel-title" style={{ color: 'var(--text-primary)' }}>
+              {t('appointments.cancel')}
+            </h2>
+            <p className="patient-text-body mb-4" style={{ color: 'var(--text-secondary)' }}>
+              {t('appointments.cancelConfirm', {
+                name: cancelTarget.patient_name,
+                when: formatDateTime(cancelTarget.scheduled_start, language),
+              })}
+            </p>
+            <FormField label={t('appointments.cancelReasonLabel')}>
+              {(p) => (
+                <textarea
+                  {...p}
+                  className="patient-field"
+                  rows={2}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder={t('appointments.cancelReasonPlaceholder')}
+                />
+              )}
+            </FormField>
+            <div className="mt-2 flex flex-wrap justify-end gap-3">
+              <button type="button" onClick={() => setCancelTarget(null)} className={BTN_SECONDARY}>
+                {t('common.keep')}
+              </button>
+              <button type="button" disabled={cancelAppt.isPending} onClick={confirmCancel} className={BTN_DANGER}>
+                {cancelAppt.isPending && <Spinner size={14} />}{t('appointments.cancel')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { OverrideWarningModal } from '../../components/OverrideWarningModal'
 import { ReliabilityBadge } from '../../components/ReliabilityBadge'
 import { Breadcrumbs } from '../../components/primitives/Breadcrumbs'
+import { useConfirm } from '../../components/primitives/ConfirmDialog'
 import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
@@ -23,6 +24,7 @@ const CARD = 'rounded-2xl border border-[#F3F4F6] bg-white p-5 shadow-sm sm:p-6'
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] border border-[#0B7A70] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0B7A70] transition-all disabled:opacity-60 sm:text-sm'
 const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60 sm:text-sm'
 const BTN_SECONDARY_SM = 'inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-60'
+const BTN_DANGER_SM = 'inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-100 transition-all disabled:opacity-60'
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-amber-50 text-amber-700 border-amber-200/60',
@@ -42,6 +44,7 @@ export function QueueBoardPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const qc = useQueryClient()
   const [doctorId, setDoctorId] = useState<number | ''>('')
   const [patientSearch, setPatientSearch] = useState('')
@@ -95,28 +98,32 @@ export function QueueBoardPage() {
   }
 
   const transition = useMutation({
-    mutationFn: ({ id, action }: { id: number; action: 'checkIn' | 'start' | 'complete' | 'markEmergency' }) =>
+    mutationFn: ({ id, action }: { id: number; action: 'checkIn' | 'start' | 'markEmergency' | 'noShow' }) =>
       appointmentsApi[action](id),
     onSuccess: () => invalidate(),
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
+  // Completion happens only inside the doctor's encounter ("Submit & Close
+  // Encounter") -- IN_PROGRESS appointments get no action button here.
   const nextAction = (a: Appointment) => {
     if (a.status === 'CONFIRMED') return { action: 'checkIn' as const, label: t('appointments.checkIn') }
     if (a.status === 'CHECKED_IN') return { action: 'start' as const, label: t('appointments.start') }
-    if (a.status === 'IN_PROGRESS') return { action: 'complete' as const, label: t('appointments.complete') }
     return null
   }
 
-  const handleTransition = (a: Appointment, action: 'checkIn' | 'start' | 'complete' | 'markEmergency') => {
-    // The backend rejects completing a visit with no documented clinical
-    // encounter (Finding #3) — catch the common case client-side so the
-    // desk gets a clear pointer instead of a raw error after clicking.
-    if (action === 'complete' && a.encounter_id == null) {
-      showToast(t('queue.completeNoEncounterBlocked'), 'error')
-      return
-    }
+  const handleTransition = (a: Appointment, action: 'checkIn' | 'start' | 'markEmergency' | 'noShow') => {
     transition.mutate({ id: a.id, action })
+  }
+
+  const handleNoShow = async (a: Appointment) => {
+    const ok = await confirm({
+      title: t('queue.noShow'),
+      message: t('queue.noShowConfirm'),
+      confirmLabel: t('queue.noShow'),
+      danger: true,
+    })
+    if (ok) transition.mutate({ id: a.id, action: 'noShow' })
   }
 
   const rows = (queue?.results ?? [])
@@ -219,6 +226,11 @@ export function QueueBoardPage() {
                         {a.appointment_type !== 'EMERGENCY' && (
                           <button type="button" onClick={() => transition.mutate({ id: a.id, action: 'markEmergency' })} className={BTN_SECONDARY_SM}>
                             {t('queue.markEmergency')}
+                          </button>
+                        )}
+                        {['CONFIRMED', 'CHECKED_IN'].includes(a.status) && (
+                          <button type="button" onClick={() => handleNoShow(a)} className={BTN_DANGER_SM}>
+                            {t('queue.noShow')}
                           </button>
                         )}
                         {action && (

@@ -206,6 +206,8 @@
     "cancelWarning": "لا يمكن التراجع عن هذا الإجراء. سيتم إخطار طبيبك فورًا.",
     "cancelDetails": "إلغاء الموعد مع <b>{{name}}</b> في <b>{{when}}</b>.",
     "cancelled": "تم إلغاء موعدك.",
+    "cancelReasonLabel": "السبب (اختياري)",
+    "cancelReasonPlaceholder": "سبب الإلغاء…",
     "confirm": "تأكيد",
     "confirmed": "تم تأكيد الموعد.",
     "checkIn": "تسجيل الوصول",

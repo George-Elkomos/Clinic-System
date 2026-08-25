@@ -206,6 +206,8 @@
     "cancelWarning": "This action cannot be undone. Your doctor will be notified right away.",
     "cancelDetails": "Cancelling appointment with <b>{{name}}</b> on <b>{{when}}</b>.",
     "cancelled": "Your appointment was cancelled.",
+    "cancelReasonLabel": "Reason (optional)",
+    "cancelReasonPlaceholder": "Reason for cancelling…",
     "confirm": "Confirm",
     "confirmed": "Appointment confirmed.",
     "checkIn": "Check in",
