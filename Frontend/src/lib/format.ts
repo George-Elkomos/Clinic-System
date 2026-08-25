@@ -34,6 +34,19 @@ export function formatTime(iso: string, locale: string): string {
   )
 }
 
+// Formats a bare wall-clock "HH:mm" / "HH:mm:ss" string (e.g. a doctor's
+// WorkingSchedule start_time/end_time) that has no date component, so
+// formatTime's `new Date(iso)` parse doesn't apply. Builds a same-day local
+// Date from the hour/minute and reuses formatTime's Intl/bidi-stripping
+// logic, so this always renders 12-hour AM/PM / ص-م like the rest of the app.
+export function formatTimeOfDay(hhmm: string, locale: string): string {
+  if (!hhmm) return ''
+  const [hours, minutes] = hhmm.split(':').map(Number)
+  const d = new Date()
+  d.setHours(hours, minutes, 0, 0)
+  return formatTime(d.toISOString(), locale)
+}
+
 // Currency display for billing (amounts arrive as decimal strings from DRF).
 // The system is single-currency (Egyptian Pound) — the number itself always
 // uses Western digits (Intl's ar-EG default renders Arabic-Indic digits,

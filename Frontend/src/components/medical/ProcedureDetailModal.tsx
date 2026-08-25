@@ -9,6 +9,7 @@ import { StatusBadge } from '../primitives/StatusBadge'
 import { useToast } from '../primitives/Toast'
 import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
+import { formatDateTime } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { proceduresApi } from '../../services/procedures.api'
 import type { ClinicalProcedure } from '../../services/types'
@@ -19,8 +20,6 @@ interface Props {
   onClose: () => void
   onChanged?: () => void
 }
-
-const formatDateTime = (value: string | null) => (value ? new Date(value).toLocaleString() : '—')
 
 export function ProcedureDetailModal({ procedureId, onClose, onChanged }: Props) {
   const { t } = useTranslation()
@@ -125,8 +124,8 @@ export function ProcedureDetailModal({ procedureId, onClose, onChanged }: Props)
       </div>
 
       <div className="procedure-detail__timer">
-        <span>{t('procedures.startedAt')}: {formatDateTime(procedure.start_time)}</span>
-        <span>{t('procedures.endedAt')}: {formatDateTime(procedure.end_time)}</span>
+        <span>{t('procedures.startedAt')}: {procedure.start_time ? formatDateTime(procedure.start_time, language) : '—'}</span>
+        <span>{t('procedures.endedAt')}: {procedure.end_time ? formatDateTime(procedure.end_time, language) : '—'}</span>
       </div>
 
       {procedure.status === 'CANCELLED' && procedure.cancellation_reason && (

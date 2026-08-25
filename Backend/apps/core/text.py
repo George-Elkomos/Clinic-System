@@ -28,12 +28,18 @@ def bidi_name(user) -> str:
 def format_when_bilingual(dt) -> tuple[str, str]:
     """Render a datetime for notification text in both languages.
 
-    Returns (english, arabic). The Arabic side uses the numeric ar-EG style
-    (dd/mm/yyyy, HH:MM) rather than a spelled-out month, and is pre-isolated
-    since it's always embedded inside an Arabic sentence.
+    Returns (english, arabic). Both sides use a 12-hour clock with an
+    explicit period marker (AM/PM, ص/م) rather than 24-hour military time --
+    strftime's %p is locale-independent (always "AM"/"PM" in the C locale
+    Python runs under), so the ص/م marker is built by hand instead. The
+    Arabic side uses the numeric ar-EG date style (dd/mm/yyyy) rather than a
+    spelled-out month, and is pre-isolated since it's always embedded inside
+    an Arabic sentence.
     """
-    en = dt.strftime("%d %b %Y, %H:%M")
-    ar = bidi_isolate(dt.strftime("%d/%m/%Y, %H:%M"))
+    hour12 = dt.hour % 12 or 12
+    minute = f"{dt.minute:02d}"
+    en = f"{dt.strftime('%d %b %Y')}, {hour12}:{minute} {'AM' if dt.hour < 12 else 'PM'}"
+    ar = bidi_isolate(f"{dt.strftime('%d/%m/%Y')}, {hour12}:{minute} {'ص' if dt.hour < 12 else 'م'}")
     return en, ar
 
 

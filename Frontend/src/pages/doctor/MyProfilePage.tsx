@@ -11,7 +11,9 @@ import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
 import { ChangePasswordForm } from '../../components/settings/ChangePasswordForm'
 import { useAuth } from '../../hooks/useAuth'
+import { useLanguage } from '../../hooks/useLanguage'
 import { LANGUAGE_OPTIONS, parseLanguages } from '../../lib/languages'
+import { formatTimeOfDay } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { authApi } from '../../services/auth.api'
 import { doctorsApi } from '../../services/doctors.api'
@@ -25,6 +27,7 @@ const BTN_SECONDARY = 'inline-flex items-center justify-center gap-2 rounded-xl 
 export function MyProfilePage() {
   const { t } = useTranslation()
   const { user, refreshUser } = useAuth()
+  const { language } = useLanguage()
   const { showToast } = useToast()
   const qc = useQueryClient()
   const navigate = useNavigate()
@@ -298,7 +301,7 @@ export function MyProfilePage() {
           <div className="flex flex-wrap gap-2">
             {schedules.map((s) => (
               <span key={s.id} className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700">
-                {s.weekday_display}: {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
+                {s.weekday_display}: {formatTimeOfDay(s.start_time, language)}–{formatTimeOfDay(s.end_time, language)}
               </span>
             ))}
           </div>

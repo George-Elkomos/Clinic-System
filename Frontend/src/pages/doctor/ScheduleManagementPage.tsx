@@ -8,6 +8,8 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { useLanguage } from '../../hooks/useLanguage'
+import { formatTimeOfDay } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { doctorsApi } from '../../services/doctors.api'
 
@@ -21,6 +23,7 @@ function todayISO() {
 
 export function ScheduleManagementPage() {
   const { t } = useTranslation()
+  const { language } = useLanguage()
   const { showToast } = useToast()
   const confirm = useConfirm()
   const qc = useQueryClient()
@@ -109,7 +112,7 @@ export function ScheduleManagementPage() {
             {(schedules ?? []).map((s) => (
               <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <span className="patient-text-body" style={{ color: 'var(--text-primary)' }}>
-                  <strong>{t(`schedule.days.${s.weekday}`)}</strong> · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
+                  <strong>{t(`schedule.days.${s.weekday}`)}</strong> · {formatTimeOfDay(s.start_time, language)}–{formatTimeOfDay(s.end_time, language)}
                 </span>
                 <button type="button" onClick={() => onRemove(s.id)} className={BTN_DANGER}>{t('schedule.remove')}</button>
               </div>

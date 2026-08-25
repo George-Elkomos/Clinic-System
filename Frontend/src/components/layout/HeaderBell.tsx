@@ -107,8 +107,8 @@ export function HeaderBell() {
       </button>
 
       {open && (
-        <div className="absolute end-0 top-[calc(100%+8px)] z-50 flex max-h-[480px] w-[380px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10">
-          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
+        <div className="fixed inset-x-3 top-[88px] z-50 flex max-h-[380px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 sm:absolute sm:inset-x-auto sm:end-0 sm:top-[calc(100%+8px)] sm:w-[380px]">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-3">
             <div className="flex items-center gap-2">
               <span className="text-base font-semibold" style={{ color: '#1E293B' }}>
                 {t('notifications.title')}
@@ -152,7 +152,7 @@ export function HeaderBell() {
                     key={n.id}
                     type="button"
                     onClick={() => !n.is_read && void markOne(n.id)}
-                    className={`flex w-full items-start gap-3.5 border-0 border-b border-slate-100 px-5 py-3.5 text-start transition-colors duration-150 last:border-0 ${
+                    className={`flex w-full items-start gap-2.5 border-0 border-b border-slate-100 px-4 py-2.5 text-start transition-colors duration-150 last:border-0 ${
                       n.is_read ? 'bg-white hover:bg-slate-50/60' : 'bg-slate-50/80 hover:bg-slate-100/80'
                     }`}
                   >
@@ -162,12 +162,12 @@ export function HeaderBell() {
                       aria-hidden="true"
                     />
                     <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
                       style={{ background: style.bg }}
                     >
-                      <Icon size={16} style={{ color: style.color }} />
+                      <Icon size={14} style={{ color: style.color }} />
                     </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-semibold" style={{ color: '#1E293B' }}>
                           <bdi>{title}</bdi>
@@ -176,7 +176,7 @@ export function HeaderBell() {
                           {relativeTime(n.created_at, toIntlLocale(language))}
                         </span>
                       </span>
-                      <span className="text-xs leading-relaxed" style={{ color: '#475569' }}>
+                      <span className="text-xs leading-snug" style={{ color: '#475569' }}>
                         <bdi>{body}</bdi>
                       </span>
                     </span>

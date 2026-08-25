@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
 import { errorMessage } from '../../services/apiClient'
 import { saveBlob } from '../../lib/download'
+import { formatDateTime } from '../../lib/format'
 import { medicalApi } from '../../services/medical.api'
 import { radiologyApi } from '../../services/radiology.api'
 import type { RadiologyOrder } from '../../services/types'
@@ -20,8 +21,6 @@ interface Props {
   onClose: () => void
   onChanged?: () => void
 }
-
-const formatDateTime = (value: string | null) => (value ? new Date(value).toLocaleString() : '—')
 
 export function RadiologyOrderDetailModal({ orderId, onClose, onChanged }: Props) {
   const { t } = useTranslation()
@@ -130,7 +129,7 @@ export function RadiologyOrderDetailModal({ orderId, onClose, onChanged }: Props
 
       <div className="procedure-detail__timer">
         <span>{order.patient_name} · {order.doctor_name}</span>
-        <span>{formatDateTime(order.created_at)}</span>
+        <span>{formatDateTime(order.created_at, language)}</span>
       </div>
 
       {order.clinical_reason && (

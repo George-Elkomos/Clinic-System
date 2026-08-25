@@ -247,7 +247,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         """Doctor's live queue: previous, current, and next appointment with patient details."""
         if request.user.role != RoleChoices.DOCTOR:
             raise PermissionDenied("Only doctors can view the live queue.")
-        today = timezone.now().date()
+        # localdate(), not now().date() -- the latter truncates in UTC, which
+        # misclassifies early-morning local appointments (e.g. 2 AM Cairo) as
+        # "yesterday" against the __date lookups below (those convert to
+        # settings.TIME_ZONE via USE_TZ, i.e. local time already).
+        today = timezone.localdate()
         by_doctor = Appointment.objects.select_related(
             "patient__user", "doctor__user", "time_slot"
         ).filter(doctor__user=request.user)
@@ -285,7 +289,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appt = self.get_object()
         if request.user.role == RoleChoices.PATIENT and appt.patient.user != request.user:
             raise PermissionDenied()
-        today = appt.scheduled_start.date()
+        # localtime() first -- scheduled_start is UTC-aware, and .date() alone
+        # would truncate in UTC instead of settings.TIME_ZONE (same class of
+        # bug as my_queue above), misgrouping early-morning appointments.
+        today = timezone.localtime(appt.scheduled_start).date()
         waiting = [AppointmentStatus.CHECKED_IN, AppointmentStatus.CONFIRMED]
         ahead = Appointment.objects.filter(
             doctor=appt.doctor, scheduled_start__date=today, status__in=waiting,

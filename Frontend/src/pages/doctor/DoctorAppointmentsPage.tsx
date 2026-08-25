@@ -16,7 +16,18 @@ import { appointmentsApi } from '../../services/appointments.api'
 import { followupsApi } from '../../services/followups.api'
 import type { Appointment, AppointmentStatus } from '../../services/types'
 
-const STATUSES: AppointmentStatus[] = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+// Filter dropdown collapses to the 4 core buckets a doctor actually thinks in
+// terms of -- CONFIRMED/CHECKED_IN merge into one "Confirmed" value (comma-
+// separated -> AppointmentFilter's status__in on the backend), mirroring the
+// secretary desk's AppointmentDeskPage.tsx. IN_PROGRESS isn't offered as a
+// filter at all since those rows are always pinned above regardless of the
+// selected filter (see `pinnedRows` below), so they'd never be hidden anyway.
+const STATUS_FILTERS: { value: string; labelKey: string }[] = [
+  { value: 'PENDING', labelKey: 'status.PENDING' },
+  { value: 'CONFIRMED,CHECKED_IN', labelKey: 'appointments.statusConfirmedArrived' },
+  { value: 'COMPLETED', labelKey: 'status.COMPLETED' },
+  { value: 'CANCELLED', labelKey: 'status.CANCELLED' },
+]
 // Opening the chart from any of these statuses is what starts the visit — the
 // doctor no longer clicks a separate manual check-in/start button.
 const OPENABLE_STATUSES: AppointmentStatus[] = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS']
@@ -169,7 +180,7 @@ export function DoctorAppointmentsPage() {
               id={p.id}
               options={[
                 { value: '', label: t('appointments.filterAll') },
-                ...STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) })),
+                ...STATUS_FILTERS.map((f) => ({ value: f.value, label: t(f.labelKey) })),
               ]}
               value={status}
               onChange={(v) => setStatus(Array.isArray(v) ? '' : String(v))}
