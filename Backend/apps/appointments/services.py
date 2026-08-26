@@ -11,6 +11,7 @@ from apps.core.enums import (
     AppointmentStatus,
     AppointmentType,
     NotificationVerb,
+    RoleChoices,
     SlotStatus,
 )
 from apps.core.text import bidi_name, doctor_display_name, format_when_bilingual
@@ -54,7 +55,7 @@ def book_slot(*, patient, slot_id, reason="", created_by=None,
     slot.status = SlotStatus.BOOKED
     slot.save(update_fields=["status"])
 
-    return Appointment.objects.create(
+    appointment = Appointment.objects.create(
         patient=patient,
         doctor=slot.doctor,
         time_slot=slot,
@@ -67,6 +68,24 @@ def book_slot(*, patient, slot_id, reason="", created_by=None,
         is_manual_override=is_manual_override,
         override_reason=override_reason if is_manual_override else "",
     )
+
+    # Only alert the desk when the *patient* is the one who just created the
+    # booking -- staff booking on a patient's behalf already know about it.
+    if getattr(created_by, "role", None) == RoleChoices.PATIENT:
+        when, when_ar = format_when_bilingual(appointment.scheduled_start)
+        _notify_secretaries(
+            verb=NotificationVerb.APPT_BOOKED,
+            title="New booking awaiting confirmation",
+            title_ar="حجز جديد بانتظار التأكيد",
+            body=f"{bidi_name(patient.user)} booked an appointment with {appointment.doctor} on {when}.",
+            body_ar=(
+                f"قام {bidi_name(patient.user)} بحجز موعد مع "
+                f"{doctor_display_name(appointment.doctor, arabic=True)} في {when_ar}."
+            ),
+            related=appointment,
+        )
+
+    return appointment
 
 
 @transaction.atomic
@@ -82,8 +101,17 @@ def confirm_appointment(appointment):
 
 @transaction.atomic
 def cancel_appointment(appointment, *, cancelled_by, reason="", enforce_window=False):
-    """Cancel an appointment and free its slot (kept BLOCKED-free for rebooking)."""
-    if not appointment.is_active:
+    """Cancel an appointment and free its slot (kept BLOCKED-free for rebooking).
+
+    NO_SHOW is cancellable on top of is_active's own PENDING/CONFIRMED/
+    CHECKED_IN/IN_PROGRESS -- moving it to CANCELLED intentionally drops it
+    from the no-show reliability count (see
+    apps.users.services.patient_reliability), which is exactly why the view
+    only lets a manager reach this for a NO_SHOW appointment (see
+    AppointmentViewSet.cancel) -- front-desk staff must not be able to erase
+    a no-show penalty on their own.
+    """
+    if not appointment.is_active and appointment.status != AppointmentStatus.NO_SHOW:
         raise ValidationError(
             {"status": "This appointment can no longer be cancelled."}
         )

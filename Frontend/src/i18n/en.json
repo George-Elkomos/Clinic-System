@@ -211,6 +211,7 @@
     "confirm": "Confirm",
     "confirmed": "Appointment confirmed.",
     "checkIn": "Check in",
+    "checkedIn": "Patient checked in.",
     "start": "Start visit",
     "complete": "Complete",
     "filterAll": "All",

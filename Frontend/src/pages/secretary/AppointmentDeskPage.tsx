@@ -7,6 +7,7 @@ import { FormField } from '../../components/primitives/FormField'
 import { Select } from '../../components/primitives/Select'
 import { CenteredSpinner, Spinner } from '../../components/primitives/Spinner'
 import { useToast } from '../../components/primitives/Toast'
+import { useAuth } from '../../hooks/useAuth'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatDateTime } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
@@ -24,6 +25,7 @@ const STATUS_FILTERS: { value: string; labelKey: string }[] = [
   { value: 'CONFIRMED,CHECKED_IN', labelKey: 'appointments.statusConfirmedArrived' },
   { value: 'COMPLETED', labelKey: 'status.COMPLETED' },
   { value: 'CANCELLED', labelKey: 'status.CANCELLED' },
+  { value: 'NO_SHOW', labelKey: 'status.NO_SHOW' },
   { value: 'EXPIRED', labelKey: 'status.EXPIRED' },
 ]
 
@@ -47,6 +49,8 @@ export function AppointmentDeskPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
   const { showToast } = useToast()
+  const { user } = useAuth()
+  const isManager = user?.role === 'MANAGER'
   const qc = useQueryClient()
   const [status, setStatus] = useState<string>('PENDING')
   const [cancelTarget, setCancelTarget] = useState<Appointment | null>(null)
@@ -61,6 +65,15 @@ export function AppointmentDeskPage() {
     mutationFn: (id: number) => appointmentsApi.confirm(id),
     onSuccess: () => {
       showToast(t('appointments.confirmed'), 'success')
+      qc.invalidateQueries({ queryKey: ['appointments'] })
+    },
+    onError: (err) => showToast(errorMessage(err), 'error'),
+  })
+
+  const checkInAppt = useMutation({
+    mutationFn: (id: number) => appointmentsApi.checkIn(id),
+    onSuccess: () => {
+      showToast(t('appointments.checkedIn'), 'success')
       qc.invalidateQueries({ queryKey: ['appointments'] })
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
@@ -140,7 +153,17 @@ export function AppointmentDeskPage() {
                       {confirmAppt.isPending && confirmAppt.variables === a.id && <Spinner size={14} />}{t('appointments.confirm')}
                     </button>
                   )}
-                  {['PENDING', 'CONFIRMED'].includes(a.status) && (
+                  {a.status === 'CONFIRMED' && (
+                    <button
+                      type="button"
+                      disabled={checkInAppt.isPending && checkInAppt.variables === a.id}
+                      onClick={() => checkInAppt.mutate(a.id)}
+                      className={BTN_PRIMARY}
+                    >
+                      {checkInAppt.isPending && checkInAppt.variables === a.id && <Spinner size={14} />}{t('appointments.checkIn')}
+                    </button>
+                  )}
+                  {(['PENDING', 'CONFIRMED'].includes(a.status) || (a.status === 'NO_SHOW' && isManager)) && (
                     <button type="button" onClick={() => onCancel(a)} className={BTN_DANGER}>{t('appointments.cancel')}</button>
                   )}
                 </div>

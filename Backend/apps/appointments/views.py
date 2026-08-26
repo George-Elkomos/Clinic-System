@@ -118,13 +118,18 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         appointment = self.get_object()
-        # Appointments that have already progressed past CONFIRMED (e.g.
-        # CHECKED_IN, IN_PROGRESS) can only be cancelled by a manager.
+        # Front-desk staff can only cancel PENDING/CONFIRMED -- appointments
+        # never acted on. Anything past that is manager-only:
+        # CHECKED_IN/IN_PROGRESS because the patient is physically present /
+        # mid-visit, and NO_SHOW because it carries a reliability-score
+        # penalty (apps.users.services.patient_reliability) that front-desk
+        # staff must not be able to erase by cancelling it away.
         safe_to_cancel = (AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED)
         if (appointment.status not in safe_to_cancel
                 and request.user.role != RoleChoices.MANAGER):
             raise PermissionDenied(
-                "Only a manager can cancel an appointment that has already started."
+                "Only a manager can cancel an appointment that's already checked-in, "
+                "in progress, or marked as a no-show."
             )
         serializer = CancelAppointmentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

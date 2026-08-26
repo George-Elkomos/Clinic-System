@@ -7,10 +7,15 @@ from django.utils import timezone
 
 from apps.appointments import services
 from apps.appointments.models import Appointment
-from apps.core.enums import AppointmentStatus, SlotStatus
+from apps.core.enums import AppointmentStatus, RoleChoices, SlotStatus
 from apps.doctors.services import slot_generator
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def manager(make_user):
+    return make_user("mgr-clinic@test.dev", RoleChoices.MANAGER, first_name="Man", last_name="Ager")
 
 
 # --- Auth -------------------------------------------------------------------
@@ -372,3 +377,31 @@ def test_no_show_allowed_for_secretary(api, patient, doctor_profile, future_slot
     assert resp.status_code == 200
     appt.refresh_from_db()
     assert appt.status == AppointmentStatus.NO_SHOW
+
+
+# --- Cancelling a NO_SHOW appointment is manager-only -------------------------
+# A NO_SHOW carries a reliability-score penalty (apps.users.services.
+# patient_reliability counts NO_SHOW/EXPIRED, never CANCELLED); front-desk
+# staff must not be able to erase that penalty by cancelling it away.
+
+def test_cancel_no_show_forbidden_for_secretary(api, patient, doctor_profile, future_slot, secretary):
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(secretary)
+    api.post(reverse("appointment-no-show", args=[appt.id]))
+    resp = api.post(reverse("appointment-cancel", args=[appt.id]), {}, format="json")
+    assert resp.status_code == 403
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.NO_SHOW
+
+
+def test_cancel_no_show_allowed_for_manager(api, patient, doctor_profile, future_slot, secretary, manager):
+    appt = _book(patient, future_slot)
+    services.confirm_appointment(appt)
+    api.force_authenticate(secretary)
+    api.post(reverse("appointment-no-show", args=[appt.id]))
+    api.force_authenticate(manager)
+    resp = api.post(reverse("appointment-cancel", args=[appt.id]), {}, format="json")
+    assert resp.status_code == 200
+    appt.refresh_from_db()
+    assert appt.status == AppointmentStatus.CANCELLED
