@@ -21,6 +21,60 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1) // 1..12
+const MINUTE_STEPS = Array.from({ length: 12 }, (_, i) => i * 5) // 00, 05, …, 55
+
+function to12h(hhmm: string) {
+  const [h, m] = hhmm.split(':').map(Number)
+  const period: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM'
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  // Snap to the nearest 5-minute step the picker offers.
+  const minute = MINUTE_STEPS.reduce((closest, step) => (
+    Math.abs(step - m) < Math.abs(closest - m) ? step : closest
+  ), 0)
+  return { hour12, minute, period }
+}
+
+function to24h(hour12: number, minute: number, period: 'AM' | 'PM') {
+  const h = period === 'PM' ? (hour12 % 12) + 12 : hour12 % 12
+  return `${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+// Native <input type="time"> renders in whatever 12h/24h format the
+// browser/OS locale dictates, ignoring the app's own language setting --
+// this always shows a 12-hour clock with localized AM/PM (ص/م), matching
+// how formatTimeOfDay already displays saved schedules everywhere else.
+function TimeOfDayPicker({ id, value, onChange }: { id?: string; value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation()
+  const { hour12, minute, period } = to12h(value)
+
+  const asValue = (v: string | number | Array<string | number>) => (Array.isArray(v) ? v[0] : v)
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <Select
+        id={id}
+        options={HOURS_12.map((h) => ({ value: h, label: String(h) }))}
+        value={hour12}
+        onChange={(v) => onChange(to24h(Number(asValue(v)), minute, period))}
+      />
+      <Select
+        options={MINUTE_STEPS.map((m) => ({ value: m, label: String(m).padStart(2, '0') }))}
+        value={minute}
+        onChange={(v) => onChange(to24h(hour12, Number(asValue(v)), period))}
+      />
+      <Select
+        options={[
+          { value: 'AM', label: t('schedule.am') },
+          { value: 'PM', label: t('schedule.pm') },
+        ]}
+        value={period}
+        onChange={(v) => onChange(to24h(hour12, minute, asValue(v) as 'AM' | 'PM'))}
+      />
+    </div>
+  )
+}
+
 export function ScheduleManagementPage() {
   const { t } = useTranslation()
   const { language } = useLanguage()
@@ -86,10 +140,10 @@ export function ScheduleManagementPage() {
         </FormField>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label={t('schedule.startTime')}>
-            {(p) => <input {...p} className="patient-field" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />}
+            {(p) => <TimeOfDayPicker id={p.id} value={startTime} onChange={setStartTime} />}
           </FormField>
           <FormField label={t('schedule.endTime')}>
-            {(p) => <input {...p} className="patient-field" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />}
+            {(p) => <TimeOfDayPicker id={p.id} value={endTime} onChange={setEndTime} />}
           </FormField>
         </div>
         <p className="patient-text-body-secondary mt-3" style={{ color: 'var(--text-secondary)' }}>
