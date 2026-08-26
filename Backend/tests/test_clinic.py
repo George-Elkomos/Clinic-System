@@ -9,6 +9,7 @@ from apps.appointments import services
 from apps.appointments.models import Appointment
 from apps.core.enums import AppointmentStatus, RoleChoices, SlotStatus
 from apps.doctors.services import slot_generator
+from apps.notifications.models import Notification
 
 pytestmark = pytest.mark.django_db
 
@@ -139,6 +140,36 @@ def test_booking_marks_slot_and_creates_pending(patient, future_slot):
     future_slot.refresh_from_db()
     assert appt.status == AppointmentStatus.PENDING
     assert future_slot.status == SlotStatus.BOOKED
+
+
+def test_patient_booking_notifies_secretaries_with_expected_template(
+    patient, doctor_profile, future_slot, secretary,
+):
+    """See apps/core/text.py's format_when_short_bilingual and
+    services.book_slot -- the secretary alert must read as:
+    'New booking request: <patient> with Dr. <doctor> at <day mon, HH:MM AM/PM>
+    - Awaiting Confirmation'."""
+    from apps.core.text import bidi_name, doctor_display_name, format_when_short_bilingual
+
+    appt = services.book_slot(
+        patient=patient.patient_profile, slot_id=future_slot.pk, created_by=patient,
+    )
+    notif = Notification.objects.get(recipient=secretary, verb="APPT_BOOKED")
+    assert notif.title == "New booking request"
+    when, _when_ar = format_when_short_bilingual(appt.scheduled_start)
+    assert notif.body == (
+        f"New booking request: {bidi_name(patient)} with {doctor_display_name(doctor_profile)} "
+        f"at {when} - Awaiting Confirmation"
+    )
+
+
+def test_staff_booking_on_behalf_of_patient_does_not_notify_secretaries(
+    patient, doctor_profile, future_slot, secretary,
+):
+    services.book_slot(
+        patient=patient.patient_profile, slot_id=future_slot.pk, created_by=secretary,
+    )
+    assert not Notification.objects.filter(recipient=secretary, verb="APPT_BOOKED").exists()
 
 
 def test_double_booking_is_rejected(patient, patient2, future_slot):

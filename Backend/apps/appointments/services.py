@@ -14,7 +14,12 @@ from apps.core.enums import (
     RoleChoices,
     SlotStatus,
 )
-from apps.core.text import bidi_name, doctor_display_name, format_when_bilingual
+from apps.core.text import (
+    bidi_name,
+    doctor_display_name,
+    format_when_bilingual,
+    format_when_short_bilingual,
+)
 from apps.doctors.models import TimeSlot
 
 from .models import Appointment
@@ -72,15 +77,19 @@ def book_slot(*, patient, slot_id, reason="", created_by=None,
     # Only alert the desk when the *patient* is the one who just created the
     # booking -- staff booking on a patient's behalf already know about it.
     if getattr(created_by, "role", None) == RoleChoices.PATIENT:
-        when, when_ar = format_when_bilingual(appointment.scheduled_start)
+        when, when_ar = format_when_short_bilingual(appointment.scheduled_start)
+        patient_name = bidi_name(patient.user)
         _notify_secretaries(
             verb=NotificationVerb.APPT_BOOKED,
-            title="New booking awaiting confirmation",
-            title_ar="حجز جديد بانتظار التأكيد",
-            body=f"{bidi_name(patient.user)} booked an appointment with {appointment.doctor} on {when}.",
+            title="New booking request",
+            title_ar="طلب حجز جديد",
+            body=(
+                f"New booking request: {patient_name} with "
+                f"{doctor_display_name(appointment.doctor)} at {when} - Awaiting Confirmation"
+            ),
             body_ar=(
-                f"قام {bidi_name(patient.user)} بحجز موعد مع "
-                f"{doctor_display_name(appointment.doctor, arabic=True)} في {when_ar}."
+                f"طلب حجز جديد: {patient_name} مع "
+                f"{doctor_display_name(appointment.doctor, arabic=True)} في {when_ar} - في انتظار التأكيد"
             ),
             related=appointment,
         )

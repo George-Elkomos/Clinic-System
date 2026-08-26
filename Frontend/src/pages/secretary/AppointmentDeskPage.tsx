@@ -12,17 +12,17 @@ import { useLanguage } from '../../hooks/useLanguage'
 import { formatDateTime } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
 import { appointmentsApi } from '../../services/appointments.api'
-import type { Appointment, AppointmentStatus } from '../../services/types'
+import type { Appointment, AppointmentStatus, Paginated } from '../../services/types'
 
-// The desk only ever needs to filter by these five buckets — CONFIRMED and
-// CHECKED_IN collapse into one "Confirmed / Arrived" option (comma-separated
-// value -> AppointmentFilter's status__in on the backend) since front-desk
-// staff don't need to distinguish "confirmed but not yet arrived" from
-// "arrived" here. IN_PROGRESS is the doctor's live-queue concern, not the
-// desk's, so it's deliberately not offered.
+// CONFIRMED and CHECKED_IN get their own tabs (not merged) so a secretary can
+// isolate "still waiting to arrive" (needs Check-In) from "already arrived"
+// -- now that Check-In lives on this page, that distinction is exactly what
+// staff need to act on. IN_PROGRESS is the doctor's live-queue concern, not
+// the desk's, so it's deliberately not offered.
 const STATUS_FILTERS: { value: string; labelKey: string }[] = [
   { value: 'PENDING', labelKey: 'status.PENDING' },
-  { value: 'CONFIRMED,CHECKED_IN', labelKey: 'appointments.statusConfirmedArrived' },
+  { value: 'CONFIRMED', labelKey: 'status.CONFIRMED' },
+  { value: 'CHECKED_IN', labelKey: 'status.CHECKED_IN' },
   { value: 'COMPLETED', labelKey: 'status.COMPLETED' },
   { value: 'CANCELLED', labelKey: 'status.CANCELLED' },
   { value: 'NO_SHOW', labelKey: 'status.NO_SHOW' },
@@ -61,20 +61,40 @@ export function AppointmentDeskPage() {
     queryFn: () => appointmentsApi.list(status ? { status } : undefined),
   })
 
+  // Patches the row in place with the server's fresh copy so the status
+  // badge and action button swap instantly -- the row stays visible even
+  // after it stops matching the active status filter (e.g. a row confirmed
+  // while viewing the PENDING tab keeps showing "Confirmed" + Check-In
+  // right there) rather than disappearing the moment a refetch happens.
+  // refetchType: 'none' marks every cached filter tab (including this one)
+  // stale for the *next* time it's mounted/refetched, without triggering an
+  // immediate refetch of the tab currently on screen -- an immediate
+  // 'active' refetch would race this same patch and win (queries default to
+  // staleTime: 30_000 here, so nothing else would refresh it in time),
+  // wiping the instant update right back out.
+  const patchAppointment = (updated: Appointment) => {
+    qc.setQueryData<Paginated<Appointment>>(['appointments', 'desk', status], (old) =>
+      old
+        ? { ...old, results: old.results.map((a) => (a.id === updated.id ? updated : a)) }
+        : old,
+    )
+    qc.invalidateQueries({ queryKey: ['appointments'], refetchType: 'none' })
+  }
+
   const confirmAppt = useMutation({
     mutationFn: (id: number) => appointmentsApi.confirm(id),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       showToast(t('appointments.confirmed'), 'success')
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      patchAppointment(updated)
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })
 
   const checkInAppt = useMutation({
     mutationFn: (id: number) => appointmentsApi.checkIn(id),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       showToast(t('appointments.checkedIn'), 'success')
-      qc.invalidateQueries({ queryKey: ['appointments'] })
+      patchAppointment(updated)
     },
     onError: (err) => showToast(errorMessage(err), 'error'),
   })

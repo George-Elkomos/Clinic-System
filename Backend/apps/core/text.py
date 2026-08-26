@@ -1,4 +1,5 @@
 """Small text-normalization helpers shared across apps."""
+from django.utils import timezone
 
 # Unicode First Strong Isolate / Pop Directional Isolate. Wrapping an embedded
 # run of text in these marks tells the Unicode Bidi Algorithm to resolve that
@@ -35,11 +36,44 @@ def format_when_bilingual(dt) -> tuple[str, str]:
     Arabic side uses the numeric ar-EG date style (dd/mm/yyyy) rather than a
     spelled-out month, and is pre-isolated since it's always embedded inside
     an Arabic sentence.
+
+    `dt` is converted to the current TIME_ZONE (Africa/Cairo) first --
+    DateTimeField values come back UTC-aware straight from the DB, and
+    formatting that raw UTC value directly would show a clock time hours off
+    from the appointment's actual local time.
     """
+    dt = timezone.localtime(dt)
     hour12 = dt.hour % 12 or 12
     minute = f"{dt.minute:02d}"
     en = f"{dt.strftime('%d %b %Y')}, {hour12}:{minute} {'AM' if dt.hour < 12 else 'PM'}"
     ar = bidi_isolate(f"{dt.strftime('%d/%m/%Y')}, {hour12}:{minute} {'ص' if dt.hour < 12 else 'م'}")
+    return en, ar
+
+
+_AR_MONTHS = [
+    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+]
+
+
+def format_when_short_bilingual(dt) -> tuple[str, str]:
+    """Render a datetime as 'day month, HH:MM AM/PM' -- no year, hour
+    zero-padded -- for notification text where "which day, roughly" is
+    enough context (unlike format_when_bilingual's year-inclusive form,
+    meant to stand as a full timestamp on its own). The Arabic side spells
+    out the month name (unlike format_when_bilingual's numeric dd/mm) since
+    this is meant to read as a short, natural phrase rather than a date
+    field, and is pre-isolated since it's always embedded inside an Arabic
+    sentence. `dt` is converted to local time first -- see
+    format_when_bilingual's docstring for why.
+    """
+    dt = timezone.localtime(dt)
+    hour12 = dt.hour % 12 or 12
+    minute = f"{dt.minute:02d}"
+    en = f"{dt.strftime('%d %b')}, {hour12:02d}:{minute} {'AM' if dt.hour < 12 else 'PM'}"
+    ar = bidi_isolate(
+        f"{dt.day:02d} {_AR_MONTHS[dt.month - 1]}، {hour12:02d}:{minute} {'ص' if dt.hour < 12 else 'م'}"
+    )
     return en, ar
 
 
