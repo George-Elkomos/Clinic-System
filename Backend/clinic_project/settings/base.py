@@ -236,7 +236,15 @@ TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", default="")
 TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", default="")   # main Auth Token OR API Key Secret
 TWILIO_API_KEY = env("TWILIO_API_KEY", default="")         # API Key SID (SK...) — if set, use API Key auth
 TWILIO_FROM_NUMBER = env("TWILIO_FROM_NUMBER", default="")
-TWILIO_WHATSAPP_FROM = env("TWILIO_WHATSAPP_FROM", default="")
+
+# WhatsApp delivery goes through a self-hosted OpenWA gateway (unofficial,
+# reverse-engineered client) instead of Twilio's WhatsApp API — see
+# apps/notifications/backends.py for the ban-risk tradeoffs. Session pairing
+# (QR scan) is a manual one-time step against OPENWA_BASE_URL, not automated
+# here.
+OPENWA_BASE_URL = env("OPENWA_BASE_URL", default="http://localhost:2785")
+OPENWA_API_KEY = env("OPENWA_API_KEY", default="")
+OPENWA_SESSION_ID = env("OPENWA_SESSION_ID", default="")
 
 # --- Domain knobs -----------------------------------------------------------
 SLOT_HORIZON_DAYS = env("SLOT_HORIZON_DAYS")

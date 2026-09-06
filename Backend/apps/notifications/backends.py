@@ -90,25 +90,30 @@ def send_sms(notification):
 
 
 def send_whatsapp(notification):
-    """No-op unless WHATSAPP_ENABLED and Twilio credentials are present.
+    """No-op unless WHATSAPP_ENABLED and an OpenWA session is configured.
 
-    Set TWILIO_WHATSAPP_FROM to your approved WhatsApp sender number in E.164
-    format (e.g. +14155238886 sandbox or your registered business number).
+    Sends through a self-hosted OpenWA gateway (unofficial WhatsApp client —
+    see OPENWA_* settings) rather than Twilio's WhatsApp API. The session
+    referenced by OPENWA_SESSION_ID must already be paired (QR-scanned)
+    against a dedicated clinic number before this can succeed.
     """
     if not settings.WHATSAPP_ENABLED:
         return False
     phone = notification.recipient.phone
-    if not (phone and settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN
-            and settings.TWILIO_WHATSAPP_FROM):
+    if not (phone and settings.OPENWA_API_KEY and settings.OPENWA_SESSION_ID):
         return False
     try:
+        import requests
+
         title, body = _localized_text(notification)
-        client = _twilio_client()
-        client.messages.create(
-            body=f"*{title}*\n{body}",
-            from_=f"whatsapp:{settings.TWILIO_WHATSAPP_FROM}",
-            to=f"whatsapp:{_e164(phone)}",
+        chat_id = f"{_e164(phone).lstrip('+')}@c.us"
+        response = requests.post(
+            f"{settings.OPENWA_BASE_URL}/api/sessions/{settings.OPENWA_SESSION_ID}/messages/send-text",
+            json={"chatId": chat_id, "text": f"*{title}*\n{body}"},
+            headers={"X-API-Key": settings.OPENWA_API_KEY},
+            timeout=10,
         )
+        response.raise_for_status()
         return True
     except Exception:  # pragma: no cover - depends on external service
         logger.exception("Failed to send WhatsApp notification %s", notification.pk)
