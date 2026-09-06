@@ -184,7 +184,12 @@ class Payment(TimeStampedModel):
 
 
 class FeeValidity(TimeStampedModel):
-    """Free follow-up window opened when a consultation invoice is fully paid.
+    """Free follow-up window opened when a consultation invoice is *issued*.
+
+    The consultation fee buys an episode of care (visit + follow-ups within
+    BILLING_FOLLOWUP_DAYS), so the entitlement is created by the sale, not by
+    the collection. Whether the invoice is paid is a receivables concern —
+    see the arrears check in `handle_appointment_completed`.
 
     While today is inside [valid_from, valid_until] and used_count is below
     max_free_visits, completing an appointment with the same (patient, doctor)

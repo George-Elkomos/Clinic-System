@@ -235,6 +235,47 @@ class TestCompletionBillingHook:
         assert fv.valid_until == timezone.localdate() + timedelta(days=14)
         assert fv.used_count == 0
 
+    def test_free_followup_window_opens_while_invoice_is_still_unpaid(
+        self, consultation_item, patient, doctor_profile, secretary
+    ):
+        """Documents the intended behaviour (Task 2): the entitlement is
+        created by the sale (invoice issued), not by the collection. An
+        unpaid consultation invoice still opens a fully-usable window."""
+        _complete_visit(patient, doctor_profile, secretary)
+
+        invoice = Invoice.objects.get(patient=patient)
+        assert invoice.status == InvoiceStatus.ISSUED
+        assert invoice.paid_amount == Decimal("0.00")
+        fv = FeeValidity.objects.get(patient=patient, doctor=doctor_profile.user)
+        assert fv.covers(timezone.localdate()) is True
+
+    def test_free_visit_with_arrears_proceeds_and_reports_the_warning(
+        self, consultation_item, patient, doctor_profile, secretary
+    ):
+        """Task 2: arrears are a receivables warning, never a reason to
+        refuse a free follow-up."""
+        _complete_visit(patient, doctor_profile, secretary)  # opens the window
+
+        overdue_invoice = Invoice.objects.create(
+            patient=patient,
+            doctor=doctor_profile.user,
+            due_date=timezone.localdate() - timedelta(days=5),
+            status=InvoiceStatus.ISSUED,
+        )
+        overdue_invoice.total = Decimal("120.00")
+        overdue_invoice.save(update_fields=["total"])
+
+        from apps.billing.services import handle_appointment_completed
+
+        appointment = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary
+        )
+        invoice, fee_validity, arrears = handle_appointment_completed(appointment)
+
+        assert invoice is None  # the free visit was consumed, not billed
+        assert fee_validity is not None
+        assert arrears == Decimal("120.00")
+
     def test_doctor_fee_overrides_catalog_price(
         self, consultation_item, patient, doctor_profile, secretary
     ):
@@ -316,11 +357,12 @@ class TestCompletionBillingHook:
             return real_filter(*args, **kwargs)
 
         monkeypatch.setattr(InvoiceItem.objects, "filter", racy_filter)
-        invoice, fee_validity = billing_services.handle_appointment_completed(appointment)
+        invoice, fee_validity, arrears = billing_services.handle_appointment_completed(appointment)
 
         assert Invoice.objects.filter(patient=patient).count() == 1
         assert fee_validity is None
         assert invoice == Invoice.objects.get(patient=patient)
+        assert arrears == Decimal("0.00")
 
 
 class TestInvoiceIsolation:

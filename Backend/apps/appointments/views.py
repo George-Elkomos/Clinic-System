@@ -201,11 +201,14 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         # generated" or "free follow-up visit used" right after completion.
         invoice = getattr(appointment, "billing_invoice", None)
         validity = getattr(appointment, "billing_fee_validity", None)
+        arrears = getattr(appointment, "billing_arrears_balance", None)
         data["billing"] = {
             "invoice_id": invoice.id if invoice else None,
             "invoice_number": invoice.number if invoice else None,
             "invoice_total": str(invoice.total) if invoice else None,
             "free_followup_used": invoice is None and validity is not None,
+            # Overdue balance from other invoices, informational only.
+            "arrears_balance": str(arrears) if arrears else None,
         }
         return Response(data)
 

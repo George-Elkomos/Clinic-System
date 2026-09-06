@@ -3,7 +3,9 @@
 Three entry points:
 - `handle_appointment_completed(appointment)` — called by
   appointments.services.complete_appointment(). Either consumes a free
-  follow-up (FeeValidity) or issues a consultation invoice.
+  follow-up (FeeValidity) or issues a consultation invoice; also surfaces
+  the patient's overdue balance (if any) as a receptionist-facing warning
+  when a free visit is consumed — see `_overdue_balance`.
 - `record_payment(...)` — applies money to an invoice and keeps
   paid_amount/balance/status consistent.
 - `billing_report(period)` — manager aggregates (billed/collected/outstanding
@@ -66,14 +68,35 @@ def _consultation_price(doctor_profile, service_item):
     return service_item.default_price
 
 
+def _overdue_balance(patient_user, today):
+    """Sum of `balance` on the patient's overdue invoices.
+
+    A receivables question, not an entitlement one: this is informational
+    only, for the front desk to see — it is never a reason to refuse a free
+    follow-up (see `handle_appointment_completed`).
+    """
+    return (
+        Invoice.objects.filter(
+            patient=patient_user,
+            status__in=(InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID),
+            due_date__lt=today,
+        ).aggregate(total=Sum("balance"))["total"] or Decimal("0.00")
+    )
+
+
 @transaction.atomic
 def handle_appointment_completed(appointment):
     """Billing hook for a COMPLETED appointment.
 
-    Returns (invoice, fee_validity):
-    - Free follow-up consumed  -> (None, fee_validity)
-    - New invoice issued       -> (invoice, new_fee_validity)
-    - Already billed (idempotent re-complete) -> (existing_invoice, None)
+    Returns (invoice, fee_validity, arrears_balance):
+    - Free follow-up consumed  -> (None, fee_validity, arrears_balance)
+    - New invoice issued       -> (invoice, new_fee_validity, Decimal("0.00"))
+    - Already billed (idempotent re-complete) -> (existing_invoice, None, Decimal("0.00"))
+
+    `arrears_balance` is the patient's overdue balance from other invoices,
+    checked at the point a free visit is consumed. The visit is never
+    refused because of it — the receptionist decides what to do with the
+    warning.
     """
     patient_user = appointment.patient.user
     doctor_user = appointment.doctor.user
@@ -84,7 +107,7 @@ def handle_appointment_completed(appointment):
         source_type=BillingSourceType.APPOINTMENT, source_id=appointment.id
     ).select_related("invoice").first()
     if existing is not None:
-        return existing.invoice, None
+        return existing.invoice, None, Decimal("0.00")
 
     # Active free-follow-up window for this (patient, doctor) pair?
     validity = (
@@ -103,7 +126,8 @@ def handle_appointment_completed(appointment):
         validity.used_count = F("used_count") + 1
         validity.save(update_fields=["used_count", "updated_at"])
         validity.refresh_from_db()
-        return None, validity
+        arrears_balance = _overdue_balance(patient_user, today)
+        return None, validity, arrears_balance
 
     # No free visit -> issue a consultation invoice from the catalog.
     service_item = _consultation_service_item()
@@ -133,7 +157,7 @@ def handle_appointment_completed(appointment):
         existing = InvoiceItem.objects.filter(
             source_type=BillingSourceType.APPOINTMENT, source_id=appointment.id
         ).select_related("invoice").first()
-        return existing.invoice, None
+        return existing.invoice, None, Decimal("0.00")
 
     invoice.recalculate_totals()
 
@@ -144,7 +168,7 @@ def handle_appointment_completed(appointment):
         valid_from=today,
         valid_until=today + timedelta(days=settings.BILLING_FOLLOWUP_DAYS),
     )
-    return invoice, new_validity
+    return invoice, new_validity, Decimal("0.00")
 
 
 @transaction.atomic

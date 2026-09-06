@@ -309,11 +309,13 @@ def complete_appointment(appointment):
     link.last_treated_at = appointment.completed_at
     link.save(update_fields=["last_treated_at", "updated_at"])
 
-    invoice, fee_validity = handle_appointment_completed(appointment)
+    invoice, fee_validity, arrears_balance = handle_appointment_completed(appointment)
     # Exposed (not persisted) so the API layer can tell the front desk what
-    # happened: "Invoice #INV-XXXX generated" vs "free follow-up used".
+    # happened: "Invoice #INV-XXXX generated" vs "free follow-up used", plus
+    # any overdue balance to warn reception about (never a reason to refuse).
     appointment.billing_invoice = invoice
     appointment.billing_fee_validity = fee_validity
+    appointment.billing_arrears_balance = arrears_balance
     return appointment
 
 
