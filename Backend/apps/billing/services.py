@@ -18,7 +18,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -109,22 +109,32 @@ def handle_appointment_completed(appointment):
     service_item = _consultation_service_item()
     price = _consultation_price(appointment.doctor, service_item)
 
-    invoice = Invoice.objects.create(
-        patient=patient_user,
-        doctor=doctor_user,
-        due_date=today + timedelta(days=settings.BILLING_INVOICE_DUE_DAYS),
-        status=InvoiceStatus.ISSUED,
-        currency=settings.BILLING_CURRENCY,
-    )
-    InvoiceItem.objects.create(
-        invoice=invoice,
-        description=service_item.name,
-        service_item=service_item,
-        quantity=1,
-        unit_price=price,
-        source_type=BillingSourceType.APPOINTMENT,
-        source_id=appointment.id,
-    )
+    try:
+        with transaction.atomic():
+            invoice = Invoice.objects.create(
+                patient=patient_user,
+                doctor=doctor_user,
+                due_date=today + timedelta(days=settings.BILLING_INVOICE_DUE_DAYS),
+                status=InvoiceStatus.ISSUED,
+                currency=settings.BILLING_CURRENCY,
+            )
+            InvoiceItem.objects.create(
+                invoice=invoice,
+                description=service_item.name,
+                service_item=service_item,
+                quantity=1,
+                unit_price=price,
+                source_type=BillingSourceType.APPOINTMENT,
+                source_id=appointment.id,
+            )
+    except IntegrityError:
+        # Race: another request won between the idempotency check above and
+        # this insert. Return its invoice instead of double-billing.
+        existing = InvoiceItem.objects.filter(
+            source_type=BillingSourceType.APPOINTMENT, source_id=appointment.id
+        ).select_related("invoice").first()
+        return existing.invoice, None
+
     invoice.recalculate_totals()
 
     new_validity = FeeValidity.objects.create(

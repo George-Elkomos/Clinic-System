@@ -9,6 +9,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from django.db import IntegrityError
+from django.db import transaction as db_transaction
 from django.urls import reverse
 from django.utils import timezone
 
@@ -119,6 +121,39 @@ class TestInvoiceItem:
         item.refresh_from_db()
         assert item.service_item is None
         assert item.line_total == Decimal("50.00")
+
+    def test_duplicate_source_raises_integrity_error(self, invoice, consultation_item):
+        InvoiceItem.objects.create(
+            invoice=invoice,
+            description="General Consultation",
+            service_item=consultation_item,
+            quantity=1,
+            unit_price=Decimal("50.00"),
+            source_type=BillingSourceType.APPOINTMENT,
+            source_id=999,
+        )
+        with pytest.raises(IntegrityError):
+            with db_transaction.atomic():
+                InvoiceItem.objects.create(
+                    invoice=invoice,
+                    description="General Consultation (duplicate)",
+                    service_item=consultation_item,
+                    quantity=1,
+                    unit_price=Decimal("50.00"),
+                    source_type=BillingSourceType.APPOINTMENT,
+                    source_id=999,
+                )
+
+    def test_manual_lines_with_no_source_id_are_repeatable(self, invoice, consultation_item):
+        for _ in range(2):
+            InvoiceItem.objects.create(
+                invoice=invoice,
+                description="Manual adjustment",
+                service_item=consultation_item,
+                quantity=1,
+                unit_price=Decimal("10.00"),
+            )
+        assert invoice.items.filter(source_id__isnull=True).count() == 2
 
 
 class TestPayment:
@@ -243,6 +278,49 @@ class TestCompletionBillingHook:
         appointment_services.complete_appointment(appointment)  # idempotent re-complete
         assert Invoice.objects.filter(patient=patient).count() == 1
         assert FeeValidity.objects.get(patient=patient).used_count == 0
+
+    def test_race_between_the_precheck_and_insert_is_caught_by_the_constraint(
+        self, consultation_item, patient, doctor_profile, secretary, monkeypatch
+    ):
+        """Simulates two concurrent requests: both pass the idempotency
+        pre-check (nothing exists yet), then race to insert. The loser must
+        hit the UniqueConstraint, catch IntegrityError, and return the
+        winner's invoice instead of a 500 or a second invoice."""
+        from apps.billing import services as billing_services
+
+        appointment = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary
+        )
+
+        real_filter = InvoiceItem.objects.filter
+        call_count = {"n": 0}
+
+        def racy_filter(*args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                # First caller's pre-check: pretend nothing exists yet, then
+                # let a "concurrent" request win the insert before we do.
+                InvoiceItem.objects.create(
+                    invoice=Invoice.objects.create(
+                        patient=patient, doctor=doctor_profile.user,
+                        status=InvoiceStatus.ISSUED,
+                    ),
+                    description="General Consultation",
+                    service_item=consultation_item,
+                    quantity=1,
+                    unit_price=consultation_item.default_price,
+                    source_type=BillingSourceType.APPOINTMENT,
+                    source_id=appointment.id,
+                )
+                return real_filter(*args, **kwargs).none()
+            return real_filter(*args, **kwargs)
+
+        monkeypatch.setattr(InvoiceItem.objects, "filter", racy_filter)
+        invoice, fee_validity = billing_services.handle_appointment_completed(appointment)
+
+        assert Invoice.objects.filter(patient=patient).count() == 1
+        assert fee_validity is None
+        assert invoice == Invoice.objects.get(patient=patient)
 
 
 class TestInvoiceIsolation:

@@ -140,6 +140,13 @@ class InvoiceItem(TimeStampedModel):
 
     class Meta:
         ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_type", "source_id"],
+                condition=models.Q(source_id__isnull=False),
+                name="uniq_invoice_item_source",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.description} x{self.quantity} = {self.line_total}"
