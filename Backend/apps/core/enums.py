@@ -285,6 +285,53 @@ class AuditAction(models.TextChoices):
     ACCESS = "ACCESS", _("Access")
 
 
+# --- Financial roadmap Task 4 — Accounting core --------------------------------
+
+class RootType(models.TextChoices):
+    ASSET = "ASSET", _("Asset")
+    LIABILITY = "LIABILITY", _("Liability")
+    INCOME = "INCOME", _("Income")
+    EXPENSE = "EXPENSE", _("Expense")
+    EQUITY = "EQUITY", _("Equity")
+
+
+class AccountType(models.TextChoices):
+    RECEIVABLE = "RECEIVABLE", _("Receivable")
+    PAYABLE = "PAYABLE", _("Payable")
+    CASH = "CASH", _("Cash")
+    BANK = "BANK", _("Bank")
+    INCOME = "INCOME", _("Income")
+    EXPENSE = "EXPENSE", _("Expense")
+    TAX = "TAX", _("Tax")
+    INVENTORY = "INVENTORY", _("Inventory")
+    COGS = "COGS", _("Cost of goods sold")
+    FIXED_ASSET = "FIXED_ASSET", _("Fixed asset")
+    ACCUMULATED_DEPRECIATION = "ACCUMULATED_DEPRECIATION", _("Accumulated depreciation")
+    EQUITY = "EQUITY", _("Equity")
+    PATIENT_DEPOSIT = "PATIENT_DEPOSIT", _("Patient deposit")
+    CONTRACTUAL_ADJUSTMENT = "CONTRACTUAL_ADJUSTMENT", _("Contractual adjustment")
+    WRITE_OFF = "WRITE_OFF", _("Write off")
+    ROUND_OFF = "ROUND_OFF", _("Round off")
+    DEFERRED_REVENUE = "DEFERRED_REVENUE", _("Deferred revenue")
+
+
+class ReportSection(models.TextChoices):
+    """Which financial statement an account's root_type feeds into."""
+    BALANCE_SHEET = "BALANCE_SHEET", _("Balance sheet")
+    PROFIT_AND_LOSS = "PROFIT_AND_LOSS", _("Profit and loss")
+
+
+class FiscalYearStatus(models.TextChoices):
+    OPEN = "OPEN", _("Open")
+    CLOSED = "CLOSED", _("Closed")
+
+
+class PeriodStatus(models.TextChoices):
+    OPEN = "OPEN", _("Open")
+    SOFT_CLOSED = "SOFT_CLOSED", _("Soft closed")
+    CLOSED = "CLOSED", _("Closed")
+
+
 # --- Phase 16 — Advanced Analytics ---------------------------------------------
 
 class PeriodChoices(models.TextChoices):

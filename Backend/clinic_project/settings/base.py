@@ -87,6 +87,7 @@ LOCAL_APPS = [
     "apps.referrals",     # Phase 13 — referrals + complaints master
     "apps.procedures",    # Phase 14 — clinical procedures
     "apps.radiology",     # Phase 15 — radiology order templates
+    "apps.accounting",    # Financial roadmap — double-entry accounting core
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
