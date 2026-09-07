@@ -127,11 +127,13 @@ WSGI_APPLICATION = "clinic_project.wsgi.application"
 ASGI_APPLICATION = "clinic_project.asgi.application"
 
 # --- Database ---------------------------------------------------------------
-# SQLite by default. WAL mode + busy timeout + FK enforcement are applied via
-# the connection_created signal in apps/core/apps.py (works across SQLite setups).
+# PostgreSQL via DATABASE_URL (falls back to a local SQLite file if unset, e.g.
+# a fresh checkout with no .env yet). WAL mode + busy timeout + FK enforcement
+# for SQLite are applied via the connection_created signal in apps/core/apps.py.
 DATABASES = {"default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")}
 DATABASES["default"].setdefault("OPTIONS", {})
-DATABASES["default"]["OPTIONS"]["timeout"] = 20
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    DATABASES["default"]["OPTIONS"]["timeout"] = 20
 
 # --- Auth -------------------------------------------------------------------
 AUTH_USER_MODEL = "users.User"

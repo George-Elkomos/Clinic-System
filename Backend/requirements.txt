@@ -11,6 +11,9 @@ django-cors-headers==4.9.0
 django-filter==25.2
 django-environ==0.13.0
 
+# --- Database (PostgreSQL, dev + prod; see clinic_project/settings/base.py) ---
+psycopg[binary]==3.2.10
+
 # --- Files / PDF ---
 Pillow==12.2.0          # cp314 wheel — image uploads + logo compositing
 reportlab==4.5.1        # pure-Python — ALL PDFs (prescriptions, reports)

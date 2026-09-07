@@ -87,6 +87,21 @@ function Do-Status {
   Write-Host ("worker   (PID {0}): {1}" -f $pids.worker, $w)
 }
 
+function Ensure-Postgres {
+  # PostgreSQL (Task 3, financial roadmap) runs as a Windows service and is
+  # normally already running (Automatic startup), but make sure — SQLite
+  # silently ignores select_for_update(), Postgres must not be skipped.
+  $pgService = Get-Service -Name 'postgresql-x64-17' -ErrorAction SilentlyContinue
+  if ($null -eq $pgService) {
+    Write-Host '  PostgreSQL service not found — assuming DATABASE_URL falls back to SQLite.' -ForegroundColor DarkGray
+    return
+  }
+  if ($pgService.Status -ne 'Running') {
+    Write-Host 'Starting PostgreSQL service...' -ForegroundColor Cyan
+    Start-Service -Name 'postgresql-x64-17'
+  }
+}
+
 function Do-Start {
   # No auto-setup: fail fast with guidance if prerequisites are missing.
   if (-not (Test-Path $PyExe)) {
@@ -95,6 +110,7 @@ function Do-Start {
   if (-not (Test-Path $NodeMods)) {
     throw "Frontend dependencies not installed.`nRun:  cd Frontend ; npm install"
   }
+  Ensure-Postgres
 
   $pids = Read-Pids
   if ($null -ne $pids -and ((Test-Alive ([int]$pids.backend)) -or (Test-Alive ([int]$pids.frontend)) -or (Test-Alive ([int]$pids.worker)))) {

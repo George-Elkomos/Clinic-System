@@ -2,7 +2,7 @@
 
 Clinic management system.
 **Backend:** Django 5.2 + DRF + SimpleJWT + django-q2 + django-simple-history.
-**Frontend:** React + TypeScript + Vite. **DB:** SQLite (dev) → PostgreSQL (production).
+**Frontend:** React + TypeScript + Vite. **DB:** PostgreSQL (dev, since financial roadmap Task 3) — production is still SQLite pending a separate cutover, see `SERVER_INFO.md`.
 
 ```
 Backend/apps/       18 apps: ai_scribe appointments audit billing core doctors encounters
@@ -16,8 +16,8 @@ Backend/clinic_project/settings/   base / dev / test / prod
 
 ```bash
 cd Backend
-pytest                          # full suite (324 tests)
-pytest tests/test_billing.py    # billing (27 tests)
+pytest                          # full suite (327 tests)
+pytest tests/test_billing.py    # billing (30 tests)
 python manage.py makemigrations
 python manage.py migrate
 ```
@@ -74,7 +74,7 @@ must follow these.
 
 ## 5. Tests
 
-- **The 27 tests in `tests/test_billing.py` must stay green.** A change that breaks them is a
+- **The billing tests in `tests/test_billing.py` must stay green.** A change that breaks them is a
   wrong change.
 - New financial logic requires tests. No test means not done.
 - After any financial scenario in a test, **the trial balance must equal zero**.

@@ -63,7 +63,7 @@ for the full annotated template). Current production values, by category:
 | `SECRET_KEY` | (random, generated on server) | Never share/commit |
 | `DEBUG` | `False` | |
 | `ALLOWED_HOSTS` | `213.199.47.114,clinicms.duckdns.org` | |
-| `DATABASE_URL` | `sqlite:///db.sqlite3` | |
+| `DATABASE_URL` | `sqlite:///db.sqlite3` | Still SQLite in production. Local dev moved to PostgreSQL (financial roadmap Task 3, `docs/financial-design/FINANCIAL-ROADMAP.md`) because `select_for_update()` is a silent no-op on SQLite and upcoming accounting tables need real `CHECK`/partial-unique constraints. Migrating *this* server to Postgres is a separate, deliberate follow-up (live data, planned downtime) — not done as part of that task. |
 | `CORS_ALLOWED_ORIGINS` | `https://clinicms.duckdns.org` | Same-origin serving makes this mostly moot, kept for safety |
 | `CSRF_TRUSTED_ORIGINS` | `https://clinicms.duckdns.org` | Needed for HTTPS behind the Nginx proxy |
 | `JWT_COOKIE_SECURE` | `True` | Requires real HTTPS — it is now live |
@@ -200,3 +200,7 @@ python manage.py <command>
   `Server-Documentation/02-access-and-security.md`).
 - **Single Daphne instance only** — do not attempt to scale horizontally
   without first replacing `InMemoryChannelLayer` with `channels_redis`.
+- **Still on SQLite in production** — local dev runs PostgreSQL now (see the
+  `DATABASE_URL` row above). Cutting this server over needs installing
+  PostgreSQL on the VPS, a data migration step, and a maintenance window;
+  none of that has happened yet.
