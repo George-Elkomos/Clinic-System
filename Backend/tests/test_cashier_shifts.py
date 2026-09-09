@@ -182,6 +182,49 @@ class TestExpectedCash:
         assert refund.shift == shift
         assert billing_services.expected_cash(shift) == Decimal("275.00")
 
+    def test_a_refund_is_attributed_to_the_payer_not_the_approver(
+        self, consultation_item, patient, doctor_profile, secretary, shift, cashier, manager,
+    ):
+        """The manager approves from their own till; the cashier hands over the
+        cash. The money must come off the cashier's drawer, not the manager's."""
+        manager_shift = billing_services.open_shift(
+            cashier=manager, till_id="T2", opening_float=Decimal("500.00"),
+        )
+        invoice = _issued_invoice(patient, doctor_profile, secretary)
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("100.00"),
+            payment_method=PaymentMethod.CASH, received_by=cashier,
+        )
+        refund = billing_services.issue_refund(
+            invoice=invoice, amount=Decimal("30.00"),
+            payment_method=PaymentMethod.CASH, reason_code="overcharge",
+            approved_by=manager, paid_by=cashier,
+        )
+        assert refund.shift == shift
+        assert billing_services.expected_cash(shift) == Decimal("270.00")
+        assert billing_services.expected_cash(manager_shift) == Decimal("500.00")
+
+    def test_a_refund_with_no_payer_is_left_unattributed(
+        self, consultation_item, patient, doctor_profile, secretary, shift, cashier, manager,
+    ):
+        """Never guess the drawer from the approver: an unattributed refund is
+        a truthful gap, a wrongly attributed one corrupts two counts at once."""
+        manager_shift = billing_services.open_shift(
+            cashier=manager, till_id="T2", opening_float=Decimal("500.00"),
+        )
+        invoice = _issued_invoice(patient, doctor_profile, secretary)
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("100.00"),
+            payment_method=PaymentMethod.CASH, received_by=cashier,
+        )
+        refund = billing_services.issue_refund(
+            invoice=invoice, amount=Decimal("30.00"),
+            payment_method=PaymentMethod.CASH, reason_code="overcharge",
+            approved_by=manager,
+        )
+        assert refund.shift is None
+        assert billing_services.expected_cash(manager_shift) == Decimal("500.00")
+
     def test_money_cannot_be_stamped_onto_a_closed_shift(
         self, consultation_item, patient, doctor_profile, secretary, shift, cashier,
     ):

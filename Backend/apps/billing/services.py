@@ -554,14 +554,27 @@ def issue_credit_note(*, invoice, amount, reason_code, approved_by):
 
 @transaction.atomic
 def issue_refund(
-    *, invoice, amount, payment_method, reason_code, approved_by, shift=None,
+    *, invoice, amount, payment_method, reason_code, approved_by,
+    paid_by=None, shift=None,
 ):
     """Pay back money already collected on `invoice`. Can never exceed what
     was actually collected and not already refunded (financial roadmap Task 7).
 
     A cash refund takes money out of the drawer, so it is stamped with the
     till session it was paid from (Task 11) and reduces that shift's expected
-    cash — same resolution rule as `record_payment`.
+    cash.
+
+    ⚠️ The drawer is resolved from `paid_by` — the person who actually handed
+    the cash over — never from `approved_by`. The two are usually different
+    people: a manager approves, a cashier pays. Resolving from the approver
+    would charge the refund to *their* till, producing a phantom short on the
+    approver's drawer and a phantom over on the one the money really left
+    (`paid_by` is to a refund what `received_by` is to a payment).
+
+    With no `paid_by` and no `shift` the refund is left unattributed rather
+    than guessed at: the cashier's own close will then show a real short that
+    needs explaining, which is a truthful signal — unlike quietly corrupting
+    a different cashier's count.
     """
     invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
     amount = Decimal(amount)
@@ -583,7 +596,7 @@ def issue_refund(
     refund = Refund.objects.create(
         invoice=invoice, amount=amount, payment_method=payment_method,
         reason_code=reason_code, approved_by=approved_by,
-        shift=_resolve_shift(shift, approved_by),
+        shift=_resolve_shift(shift, paid_by),
     )
     purpose, qualifier = _CASH_PURPOSE_BY_PAYMENT_METHOD[payment_method]
     entry = accounting_services.post(
