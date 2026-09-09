@@ -211,7 +211,8 @@ CHART = [
 
 # (purpose, qualifier, code) — only the purposes apps/billing resolves against
 # today (Tasks 6-8: self-pay invoicing, cash/card/bank receipt, deposits,
-# refunds/write-offs). Insurer/payer purposes are Task 10, not seeded yet.
+# refunds/write-offs; Task 11: till variance). Insurer/payer purposes are
+# Task 10, not seeded yet.
 MAP_ENTRIES = [
     ("AR_PATIENT", "", "1210"),
     ("REVENUE_BY_SERVICE_CATEGORY", "CONSULTATION", "4111"),
@@ -226,6 +227,8 @@ MAP_ENTRIES = [
     ("PATIENT_DEPOSIT_LIABILITY", "", "2210"),
     ("PATIENT_CREDIT_BALANCE", "", "2220"),
     ("BAD_DEBT_PATIENT", "", "5480"),
+    # Task 11 — where a cashier shift's counted-vs-expected difference lands.
+    ("CASH_VARIANCE", "", "5640"),
     ("REFUND_CONTRA", "", "4580"),
 ]
 

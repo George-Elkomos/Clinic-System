@@ -14,6 +14,10 @@ Entry points:
 - `issue_credit_note(...)` / `issue_refund(...)` / `cancel_invoice(...)` —
   Task 7 corrections. All three post a ledger entry and never edit/delete
   the original invoice's totals — see each function's docstring.
+- `open_shift(...)` / `close_shift(...)` — Task 11 cashier shifts. Closing
+  counts the drawer and posts the difference against `CASH_VARIANCE`; the
+  expected figure is derived from the shift's own cash rows, never counted up
+  as the shift runs.
 - `billing_report(period)` — manager aggregates (billed/collected/outstanding
   + per-doctor revenue split).
 
@@ -38,12 +42,24 @@ from apps.accounting import services as accounting_services
 from apps.accounting.models import AccountMap, JournalEntry
 from apps.core.enums import (
     BillingSourceType,
+    CashierShiftStatus,
     InvoiceStatus,
     PaymentMethod,
     ServiceItemType,
 )
 
-from .models import CreditNote, FeeValidity, Invoice, InvoiceItem, Payment, PatientDeposit, Refund, ServiceItem
+from .models import (
+    DEFAULT_TILL_ID,
+    CashierShift,
+    CreditNote,
+    FeeValidity,
+    Invoice,
+    InvoiceItem,
+    PatientDeposit,
+    Payment,
+    Refund,
+    ServiceItem,
+)
 
 # payment_method -> (AccountMap purpose, qualifier) for the debit side of a receipt.
 _CASH_PURPOSE_BY_PAYMENT_METHOD = {
@@ -392,13 +408,20 @@ def handle_lab_order_completed(order, *, user):
 
 
 @transaction.atomic
-def record_payment(*, invoice, amount, payment_method, received_by, reference=""):
+def record_payment(
+    *, invoice, amount, payment_method, received_by, reference="", shift=None,
+):
     """Apply a payment and keep the invoice's money fields + status in sync.
 
     An amount over the remaining balance is never refused (financial roadmap
     Task 7): only `invoice.balance` is applied to this invoice, and the excess
     becomes a `PatientDeposit` — a liability, held for the patient rather than
     recognised as revenue, usable on a future invoice.
+
+    The payment is stamped with `shift` (Task 11) — or, when none is passed,
+    with whatever shift `received_by` currently has open. Having no open shift
+    is not an error: money is still taken, it simply reconciles against no
+    drawer count.
     """
     invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
 
@@ -419,6 +442,7 @@ def record_payment(*, invoice, amount, payment_method, received_by, reference=""
         payment_method=payment_method,
         received_by=received_by,
         reference=reference,
+        shift=_resolve_shift(shift, received_by),
     )
     entry = post_payment_received(payment, applied=applied, overpayment=overpayment)
 
@@ -529,9 +553,15 @@ def issue_credit_note(*, invoice, amount, reason_code, approved_by):
 
 
 @transaction.atomic
-def issue_refund(*, invoice, amount, payment_method, reason_code, approved_by):
+def issue_refund(
+    *, invoice, amount, payment_method, reason_code, approved_by, shift=None,
+):
     """Pay back money already collected on `invoice`. Can never exceed what
     was actually collected and not already refunded (financial roadmap Task 7).
+
+    A cash refund takes money out of the drawer, so it is stamped with the
+    till session it was paid from (Task 11) and reduces that shift's expected
+    cash — same resolution rule as `record_payment`.
     """
     invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
     amount = Decimal(amount)
@@ -553,6 +583,7 @@ def issue_refund(*, invoice, amount, payment_method, reason_code, approved_by):
     refund = Refund.objects.create(
         invoice=invoice, amount=amount, payment_method=payment_method,
         reason_code=reason_code, approved_by=approved_by,
+        shift=_resolve_shift(shift, approved_by),
     )
     purpose, qualifier = _CASH_PURPOSE_BY_PAYMENT_METHOD[payment_method]
     entry = accounting_services.post(
@@ -608,6 +639,208 @@ def cancel_invoice(*, invoice, reason_code, cancelled_by):
     invoice.credited_amount = invoice.total
     invoice.save(update_fields=["status", "credited_amount", "updated_at"])
     return invoice
+
+
+# --- Cashier shifts (financial roadmap Task 11) --------------------------------
+
+def current_shift(user):
+    """The shift `user` currently has open, or None."""
+    if user is None:
+        return None
+    return CashierShift.objects.filter(
+        cashier=user, status=CashierShiftStatus.OPEN,
+    ).first()
+
+
+def _resolve_shift(shift, user):
+    """The shift a payment/refund belongs to: the one passed in, or the one
+    `user` has open. Money is never stamped onto an already-counted drawer —
+    that would falsify a variance that has already been posted.
+
+    The row is re-read **and locked**, not trusted off the passed instance.
+    Without the lock this is a check-then-act against `close_shift`, which
+    holds `select_for_update()` on the same row: read OPEN here → close_shift
+    commits its count and its variance posting → this payment lands on a
+    closed shift that the posted variance never accounted for. Taking the same
+    lock serialises the two, so this either wins (and the close sees the
+    payment) or loses (and sees CLOSED below).
+
+    ⚠️ SQLite ignores `select_for_update()` — this guard is real on the
+    PostgreSQL dev/target database only, until the production cutover.
+
+    An explicitly passed shift that is closed is refused: the caller named a
+    drawer, and it is the wrong one. When the shift was auto-resolved the
+    money is simply left unstamped instead — a shift closing mid-request is
+    not a reason to refuse a patient's payment (same rule as having no shift
+    open at all).
+    """
+    named_by_caller = shift is not None
+    if not named_by_caller:
+        shift = current_shift(user)
+        if shift is None:
+            return None
+
+    locked = CashierShift.objects.select_for_update().filter(pk=shift.pk).first()
+    if locked is not None and locked.status == CashierShiftStatus.OPEN:
+        return locked
+    if named_by_caller:
+        raise ValidationError({"shift": f"Shift #{shift.pk} is not open."})
+    return None
+
+
+@transaction.atomic
+def open_shift(*, cashier, till_id=DEFAULT_TILL_ID, opening_float=Decimal("0.00")):
+    """Open a till session for `cashier`.
+
+    One open shift per cashier and one per till, both enforced by a partial
+    `UniqueConstraint`; the `IntegrityError` handler is what actually makes
+    this safe under concurrency (CLAUDE.md §3 — a check-then-act without the
+    constraint behind it is a bug).
+    """
+    opening_float = Decimal(opening_float)
+    if opening_float < 0:
+        raise ValidationError({"opening_float": "The opening float cannot be negative."})
+
+    try:
+        with transaction.atomic():
+            return CashierShift.objects.create(
+                cashier=cashier,
+                till_id=till_id,
+                opening_float=opening_float,
+                currency=settings.BILLING_CURRENCY,
+            )
+    except IntegrityError:
+        pass
+
+    # One of the two partial unique constraints fired — say which.
+    if current_shift(cashier) is not None:
+        raise ValidationError(
+            {"cashier": "This cashier already has an open shift — close it first."}
+        )
+    raise ValidationError({"till_id": f"Till {till_id} already has an open shift."})
+
+
+def expected_cash(shift):
+    """What the drawer should hold: opening float + cash in − cash out.
+
+    Derived with `aggregate(Sum(...))` over this shift's own rows every time
+    it is asked for, never kept as a running column. Only CASH counts — a card
+    or transfer never passes through the drawer.
+    """
+    received = shift.payments.filter(
+        payment_method=PaymentMethod.CASH,
+    ).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    paid_out = shift.refunds.filter(
+        payment_method=PaymentMethod.CASH,
+    ).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    return shift.opening_float + received - paid_out
+
+
+def post_shift_variance(shift, *, variance, reason_code, user, posting_date=None):
+    """Post `Shift:{id}:variance` — the till over/short (financial roadmap
+    Task 11; `clinic-accounting-events.md`§3 `CashierShiftClosed`).
+
+    The counted drawer is the truth, so the cash account is moved to match it
+    and `CASH_VARIANCE` absorbs the difference:
+
+    - over  (counted > expected): Dr cash        / Cr cash variance
+    - short (counted < expected): Dr cash variance / Cr cash
+
+    The cash side is `CASH_DEFAULT` — the same account `post_payment_received`
+    debits for a cash receipt, so the variance lands where the cash it explains
+    actually sits. A zero variance posts nothing and returns None: there is no
+    entry to make, and the ledger refuses a zero-amount line anyway.
+    """
+    if not variance:
+        return None
+    if not reason_code:
+        raise ValidationError(
+            {"reason_code": "A till variance requires a reason_code."}
+        )
+
+    cash_account = AccountMap.resolve("CASH_DEFAULT")
+    variance_account = AccountMap.resolve("CASH_VARIANCE")
+    amount = abs(variance)
+    if variance > 0:
+        lines = [
+            {"account": cash_account, "debit": amount},
+            {"account": variance_account, "credit": amount},
+        ]
+    else:
+        lines = [
+            {"account": variance_account, "debit": amount},
+            {"account": cash_account, "credit": amount},
+        ]
+
+    return accounting_services.post(
+        posting_date=posting_date or timezone.localdate(),
+        source_type="CashierShift",
+        source_id=shift.id,
+        description=f"Till variance — shift #{shift.id} ({shift.till_id})",
+        lines=lines,
+        idempotency_key=f"Shift:{shift.id}:variance",
+        reason_code=reason_code,
+        user=user,
+    )
+
+
+@transaction.atomic
+def close_shift(
+    *, shift, counted_amount, closed_by, reason_code="", approved_by=None, notes="",
+):
+    """Count the drawer, post the difference, and close the shift for good.
+
+    `counted_amount` is what was physically counted. Anything other than the
+    expected figure is a financial correction, so it needs a `reason_code` and
+    an `approved_by` — refused here, and refused again by the database
+    (`shift_variance_requires_reason_and_approval`).
+
+    Returns the closed shift; `shift.journal_entry` is the variance posting, or
+    None when the count came out exactly right.
+    """
+    shift = CashierShift.objects.select_for_update().get(pk=shift.pk)
+    if shift.status != CashierShiftStatus.OPEN:
+        raise ValidationError({"shift": f"Shift #{shift.pk} is already closed."})
+
+    counted_amount = Decimal(counted_amount)
+    if counted_amount < 0:
+        raise ValidationError({"counted_amount": "The counted amount cannot be negative."})
+
+    expected = expected_cash(shift)
+    variance = counted_amount - expected
+    if variance:
+        if not reason_code:
+            raise ValidationError({
+                "reason_code": (
+                    f"The drawer is {'over' if variance > 0 else 'short'} by "
+                    f"{abs(variance)} — closing with a variance requires a reason_code."
+                ),
+            })
+        if approved_by is None:
+            raise ValidationError(
+                {"approved_by": "Closing with a variance requires an approver."}
+            )
+
+    entry = post_shift_variance(
+        shift, variance=variance, reason_code=reason_code, user=approved_by,
+    )
+
+    shift.status = CashierShiftStatus.CLOSED
+    shift.closed_at = timezone.now()
+    shift.closed_by = closed_by
+    shift.expected_amount = expected
+    shift.counted_amount = counted_amount
+    shift.variance = variance
+    shift.variance_reason_code = reason_code if variance else ""
+    shift.approved_by = approved_by if variance else None
+    shift.journal_entry = entry
+    shift.notes = notes
+    shift.save(update_fields=[
+        "status", "closed_at", "closed_by", "expected_amount", "counted_amount",
+        "variance", "variance_reason_code", "approved_by", "journal_entry",
+        "notes", "updated_at",
+    ])
+    return shift
 
 
 def _period_start(period):

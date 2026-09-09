@@ -234,6 +234,14 @@ class DepositStatus(models.TextChoices):
     REFUNDED = "REFUNDED", _("Refunded")
 
 
+class CashierShiftStatus(models.TextChoices):
+    """Financial roadmap Task 11 — a till session. CLOSED is final: the
+    counted cash and its variance posting are a financial record, so there
+    is no reopen transition."""
+    OPEN = "OPEN", _("Open")
+    CLOSED = "CLOSED", _("Closed")
+
+
 class ReferralType(models.TextChoices):
     INTERNAL = "INTERNAL", _("Internal")
     EXTERNAL = "EXTERNAL", _("External")

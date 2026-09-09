@@ -3,6 +3,11 @@ Financial roadmap Tasks 6-7 wire this into the double-entry ledger in
 apps.accounting: `CreditNote`/`Refund`/`PatientDeposit` plus invoice
 cancellation.
 
+`CashierShift` (Task 11) is the till session money is received into: a
+payment/refund taken while its cashier has a shift open is stamped with it,
+and closing the shift posts the difference between the counted drawer and
+what the ledger expects.
+
 Money flow: completing an appointment issues an `Invoice` built from the
 `ServiceItem` catalog; the secretary records `Payment` rows against it, and the
 invoice keeps `paid_amount`/`balance`/`status` in sync. A consultation invoice
@@ -18,15 +23,19 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from apps.core.enums import (
     BillingSourceType,
+    CashierShiftStatus,
     DepositStatus,
     InvoiceStatus,
     PaymentMethod,
     ServiceItemType,
 )
 from apps.core.models import TimeStampedModel
+
+from .exceptions import ClosedShiftError
 
 
 class ServiceItem(TimeStampedModel):
@@ -198,6 +207,13 @@ class Payment(TimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="received_payments",
     )
+    # The till session this money was taken in (Task 11). Null when the
+    # cashier had no shift open — a shift is a reconciliation aid, never a
+    # precondition for taking a patient's money.
+    shift = models.ForeignKey(
+        "billing.CashierShift", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="payments",
+    )
 
     class Meta:
         ordering = ["-paid_at"]
@@ -304,6 +320,12 @@ class Refund(TimeStampedModel):
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="approved_refunds",
     )
+    # The till session the money was paid out of (Task 11) — a cash refund
+    # takes money *out* of the drawer, so it counts against expected cash.
+    shift = models.ForeignKey(
+        "billing.CashierShift", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="refunds",
+    )
     journal_entry = models.ForeignKey(
         "accounting.JournalEntry", null=True, blank=True,
         on_delete=models.PROTECT, related_name="+",
@@ -352,3 +374,158 @@ class PatientDeposit(TimeStampedModel):
 
     def __str__(self):
         return f"Deposit {self.amount} for {self.patient} ({self.status})"
+
+
+DEFAULT_TILL_ID = "MAIN"
+
+
+class CashierShift(TimeStampedModel):
+    """One cashier's session at one till (financial roadmap Task 11).
+
+    Opening records the float already in the drawer; every cash payment taken
+    and every cash refund paid out while the shift is open is stamped with it
+    (see `services.record_payment` / `services.issue_refund`). Closing counts
+    the drawer and **posts** the difference — `services.close_shift`, never a
+    direct write here.
+
+    `expected_amount` is always derived at close time with `aggregate(Sum(...))`
+    over this shift's own payment/refund rows (`services.expected_cash`), never
+    kept as a running counter; the three money columns are the frozen record of
+    what that one count found.
+
+    ⚠️ `variance = counted_amount - expected_amount`, so it is signed: positive
+    is an *over* (more cash in the drawer than the ledger says), negative a
+    *short*. Both are posted against `CASH_VARIANCE`, in opposite directions.
+
+    A non-zero variance is a financial correction, so it requires a
+    `variance_reason_code` and an `approved_by` — enforced at the database
+    level by `shift_variance_requires_reason_and_approval`, not only in the
+    service. Once CLOSED the row is immutable (`save()`/`delete()` raise):
+    a mistaken count is corrected by a reversing journal entry, exactly like
+    every other financial record in this system.
+    """
+
+    cashier = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="cashier_shifts",
+    )
+    # A label for the physical drawer, not an account selector: every till
+    # currently posts to the same `CASH_DEFAULT` account that
+    # `post_payment_received` debits, so a variance always lands on the account
+    # the cash actually sits in. Per-till cash accounts (`CASH_BY_TILL`) would
+    # need the receipt posting to split first — not this task.
+    till_id = models.CharField(max_length=32, default=DEFAULT_TILL_ID, db_index=True)
+    status = models.CharField(
+        max_length=8, choices=CashierShiftStatus.choices, default=CashierShiftStatus.OPEN,
+        db_index=True,
+    )
+    opened_at = models.DateTimeField(default=timezone.now)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="closed_cashier_shifts",
+    )
+    opening_float = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    # All three set together at close; null while the shift is open.
+    expected_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+    )
+    counted_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    # Signed: counted - expected. No MinValueValidator — a short is negative.
+    variance = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    variance_reason_code = models.CharField(max_length=64, blank=True, default="")
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="approved_shift_variances",
+    )
+    journal_entry = models.ForeignKey(
+        "accounting.JournalEntry", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+    currency = models.CharField(max_length=8, default="EGP")
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-opened_at", "-id"]
+        indexes = [
+            models.Index(fields=["cashier", "status"]),
+            models.Index(fields=["status", "opened_at"]),
+        ]
+        constraints = [
+            # Check-then-act needs a database constraint behind it (CLAUDE.md
+            # §3): two requests must not be able to open a second shift on the
+            # same drawer, or for the same cashier, at the same moment.
+            models.UniqueConstraint(
+                fields=["cashier"], condition=models.Q(status=CashierShiftStatus.OPEN),
+                name="uniq_open_shift_per_cashier",
+            ),
+            models.UniqueConstraint(
+                fields=["till_id"], condition=models.Q(status=CashierShiftStatus.OPEN),
+                name="uniq_open_shift_per_till",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(opening_float__gte=Decimal("0.00")),
+                name="shift_opening_float_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(counted_amount__isnull=True)
+                    | models.Q(counted_amount__gte=Decimal("0.00"))
+                ),
+                name="shift_counted_amount_non_negative",
+            ),
+            # A financial correction always carries a reason and an approver.
+            models.CheckConstraint(
+                condition=(
+                    models.Q(variance__isnull=True)
+                    | models.Q(variance=Decimal("0.00"))
+                    | (
+                        ~models.Q(variance_reason_code="")
+                        & models.Q(approved_by__isnull=False)
+                    )
+                ),
+                name="shift_variance_requires_reason_and_approval",
+            ),
+            # A closed shift is a complete count: never half-filled.
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(status=CashierShiftStatus.CLOSED)
+                    | (
+                        models.Q(closed_at__isnull=False)
+                        & models.Q(expected_amount__isnull=False)
+                        & models.Q(counted_amount__isnull=False)
+                        & models.Q(variance__isnull=False)
+                    )
+                ),
+                name="closed_shift_is_complete",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Shift #{self.pk} {self.till_id} ({self.cashier}) — {self.status}"
+
+    @property
+    def is_open(self):
+        return self.status == CashierShiftStatus.OPEN
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous_status = (
+                CashierShift.objects.filter(pk=self.pk)
+                .values_list("status", flat=True)
+                .first()
+            )
+            if previous_status == CashierShiftStatus.CLOSED:
+                raise ClosedShiftError(
+                    f"Shift #{self.pk} is closed — post a correcting journal entry "
+                    f"instead of editing it."
+                )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ClosedShiftError("cashier shifts cannot be deleted")
