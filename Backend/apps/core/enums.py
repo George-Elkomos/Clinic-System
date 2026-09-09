@@ -202,7 +202,6 @@ class ServiceItemType(models.TextChoices):
     LAB_TEST = "LAB_TEST", _("Lab test")
     PROCEDURE = "PROCEDURE", _("Procedure")
     RADIOLOGY = "RADIOLOGY", _("Radiology")
-    MEDICATION = "MEDICATION", _("Medication")
     OTHER = "OTHER", _("Other")
 
 
@@ -226,7 +225,6 @@ class BillingSourceType(models.TextChoices):
     LAB_ORDER = "LAB_ORDER", _("Lab order")
     PROCEDURE = "PROCEDURE", _("Procedure")
     RADIOLOGY_ORDER = "RADIOLOGY_ORDER", _("Radiology order")
-    PRESCRIPTION = "PRESCRIPTION", _("Prescription")
 
 
 class DepositStatus(models.TextChoices):

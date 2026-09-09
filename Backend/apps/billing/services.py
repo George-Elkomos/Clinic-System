@@ -280,17 +280,16 @@ _DEFAULT_ITEM_NAME_BY_TYPE = {
     ServiceItemType.PROCEDURE: "Clinical Procedure",
     ServiceItemType.RADIOLOGY: "Radiology Study",
     ServiceItemType.LAB_TEST: "Laboratory Test",
-    ServiceItemType.MEDICATION: "Medication",
 }
 
 
 def _catalog_price(item_type):
     """The active catalog price for `item_type`; bootstrap one at 0.00 if the
     clinic never configured it (same reasoning as `_consultation_service_item`
-    — billing a completed procedure/scan/lab-order/prescription must never
-    become a hard failure that blocks the underlying clinical action. A 0.00
-    invoice is a visible prompt for the clinic to add real pricing, not a
-    silent guess at what the charge should be.
+    — billing a completed procedure/scan/lab-order must never become a hard
+    failure that blocks the underlying clinical action. A 0.00 invoice is a
+    visible prompt for the clinic to add real pricing, not a silent guess at
+    what the charge should be.
     """
     item = ServiceItem.objects.filter(item_type=item_type, is_active=True).order_by("id").first()
     if item is None:
@@ -308,8 +307,8 @@ def bill_ad_hoc_service(
 ):
     """The Task-1 pattern (unique constraint + IntegrityError handler),
     generalised for every non-appointment billing source (financial roadmap
-    Task 8: procedures, radiology, lab orders, prescriptions). One InvoiceItem
-    per source, exactly once — `InvoiceItem`'s existing
+    Task 8: procedures, radiology, lab orders). One InvoiceItem per source,
+    exactly once — `InvoiceItem`'s existing
     `UniqueConstraint(["source_type", "source_id"])` from Task 1 already
     protects every source generically; it was never APPOINTMENT-specific.
     """
@@ -388,25 +387,6 @@ def handle_lab_order_completed(order, *, user):
         source_id=order.id,
         item_type=ServiceItemType.LAB_TEST,
         description=f"Laboratory tests ({order.order_number})",
-        user=user,
-    )
-
-
-def handle_prescription_issued(prescription, *, user):
-    """Bill a `Prescription` at the point it's issued — financial roadmap
-    Task 8. This clinic has no in-house dispensing/pharmacy workflow (no
-    stock, no pharmacist role, no "handed to patient" event exists anywhere
-    in apps.medications/apps.medical_records), so the doctor's act of writing
-    the prescription is the only real, unambiguous financial event available;
-    billing at dispensing would need that workflow built first.
-    """
-    return bill_ad_hoc_service(
-        patient_user=prescription.patient.user,
-        doctor_user=prescription.doctor.user if prescription.doctor_id else None,
-        source_type=BillingSourceType.PRESCRIPTION,
-        source_id=prescription.id,
-        item_type=ServiceItemType.MEDICATION,
-        description="Prescribed medication",
         user=user,
     )
 

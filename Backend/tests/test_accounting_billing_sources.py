@@ -1,8 +1,14 @@
 """Financial roadmap Task 8 — the remaining billing sources (procedures,
-radiology, lab orders, prescriptions). Each source reuses the exact Task 1
-pattern (InvoiceItem's UniqueConstraint(["source_type", "source_id"]) +
+radiology, lab orders). Each source reuses the exact Task 1 pattern
+(InvoiceItem's UniqueConstraint(["source_type", "source_id"]) +
 IntegrityError handler) via apps.billing.services.bill_ad_hoc_service — these
 tests exercise that idempotency directly, plus each source's revenue mapping.
+
+Medication/prescriptions are deliberately NOT billed: this clinic has no
+in-house dispensing workflow, so billing at the point a prescription is
+*written* would charge patients who fill it at an outside pharmacy. Billing
+belongs at a real "dispensed from our own stock" event, which doesn't exist
+yet — see docs/financial-design/MEDICATION_FINANCIAL_WORKFLOW_ANALYSIS.md.
 
 The chart of accounts + an open Period covering "today" are seeded once for
 the whole test session (see tests/conftest.py's django_db_setup override).
@@ -160,8 +166,10 @@ class TestLabOrderBilling:
         assert entry.lines.get(account=revenue_account).credit == invoice.total == Decimal("35.00")
 
 
-class TestPrescriptionBilling:
-    def test_issuing_a_prescription_via_the_api_bills_exactly_once(self, api, patient, doctor_profile):
+class TestPrescriptionsAreNotBilled:
+    def test_issuing_a_prescription_via_the_api_posts_nothing(self, api, patient, doctor_profile):
+        """See the module docstring — no dispensing workflow exists, so
+        writing a prescription must never create an invoice or ledger entry."""
         from apps.doctors.models import DoctorPatient
 
         DoctorPatient.objects.create(doctor=doctor_profile, patient=patient.patient_profile)
@@ -174,33 +182,10 @@ class TestPrescriptionBilling:
         assert resp.status_code == 201
         prescription_id = resp.data["id"]
 
-        assert InvoiceItem.objects.filter(
-            source_type=BillingSourceType.PRESCRIPTION, source_id=prescription_id,
-        ).count() == 1
-        invoice = Invoice.objects.get(patient=patient)
-
-        from apps.medical_records.models import Prescription
-
-        prescription = Prescription.objects.get(pk=prescription_id)
-        again = billing_services.handle_prescription_issued(prescription, user=doctor_profile.user)
-        assert again.pk == invoice.pk
-        assert InvoiceItem.objects.filter(
-            source_type=BillingSourceType.PRESCRIPTION, source_id=prescription_id,
-        ).count() == 1
-
-    def test_prescription_revenue_posts_to_the_medication_account(self, patient, doctor_profile):
-        ServiceItem.objects.create(
-            name="Standard Rx", item_type=ServiceItemType.MEDICATION, default_price="15.00",
-        )
-        from apps.medical_records.models import Prescription
-
-        prescription = Prescription.objects.create(patient=patient.patient_profile, doctor=doctor_profile)
-        billing_services.handle_prescription_issued(prescription, user=doctor_profile.user)
-
-        invoice = Invoice.objects.get(patient=patient)
-        entry = JournalEntry.objects.get(idempotency_key=f"Invoice:{invoice.id}:issue")
-        revenue_account = AccountMap.resolve("REVENUE_BY_SERVICE_CATEGORY", "MEDICATION")
-        assert entry.lines.get(account=revenue_account).credit == invoice.total == Decimal("15.00")
+        assert not InvoiceItem.objects.filter(
+            source_type="PRESCRIPTION", source_id=prescription_id,
+        ).exists()
+        assert not Invoice.objects.filter(patient=patient).exists()
 
 
 class TestZeroPriceCatalogBootstrap:
