@@ -165,7 +165,7 @@ class Command(BaseCommand):
             patient=patient_profile, doctor=doctor_profile,
             reason=f"{self._tag(key)} Routine checkup.", created_by=secretary_user,
         )
-        appt_services.complete_appointment(appt)
+        appt_services.complete_appointment(appt, user=secretary_user)
         self.stdout.write(self.style.SUCCESS(f"  appointment[{key}]: created and completed via the real service"))
 
     def _report(self, doctor_profile):

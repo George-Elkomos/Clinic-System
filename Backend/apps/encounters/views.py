@@ -68,7 +68,7 @@ class EncounterViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
         encounter = self.get_object()
-        result = services.submit_encounter(encounter)
+        result = services.submit_encounter(encounter, user=request.user)
         data = EncounterReadSerializer(result).data
         # Billing outcome (Phase 12): "Submit & Close Encounter" is now the doctor's
         # only path to completing a visit (the queue's old direct "Complete Visit"

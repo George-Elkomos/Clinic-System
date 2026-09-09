@@ -203,7 +203,7 @@ def test_complete_records_doctor_patient_link(patient, doctor_profile, future_sl
     from apps.doctors.models import DoctorPatient
 
     appt = _book(patient, future_slot)
-    services.complete_appointment(appt)
+    services.complete_appointment(appt, user=doctor_profile.user)
     assert DoctorPatient.objects.filter(
         doctor=doctor_profile, patient=patient.patient_profile
     ).exists()

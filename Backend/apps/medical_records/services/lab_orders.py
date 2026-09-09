@@ -136,6 +136,10 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
             if result.is_critical:
                 has_critical = True
 
+    from apps.billing.services import handle_lab_order_completed
+
+    handle_lab_order_completed(order, user=entered_by)
+
     notify(
         recipient=order.patient.user,
         verb=NotificationVerb.LAB_RESULT_AVAILABLE,

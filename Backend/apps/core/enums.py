@@ -201,6 +201,8 @@ class ServiceItemType(models.TextChoices):
     CONSULTATION = "CONSULTATION", _("Consultation")
     LAB_TEST = "LAB_TEST", _("Lab test")
     PROCEDURE = "PROCEDURE", _("Procedure")
+    RADIOLOGY = "RADIOLOGY", _("Radiology")
+    MEDICATION = "MEDICATION", _("Medication")
     OTHER = "OTHER", _("Other")
 
 
@@ -222,6 +224,16 @@ class PaymentMethod(models.TextChoices):
 class BillingSourceType(models.TextChoices):
     APPOINTMENT = "APPOINTMENT", _("Appointment")
     LAB_ORDER = "LAB_ORDER", _("Lab order")
+    PROCEDURE = "PROCEDURE", _("Procedure")
+    RADIOLOGY_ORDER = "RADIOLOGY_ORDER", _("Radiology order")
+    PRESCRIPTION = "PRESCRIPTION", _("Prescription")
+
+
+class DepositStatus(models.TextChoices):
+    HELD = "HELD", _("Held")
+    PARTIALLY_APPLIED = "PARTIALLY_APPLIED", _("Partially applied")
+    APPLIED = "APPLIED", _("Applied")
+    REFUNDED = "REFUNDED", _("Refunded")
 
 
 class ReferralType(models.TextChoices):

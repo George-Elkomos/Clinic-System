@@ -198,6 +198,7 @@ class Command(BaseCommand):
             procedure,
             post_procedure_notes="Dressing changed cleanly, wound looks healthy.",
             complications="",
+            user=doctor_profile.user,
         )
         self.stdout.write(self.style.SUCCESS(f"  procedure[{key}]: created ({template.name}), status=COMPLETED"))
 

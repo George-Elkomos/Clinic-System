@@ -1,10 +1,14 @@
 """Billing module (Phase 12) — pricing catalog, invoices, payments, fee validity.
+Financial roadmap Tasks 6-7 wire this into the double-entry ledger in
+apps.accounting: `CreditNote`/`Refund`/`PatientDeposit` plus invoice
+cancellation.
 
 Money flow: completing an appointment issues an `Invoice` built from the
 `ServiceItem` catalog; the secretary records `Payment` rows against it, and the
-invoice keeps `paid_amount`/`balance`/`status` in sync. A fully-paid consultation
-opens a `FeeValidity` window during which follow-up visits with the same doctor
-are free (used_count is incremented instead of issuing a new invoice).
+invoice keeps `paid_amount`/`balance`/`status` in sync. A consultation invoice
+opens a `FeeValidity` window *when issued* (not when paid — see the class
+docstring) during which follow-up visits with the same doctor are free
+(used_count is incremented instead of issuing a new invoice).
 
 All FKs point at `users.User` (not the profile models): the patient/doctor split
 is role-based here, and object-level API permissions filter on `request.user`.
@@ -17,6 +21,7 @@ from django.db import models
 
 from apps.core.enums import (
     BillingSourceType,
+    DepositStatus,
     InvoiceStatus,
     PaymentMethod,
     ServiceItemType,
@@ -78,6 +83,16 @@ class Invoice(TimeStampedModel):
         max_digits=10, decimal_places=2, default=Decimal("0.00"),
         validators=[MinValueValidator(Decimal("0.00"))],
     )
+    # Both derived from Sum() over this invoice's CreditNote/Refund rows
+    # (Task 7) — never incremented with `+=`, same convention as paid_amount.
+    credited_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    refunded_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
     # Always derived: never written directly, recomputed on every save().
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     currency = models.CharField(max_length=8, default="EGP")
@@ -100,7 +115,15 @@ class Invoice(TimeStampedModel):
         return f"INV-{self.pk:05d}" if self.pk else "INV-(unsaved)"
 
     def save(self, *args, **kwargs):
-        self.balance = (self.total or Decimal("0.00")) - (self.paid_amount or Decimal("0.00"))
+        # A credit note reduces what's owed; a refund of already-collected
+        # money increases it again. Neither ever rewrites `total`/`paid_amount`
+        # — those stay the historical record of what was billed and collected.
+        self.balance = (
+            (self.total or Decimal("0.00"))
+            - (self.paid_amount or Decimal("0.00"))
+            - (self.credited_amount or Decimal("0.00"))
+            + (self.refunded_amount or Decimal("0.00"))
+        )
         if "update_fields" in kwargs and kwargs["update_fields"] is not None:
             kwargs["update_fields"] = list(set(kwargs["update_fields"]) | {"balance"})
         super().save(*args, **kwargs)
@@ -230,3 +253,102 @@ class FeeValidity(TimeStampedModel):
             self.valid_from <= date <= self.valid_until
             and self.used_count < self.max_free_visits
         )
+
+
+class CreditNote(TimeStampedModel):
+    """Reduces what a patient owes on `invoice` without editing its totals.
+
+    Posts its own ledger entry (Dr revenue / Cr AR) — a pure revenue-and-AR
+    adjustment, separate from whatever discount was applied at issue time.
+    `journal_entry` is nullable only because the ledger entry's idempotency
+    key needs this row's own pk first; `services.issue_credit_note` always
+    fills it in before returning, in the same transaction.
+    """
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="credit_notes")
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    reason_code = models.CharField(max_length=64)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="approved_credit_notes",
+    )
+    journal_entry = models.ForeignKey(
+        "accounting.JournalEntry", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(reason_code=""), name="creditnote_reason_code_required",
+            ),
+        ]
+
+    def __str__(self):
+        return f"CreditNote {self.amount} on {self.invoice.number}"
+
+
+class Refund(TimeStampedModel):
+    """Money paid back to a patient against `invoice`. Can never exceed what
+    was actually collected on that invoice (enforced in `services.issue_refund`).
+    """
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="refunds")
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    payment_method = models.CharField(max_length=16, choices=PaymentMethod.choices)
+    reason_code = models.CharField(max_length=64)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="approved_refunds",
+    )
+    journal_entry = models.ForeignKey(
+        "accounting.JournalEntry", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(reason_code=""), name="refund_reason_code_required",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Refund {self.amount} on {self.invoice.number}"
+
+
+class PatientDeposit(TimeStampedModel):
+    """Money held for a patient that isn't revenue yet — an overpayment (Task 7)
+    or an advance taken before treatment. Posted to a liability account, never
+    to revenue; `available_amount` is what's left to apply or refund.
+    """
+
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="deposits",
+    )
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    applied_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    refunded_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    status = models.CharField(
+        max_length=20, choices=DepositStatus.choices, default=DepositStatus.HELD,
+    )
+    journal_entry = models.ForeignKey(
+        "accounting.JournalEntry", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    @property
+    def available_amount(self):
+        return self.amount - self.applied_amount - self.refunded_amount
+
+    def __str__(self):
+        return f"Deposit {self.amount} for {self.patient} ({self.status})"

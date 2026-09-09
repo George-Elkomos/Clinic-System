@@ -212,6 +212,10 @@ class PrescriptionViewSet(MedicalScopedMixin, viewsets.ModelViewSet):
         patient = self._resolve_patient(serializer)
         serializer.save(doctor=self.request.user.doctor_profile, patient=patient)
 
+        from apps.billing.services import handle_prescription_issued
+
+        handle_prescription_issued(serializer.instance, user=self.request.user)
+
     @action(detail=False, methods=["post"], url_path="check-interactions")
     def check_interactions(self, request):
         """Stateless pre-save drug-allergy check.

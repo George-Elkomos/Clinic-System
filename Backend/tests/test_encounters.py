@@ -48,7 +48,7 @@ def test_submit_completes_appointment_and_locks_encounter(patient, doctor_profil
     draft = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
     draft.chief_complaint = "Headache"
     draft.save(update_fields=["chief_complaint"])
-    encounter_services.submit_encounter(draft)
+    encounter_services.submit_encounter(draft, user=doctor_profile.user)
     draft.refresh_from_db()
     appt.refresh_from_db()
     assert draft.status == EncounterStatus.SUBMITTED
@@ -64,7 +64,7 @@ def test_amend_moves_appointment_link_to_the_new_current_twin(patient, doctor_pr
     original = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
     original.chief_complaint = "Headache"
     original.save(update_fields=["chief_complaint"])
-    encounter_services.submit_encounter(original)
+    encounter_services.submit_encounter(original, user=doctor_profile.user)
 
     twin = encounter_services.amend_encounter(original)
 
@@ -98,9 +98,9 @@ def test_double_amend_chain_keeps_appointment_on_latest(patient, doctor_profile,
     v1 = encounter_services.get_or_create_draft(appointment=appt, doctor=doctor_profile)
     v1.chief_complaint = "Headache"
     v1.save(update_fields=["chief_complaint"])
-    encounter_services.submit_encounter(v1)
+    encounter_services.submit_encounter(v1, user=doctor_profile.user)
     v2 = encounter_services.amend_encounter(v1)
-    encounter_services.submit_encounter(v2)
+    encounter_services.submit_encounter(v2, user=doctor_profile.user)
     v3 = encounter_services.amend_encounter(v2)
 
     v1.refresh_from_db()
@@ -118,7 +118,7 @@ def test_submit_rejects_encounter_with_zero_clinical_content(patient, doctor_pro
     from rest_framework.exceptions import ValidationError
 
     with pytest.raises(ValidationError):
-        encounter_services.submit_encounter(draft)
+        encounter_services.submit_encounter(draft, user=doctor_profile.user)
 
     draft.refresh_from_db()
     appt.refresh_from_db()
@@ -144,7 +144,7 @@ def test_submit_accepts_encounter_with_any_single_clinical_field(
         setattr(draft, field, value)
     draft.save(update_fields=list(fields))
 
-    encounter_services.submit_encounter(draft)
+    encounter_services.submit_encounter(draft, user=doctor_profile.user)
     draft.refresh_from_db()
     assert draft.status == EncounterStatus.SUBMITTED
 
@@ -155,7 +155,7 @@ def test_submit_accepts_encounter_with_only_a_diagnosis(patient, doctor_profile,
     draft.diagnosis = diagnosis
     draft.save(update_fields=["diagnosis"])
 
-    encounter_services.submit_encounter(draft)
+    encounter_services.submit_encounter(draft, user=doctor_profile.user)
     draft.refresh_from_db()
     assert draft.status == EncounterStatus.SUBMITTED
 
@@ -209,7 +209,7 @@ def test_manager_cannot_submit_or_amend_encounter(api, manager, patient, doctor_
 
     draft.chief_complaint = "Headache"
     draft.save(update_fields=["chief_complaint"])
-    encounter_services.submit_encounter(draft)
+    encounter_services.submit_encounter(draft, user=doctor_profile.user)
     draft.refresh_from_db()
     resp = api.post(reverse("encounter-amend", args=[draft.id]))
     assert resp.status_code == 403
@@ -243,7 +243,7 @@ def test_previous_encounter_surfaces_on_followup_only(api, patient, doctor_profi
     origin_draft.diagnosis = diagnosis
     origin_draft.treatment_plan = "Rest and fluids"
     origin_draft.save(update_fields=["chief_complaint", "diagnosis", "treatment_plan"])
-    encounter_services.submit_encounter(origin_draft)
+    encounter_services.submit_encounter(origin_draft, user=doctor_profile.user)
 
     followup = appt_services.create_followup(
         origin_appointment=origin, recommended_date=timezone.localdate(),

@@ -64,7 +64,7 @@ def get_or_create_draft(*, appointment, doctor):
 
 
 @transaction.atomic
-def submit_encounter(encounter):
+def submit_encounter(encounter, *, user):
     """DRAFT -> SUBMITTED. Completes the appointment and mirrors a MedicalRecord."""
     if encounter.status != EncounterStatus.DRAFT:
         raise ValidationError({"status": "Only a draft encounter can be submitted."})
@@ -80,7 +80,7 @@ def submit_encounter(encounter):
 
     appointment = encounter.appointment
     if appointment and appointment.status != AppointmentStatus.COMPLETED:
-        complete_appointment(appointment)
+        complete_appointment(appointment, user=user)
 
     create_record_version(
         patient=encounter.patient,

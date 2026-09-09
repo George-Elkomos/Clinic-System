@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.appointments import services as appointment_services
-from apps.billing.models import FeeValidity, Invoice, InvoiceItem, Payment, ServiceItem
+from apps.billing.models import FeeValidity, Invoice, InvoiceItem, Payment, PatientDeposit, ServiceItem
 from apps.core.enums import (
     BillingSourceType,
     InvoiceStatus,
@@ -210,7 +210,7 @@ def _complete_visit(patient_user, doctor_profile, secretary):
     appointment = appointment_services.create_walk_in(
         patient=patient_user.patient_profile, doctor=doctor_profile, created_by=secretary
     )
-    return appointment_services.complete_appointment(appointment)
+    return appointment_services.complete_appointment(appointment, user=secretary)
 
 
 class TestCompletionBillingHook:
@@ -270,7 +270,7 @@ class TestCompletionBillingHook:
         appointment = appointment_services.create_walk_in(
             patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary
         )
-        invoice, fee_validity, arrears = handle_appointment_completed(appointment)
+        invoice, fee_validity, arrears = handle_appointment_completed(appointment, user=secretary)
 
         assert invoice is None  # the free visit was consumed, not billed
         assert fee_validity is not None
@@ -316,7 +316,7 @@ class TestCompletionBillingHook:
         self, consultation_item, patient, doctor_profile, secretary
     ):
         appointment = _complete_visit(patient, doctor_profile, secretary)
-        appointment_services.complete_appointment(appointment)  # idempotent re-complete
+        appointment_services.complete_appointment(appointment, user=secretary)  # idempotent re-complete
         assert Invoice.objects.filter(patient=patient).count() == 1
         assert FeeValidity.objects.get(patient=patient).used_count == 0
 
@@ -357,7 +357,9 @@ class TestCompletionBillingHook:
             return real_filter(*args, **kwargs)
 
         monkeypatch.setattr(InvoiceItem.objects, "filter", racy_filter)
-        invoice, fee_validity, arrears = billing_services.handle_appointment_completed(appointment)
+        invoice, fee_validity, arrears = billing_services.handle_appointment_completed(
+            appointment, user=secretary,
+        )
 
         assert Invoice.objects.filter(patient=patient).count() == 1
         assert fee_validity is None
@@ -424,14 +426,21 @@ class TestPaymentAPI:
         assert issued_invoice.balance == Decimal("0.00")
         assert issued_invoice.payments.count() == 2
 
-    def test_overpayment_rejected(self, api, issued_invoice, secretary):
+    def test_overpayment_becomes_a_deposit(self, api, issued_invoice, secretary):
+        """Financial roadmap Task 7: overpayment is never refused — the excess
+        becomes a PatientDeposit (a liability), and the invoice is simply PAID."""
         api.force_authenticate(secretary)
         resp = api.post(reverse("payment-list"), {
             "invoice": issued_invoice.id, "amount": "999.00", "payment_method": "CASH",
         }, format="json")
-        assert resp.status_code == 400
+        assert resp.status_code == 201
         issued_invoice.refresh_from_db()
-        assert issued_invoice.status == InvoiceStatus.ISSUED
+        assert issued_invoice.status == InvoiceStatus.PAID
+        assert issued_invoice.paid_amount == issued_invoice.total
+        assert issued_invoice.balance == Decimal("0.00")
+
+        deposit = PatientDeposit.objects.get(patient=issued_invoice.patient)
+        assert deposit.amount == Decimal("999.00") - issued_invoice.total
 
     def test_patient_cannot_record_payments(self, api, issued_invoice, patient):
         api.force_authenticate(patient)

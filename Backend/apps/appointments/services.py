@@ -287,11 +287,13 @@ def mark_overdue_no_shows(now=None):
 
 
 @transaction.atomic
-def complete_appointment(appointment):
+def complete_appointment(appointment, *, user):
     """Mark completed, record the doctor↔patient link, and trigger billing.
 
     Billing (Phase 12) either consumes an active free-follow-up window or
     issues a consultation invoice — see billing.services for the rules.
+    `user` is the actor recorded on the ledger entry an issued invoice posts
+    (financial roadmap Task 6).
     """
     from apps.billing.services import handle_appointment_completed
     from apps.core.enums import DoctorPatientSource
@@ -309,7 +311,7 @@ def complete_appointment(appointment):
     link.last_treated_at = appointment.completed_at
     link.save(update_fields=["last_treated_at", "updated_at"])
 
-    invoice, fee_validity, arrears_balance = handle_appointment_completed(appointment)
+    invoice, fee_validity, arrears_balance = handle_appointment_completed(appointment, user=user)
     # Exposed (not persisted) so the API layer can tell the front desk what
     # happened: "Invoice #INV-XXXX generated" vs "free follow-up used", plus
     # any overdue balance to warn reception about (never a reason to refuse).

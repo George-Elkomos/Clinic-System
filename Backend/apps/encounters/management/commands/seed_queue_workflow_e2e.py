@@ -166,7 +166,7 @@ class Command(BaseCommand):
             dosage="1 tablet", frequency="Three times a day", duration="7 days",
         )
 
-        encounter_services.submit_encounter(draft)
+        encounter_services.submit_encounter(draft, user=doctor_profile.user)
         origin.refresh_from_db()
         return origin
 

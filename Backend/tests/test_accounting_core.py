@@ -100,8 +100,8 @@ class TestAccountCodeImmutability:
 
 class TestAccountMap:
     def test_resolve_returns_mapped_account(self, revenue_leaf):
-        AccountMap.objects.create(purpose="AR_PATIENT", account=revenue_leaf)
-        assert AccountMap.resolve("AR_PATIENT") == revenue_leaf
+        AccountMap.objects.create(purpose="TEST_ONLY_PURPOSE", account=revenue_leaf)
+        assert AccountMap.resolve("TEST_ONLY_PURPOSE") == revenue_leaf
 
     def test_resolve_raises_when_unmapped(self):
         with pytest.raises(UnmappedPurposeError):
@@ -114,10 +114,12 @@ class TestAccountMap:
             AccountMap.resolve("REVENUE", "PROCEDURE")
 
     def test_duplicate_purpose_qualifier_raises_integrity_error(self, revenue_leaf, revenue_group):
-        AccountMap.objects.create(purpose="AR_PATIENT", qualifier="", account=revenue_leaf)
+        AccountMap.objects.create(purpose="TEST_ONLY_PURPOSE", qualifier="", account=revenue_leaf)
         with pytest.raises(IntegrityError):
             with db_transaction.atomic():
-                AccountMap.objects.create(purpose="AR_PATIENT", qualifier="", account=revenue_group)
+                AccountMap.objects.create(
+                    purpose="TEST_ONLY_PURPOSE", qualifier="", account=revenue_group,
+                )
 
 
 class TestFiscalYearAndPeriod:

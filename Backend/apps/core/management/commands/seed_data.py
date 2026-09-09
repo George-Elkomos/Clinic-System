@@ -221,7 +221,7 @@ class Command(BaseCommand):
                 appt = appt_services.book_slot(
                     patient=patient, slot_id=slot.pk, reason="Initial consultation"
                 )
-                appt_services.complete_appointment(appt)  # creates the DoctorPatient link
+                appt_services.complete_appointment(appt, user=doctor.user)  # creates the DoctorPatient link
             else:
                 DoctorPatient.objects.get_or_create(doctor=doctor, patient=patient)
 

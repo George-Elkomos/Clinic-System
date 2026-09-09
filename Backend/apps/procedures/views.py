@@ -76,7 +76,9 @@ class ClinicalProcedureViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only the performing doctor can complete this procedure.")
         input_serializer = ProcedureCompleteSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
-        result = complete_procedure(procedure, **input_serializer.validated_data)
+        result = complete_procedure(
+            procedure, **input_serializer.validated_data, user=request.user,
+        )
         return Response(ClinicalProcedureSerializer(result, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])

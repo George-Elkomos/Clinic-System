@@ -8,9 +8,20 @@ X" — callers resolve by *purpose*, never by hard-coded account code, and
 enforced non-overlapping across the whole ledger (not just within one fiscal
 year), since a posting date must resolve to exactly one period.
 
-The ledger itself (`JournalEntry`/`JournalLine`) and the posting engine are
-Task 5 — this module is deliberately postable-free.
+`JournalEntry`/`JournalLine` (Task 5) are the ledger itself: a balanced,
+immutable posting. Nothing outside `apps.accounting.services.post()` may
+construct one directly — that is the ledger's one door. Corrections are
+always a new, reversing entry (`services.reverse()`), never an edit.
+
+Immutability is enforced twice: `save()`/`delete()` raise in Python for the
+common case (an ORM call on a model instance), and a Postgres trigger
+(migration 0002) rejects UPDATE/DELETE at the database level for the case
+Python can't see — a bulk `.update()`/`.delete()` on a queryset, which never
+calls an instance's overridden methods.
 """
+from decimal import Decimal
+
+from django.conf import settings
 from django.db import models
 
 from apps.core.enums import AccountType, FiscalYearStatus, PeriodStatus, ReportSection, RootType
@@ -19,6 +30,7 @@ from apps.core.models import TimeStampedModel
 from .exceptions import (
     GroupAccountNotPostableError,
     ImmutableAccountCodeError,
+    ImmutableLedgerError,
     InactiveAccountError,
     OverlappingPeriodError,
     UnmappedPurposeError,
@@ -76,12 +88,11 @@ class Account(TimeStampedModel):
             raise InactiveAccountError(f"{self.code} {self.name} is inactive.")
 
     def _is_used(self):
-        """True once anything depends on this account's code meaning what it says.
-
-        Task 4: referenced by an `AccountMap` entry. Task 5 extends this to
-        also check journal lines once the ledger exists.
-        """
-        return AccountMap.objects.filter(account=self).exists()
+        """True once anything depends on this account's code meaning what it says:
+        mapped for a purpose, or already posted to."""
+        if AccountMap.objects.filter(account=self).exists():
+            return True
+        return self.journal_lines.exists()
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -192,3 +203,98 @@ class Period(TimeStampedModel):
     def for_date(cls, a_date):
         """The single period `a_date` falls in, or None."""
         return cls.objects.filter(start_date__lte=a_date, end_date__gte=a_date).first()
+
+
+class JournalEntry(TimeStampedModel):
+    """A balanced, immutable posting. Written only by `services.post()`."""
+
+    posting_date = models.DateField(db_index=True)
+    period = models.ForeignKey(Period, on_delete=models.PROTECT, related_name="entries")
+    source_type = models.CharField(max_length=32)
+    source_id = models.PositiveIntegerField()
+    idempotency_key = models.CharField(max_length=255)
+    description = models.CharField(max_length=255)
+    reason_code = models.CharField(max_length=64, blank=True, default="")
+    reverses = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="reversed_by",
+    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name_plural = "Journal entries"
+        constraints = [
+            models.UniqueConstraint(fields=["idempotency_key"], name="uniq_je_idempotency"),
+        ]
+        indexes = [models.Index(fields=["source_type", "source_id"])]
+
+    def __str__(self):
+        return f"JE#{self.pk} {self.description}"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ImmutableLedgerError(
+                "journal entries are immutable — post a reversal instead"
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ImmutableLedgerError("journal entries cannot be deleted")
+
+
+class JournalLine(TimeStampedModel):
+    """One debit or credit within a `JournalEntry`. Exactly one side is non-zero."""
+
+    entry = models.ForeignKey(JournalEntry, on_delete=models.PROTECT, related_name="lines")
+    line_no = models.PositiveSmallIntegerField()
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="journal_lines")
+    debit = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    credit = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    # Party — mandatory on RECEIVABLE/PAYABLE accounts, forbidden elsewhere.
+    party_type = models.CharField(max_length=16, blank=True, default="")
+    party_id = models.PositiveIntegerField(null=True, blank=True)
+    # Dimension: which doctor this line's revenue/cost is attributed to.
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+    # Traceability back to the billing line that caused this posting.
+    invoice_item = models.ForeignKey(
+        "billing.InvoiceItem", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="journal_lines",
+    )
+    memo = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["entry_id", "line_no"]
+        constraints = [
+            models.UniqueConstraint(fields=["entry", "line_no"], name="uniq_journal_line_no"),
+            models.CheckConstraint(
+                condition=models.Q(debit__gte=0) & models.Q(credit__gte=0),
+                name="jl_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(debit=0) & ~models.Q(credit=0))
+                    | (~models.Q(debit=0) & models.Q(credit=0))
+                ),
+                name="jl_exactly_one_side",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["party_type", "party_id"]),
+        ]
+
+    def __str__(self):
+        side = f"Dr {self.debit}" if self.debit else f"Cr {self.credit}"
+        return f"{self.account.code} {side}"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise ImmutableLedgerError(
+                "journal lines are immutable — post a reversal instead"
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ImmutableLedgerError("journal lines cannot be deleted")

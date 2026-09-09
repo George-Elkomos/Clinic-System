@@ -16,13 +16,16 @@ for the passwords/routes):
     without needing the doctor step at all.
   - e2e.patient2 is left with zero invoices, for the isolation/empty-state check.
 """
-from datetime import timedelta
+from calendar import monthrange
+from datetime import date, timedelta
 from decimal import Decimal
 
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounting.models import Account, FiscalYear, Period
 from apps.appointments import services as appt_services
 from apps.appointments.models import Appointment
 from apps.billing import services as billing_services
@@ -52,6 +55,8 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        self._ensure_accounting_setup()
+
         patient_user = self._user("e2e.patient@test.dev", "Omar", "Hassan", RoleChoices.PATIENT)
         self._user("e2e.patient2@test.dev", "Nour", "Salem", RoleChoices.PATIENT)
         doctor_user = self._user("e2e.doctor@test.dev", "Mona", "Adly", RoleChoices.DOCTOR)
@@ -70,6 +75,24 @@ class Command(BaseCommand):
             self._ensure_invoice_bucket(patient_user, doctor_user, secretary_user, status)
 
         self._report()
+
+    # --- accounting core (financial roadmap Task 6 needs both to exist) -----
+    def _ensure_accounting_setup(self):
+        if not Account.objects.exists():
+            call_command("seed_chart_of_accounts")
+
+        today = timezone.localdate()
+        fiscal_year, _ = FiscalYear.objects.get_or_create(
+            name=f"FY{today.year}",
+            defaults={"start_date": date(today.year, 1, 1), "end_date": date(today.year, 12, 31)},
+        )
+        if Period.for_date(today) is None:
+            last_day = monthrange(today.year, today.month)[1]
+            Period.objects.create(
+                fiscal_year=fiscal_year, name=today.strftime("%Y-%m"),
+                start_date=date(today.year, today.month, 1),
+                end_date=date(today.year, today.month, last_day),
+            )
 
     # --- accounts -----------------------------------------------------
     def _user(self, email, first, last, role):
@@ -141,6 +164,7 @@ class Command(BaseCommand):
             service_item=catalog_item, quantity=1, unit_price=price,
         )
         invoice.recalculate_totals()
+        billing_services.post_invoice_issued(invoice, user=secretary_user)
 
         if status == InvoiceStatus.PARTIALLY_PAID:
             billing_services.record_payment(

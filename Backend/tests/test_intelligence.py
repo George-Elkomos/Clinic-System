@@ -13,7 +13,7 @@ pytestmark = pytest.mark.django_db
 
 def _completed_appt(patient, doctor_profile, future_slot):
     appt = services.book_slot(patient=patient.patient_profile, slot_id=future_slot.pk)
-    services.complete_appointment(appt)
+    services.complete_appointment(appt, user=doctor_profile.user)
     return appt
 
 

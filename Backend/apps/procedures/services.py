@@ -38,7 +38,9 @@ def start_procedure(procedure: ClinicalProcedure) -> ClinicalProcedure:
     return procedure
 
 
-def complete_procedure(procedure: ClinicalProcedure, post_procedure_notes=None, complications=None) -> ClinicalProcedure:
+def complete_procedure(
+    procedure: ClinicalProcedure, post_procedure_notes=None, complications=None, *, user,
+) -> ClinicalProcedure:
     _assert_status(procedure, ProcedureStatus.IN_PROGRESS, "complete")
 
     if post_procedure_notes is not None:
@@ -56,6 +58,11 @@ def complete_procedure(procedure: ClinicalProcedure, post_procedure_notes=None, 
     procedure.save(update_fields=[
         "status", "end_time", "post_procedure_notes", "complications", "updated_at",
     ])
+
+    from apps.billing.services import handle_procedure_completed
+
+    handle_procedure_completed(procedure, user=user)
+
     notify(
         recipient=procedure.patient.user,
         verb=NotificationVerb.PROCEDURE_COMPLETED,

@@ -1,4 +1,5 @@
-from datetime import time, timedelta
+from calendar import monthrange
+from datetime import date, time, timedelta
 
 import pytest
 from django.utils import timezone
@@ -8,6 +9,40 @@ from apps.core.enums import RoleChoices, Weekday
 from apps.doctors.models import DoctorProfile, Specialty, SpecialtyCategory, WorkingSchedule
 from apps.doctors.services import slot_generator
 from apps.users.models import User
+
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, django_db_blocker):
+    """Seed the chart of accounts + an open Period covering "today" ONCE for
+    the whole test run (not per-test): every invoice issue / payment (Task 6)
+    posts to the ledger, which needs both to exist. Session-scoped and run
+    outside any per-test transaction, so it persists across the whole suite
+    instead of needing to be recreated (and re-checked for overlap) by every
+    single test that happens to touch billing."""
+    with django_db_blocker.unblock():
+        from django.core.management import call_command
+
+        from apps.accounting.models import FiscalYear, Period
+
+        call_command("seed_chart_of_accounts", verbosity=0)
+
+        today = timezone.localdate()
+        # A distinctive name (not the "FY{year}" pattern tests use for their
+        # own fixtures) so this baseline row never collides with one a test
+        # creates in its own rolled-back transaction — it's committed outside
+        # every test's transaction and persists for the whole session.
+        fiscal_year, _ = FiscalYear.objects.get_or_create(
+            name=f"FY-test-baseline-{today.year}",
+            defaults={"start_date": date(today.year, 1, 1), "end_date": date(today.year, 12, 31)},
+        )
+        if Period.for_date(today) is None:
+            last_day = monthrange(today.year, today.month)[1]
+            Period.objects.create(
+                fiscal_year=fiscal_year, name=today.strftime("%Y-%m"),
+                start_date=date(today.year, today.month, 1),
+                end_date=date(today.year, today.month, last_day),
+            )
+    return django_db_setup
 
 
 @pytest.fixture

@@ -62,6 +62,11 @@ def complete_order(order: RadiologyOrder, *, file, uploaded_by, description: str
     order.status = RadiologyOrderStatus.COMPLETED
     order.completed_at = timezone.now()
     order.save(update_fields=["status", "completed_at", "updated_at"])
+
+    from apps.billing.services import handle_radiology_order_completed
+
+    handle_radiology_order_completed(order, user=uploaded_by)
+
     notify(
         recipient=order.patient.user,
         verb=NotificationVerb.RADIOLOGY_ORDER_COMPLETED,

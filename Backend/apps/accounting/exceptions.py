@@ -29,3 +29,39 @@ class UnmappedPurposeError(AccountingError):
 
 class OverlappingPeriodError(AccountingError):
     """Raised when a `Period` would overlap an existing one."""
+
+
+# --- Task 5 — the ledger and posting engine -------------------------------------
+
+class ImmutableLedgerError(AccountingError):
+    """Raised by JournalEntry/JournalLine save()/delete() on an existing row —
+    posted entries are corrected by reversal, never edited or deleted."""
+
+
+class ImbalancedEntryError(AccountingError):
+    """Raised when a draft posting's Σdebit != Σcredit. No tolerance, ever."""
+
+
+class StructureError(AccountingError):
+    """Raised for a malformed draft: fewer than two lines, a line with both
+    (or neither) side non-zero, or a negative amount."""
+
+
+class PartyRequiredError(AccountingError):
+    """Raised when a RECEIVABLE/PAYABLE line carries no party."""
+
+
+class PartyForbiddenError(AccountingError):
+    """Raised when a non-RECEIVABLE/PAYABLE line carries a party."""
+
+
+class NoPeriodForDateError(AccountingError):
+    """Raised when no `Period` covers a posting's date."""
+
+
+class PeriodClosedError(AccountingError):
+    """Raised when posting into a CLOSED period."""
+
+
+class ReasonCodeRequiredError(AccountingError):
+    """Raised when a reversal is attempted with no reason_code."""

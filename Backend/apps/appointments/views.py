@@ -195,7 +195,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                           "or clinical notes first.",
             })
 
-        services.complete_appointment(appointment)
+        services.complete_appointment(appointment, user=request.user)
         data = AppointmentSerializer(appointment).data
         # Billing outcome (Phase 12): lets the desk show "Invoice #INV-XXXX
         # generated" or "free follow-up visit used" right after completion.
