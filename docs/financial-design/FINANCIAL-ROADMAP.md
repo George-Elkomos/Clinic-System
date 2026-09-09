@@ -23,7 +23,7 @@
 | `balance` computed in `save()` with `update_fields` handling | ✅ **correct** | This logic is right and covered by tests |
 | `F("used_count") + 1` | ✅ **correct** | Atomic increment |
 | `on_delete=PROTECT` on patient and invoice | ✅ **correct** | |
-| The 27 tests in `tests/test_billing.py` | ✅ **must stay green** | A task that breaks them is a wrong task |
+| The billing tests in `tests/test_billing.py` (30 as of Task 1) | ✅ **must stay green** | A task that breaks them is a wrong task |
 
 ### 🚫 Forbidden
 
@@ -162,7 +162,7 @@ except IntegrityError:
 - [ ] `IntegrityError` caught and the existing invoice returned (not a 500)
 - [ ] New test: creating a second `InvoiceItem` with the same `(source_type, source_id)` raises `IntegrityError`
 - [ ] New test: `handle_appointment_completed` twice in a row → **one invoice** (existing test `test_recompleting_same_appointment_does_not_double_bill` must stay green)
-- [ ] All 27 billing tests green
+- [ ] All billing tests green
 
 ---
 
@@ -238,7 +238,7 @@ The receptionist decides. The billing engine does not silently refuse.
 - [ ] The arrears figure is computed and available to the UI when a free visit is consumed
 - [ ] A free visit is **never refused** because of arrears — warning only
 - [ ] Test: patient with arrears + free visit → visit proceeds **and** the warning is present
-- [ ] All 27 billing tests green
+- [ ] All billing tests green
 
 ---
 
@@ -564,7 +564,7 @@ def issue_invoice(invoice, *, user):
 - [ ] The cash account varies by `payment_method`
 - [ ] Test: the `AR_PATIENT` balance equals the sum of `balance` over open invoices
 - [ ] Test: after a full scenario (visit → invoice → payment) **the trial balance is zero**
-- [ ] The original 27 tests **still green**
+- [ ] The pre-existing billing tests **still green**
 
 ---
 
@@ -669,6 +669,7 @@ Today **only appointments** are billed. You have `procedures`, `radiology` and `
 | 14 | **A real invoice number** | Currently derived from `pk`, so it has gaps. Tax rules require a gapless sequence |
 | 15 | **Permissions and approvals** | Limits on refunds and write-offs |
 | 16 | **Revenue-integrity jobs** | `django-q2` — **detect and report, never auto-correct** |
+| 17 | **Cash movements in and out of the till** | The float put into a drawer and the day's takings banked (`CashDeposited`, [`reference/clinic-accounting-events.md`](reference/clinic-accounting-events.md)§3). Neither is posted today, so the ledger's cash balance differs from the drawer by any float that was never a patient receipt. **Task 11's variance is unaffected** — it is computed from the shift's own rows |
 
 ---
 
