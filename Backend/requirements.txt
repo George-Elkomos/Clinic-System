@@ -11,6 +11,14 @@ django-cors-headers==4.9.0
 django-filter==25.2
 django-environ==0.13.0
 
+# --- Database driver (PostgreSQL) ---
+# settings/base.py already reads DATABASE_URL and falls back to SQLite if
+# unset — this driver is the missing prerequisite for the planned production
+# cutover (docs/postgres-production-cutover-plan.md), not a behavior change
+# by itself. Same version already proven in local dev since the financial
+# roadmap's Task 3 (Backend/.env there points at a real Postgres instance).
+psycopg[binary]==3.2.10
+
 # --- Files / PDF ---
 Pillow==12.2.0          # cp314 wheel — image uploads + logo compositing
 reportlab==4.5.1        # pure-Python — ALL PDFs (prescriptions, reports)
