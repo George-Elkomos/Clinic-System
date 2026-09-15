@@ -130,8 +130,11 @@ ASGI_APPLICATION = "clinic_project.asgi.application"
 # SQLite by default. WAL mode + busy timeout + FK enforcement are applied via
 # the connection_created signal in apps/core/apps.py (works across SQLite setups).
 DATABASES = {"default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")}
-DATABASES["default"].setdefault("OPTIONS", {})
-DATABASES["default"]["OPTIONS"]["timeout"] = 20
+# "timeout" is a SQLite-only connect option; psycopg rejects it outright
+# ("invalid connection option"), so only set it when we're actually on SQLite.
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    DATABASES["default"].setdefault("OPTIONS", {})
+    DATABASES["default"]["OPTIONS"]["timeout"] = 20
 
 # --- Auth -------------------------------------------------------------------
 AUTH_USER_MODEL = "users.User"
