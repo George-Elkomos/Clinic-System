@@ -1,6 +1,11 @@
 # Production PostgreSQL Cutover Plan
 
-**Status:** not started. **Owner:** whoever has SSH access to `213.199.47.114`.
+> ✅ **SUPERSEDED — this cutover was executed on 2026-09-15.** See
+> [`postgres-production-cutover-runbook-2026-09-15.md`](./postgres-production-cutover-runbook-2026-09-15.md)
+> for what was actually run, the two blockers hit, and the rollback procedure.
+> The text below is the original pre-cutover plan, kept for context.
+
+**Status:** not started (at time of writing). **Owner:** whoever has SSH access to `213.199.47.114`.
 **Written:** 2026-09-14, prompted by an attempt to deploy the financial
 roadmap (`financial-foundation` branch, 10 commits, Tasks 1–17 + API
 idempotency hardening) to production and discovering it depends on

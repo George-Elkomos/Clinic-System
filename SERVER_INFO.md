@@ -63,7 +63,7 @@ for the full annotated template). Current production values, by category:
 | `SECRET_KEY` | (random, generated on server) | Never share/commit |
 | `DEBUG` | `False` | |
 | `ALLOWED_HOSTS` | `213.199.47.114,clinicms.duckdns.org` | |
-| `DATABASE_URL` | `sqlite:///db.sqlite3` | |
+| `DATABASE_URL` | `postgres://clinic_app:***@127.0.0.1:5432/clinic_system` | **Migrated off SQLite on 2026-09-15** — see [`docs/postgres-production-cutover-runbook-2026-09-15.md`](docs/postgres-production-cutover-runbook-2026-09-15.md). Password in `/root/pg-cutover/secrets/clinic_app_pg_password.txt` (root, 0600). `.env` is now `chmod 600` |
 | `CORS_ALLOWED_ORIGINS` | `https://clinicms.duckdns.org` | Same-origin serving makes this mostly moot, kept for safety |
 | `CSRF_TRUSTED_ORIGINS` | `https://clinicms.duckdns.org` | Needed for HTTPS behind the Nginx proxy |
 | `JWT_COOKIE_SECURE` | `True` | Requires real HTTPS — it is now live |
@@ -116,7 +116,9 @@ last thing that can still fail before the schema actually changes.
 
 If **any** step fails, `rollback()`:
 1. `git reset --hard` back to the previous commit.
-2. Restores `db.sqlite3` (+ `-wal`/`-shm`) from a pre-migrate backup —
+2. Restores the database from a pre-migrate backup — on PostgreSQL (since
+   2026-09-15) that is a `pg_dump` that is **never restored automatically**;
+   the SQLite file-copy path described below applied before the cutover —
    **whenever that backup is present**, not only when `migrate` itself was
    the failing step. The backup is deliberately kept on disk through the
    restart + health-check that follows `migrate`, so "migration succeeded
