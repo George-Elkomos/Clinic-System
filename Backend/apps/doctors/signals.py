@@ -10,7 +10,14 @@ from .models import DoctorAbsence, TimeSlot, WorkingSchedule
 
 
 @receiver(post_save, sender=DoctorAbsence)
-def block_slots_for_absence(sender, instance, created, **kwargs):
+def block_slots_for_absence(sender, instance, created, raw, **kwargs):
+    # Without this, loading a fixture/data-migration dump of historical
+    # DoctorAbsence rows would cascade for real: it would lock and rewrite
+    # TimeSlot rows, actually CANCEL real Appointment rows years after the
+    # fact (which itself re-triggers the Appointment signals above), and
+    # send patients cancellation notifications for visits long since over.
+    if raw:
+        return
     if not created:
         return
 
@@ -71,11 +78,21 @@ def _notify_absence(appt):
 
 
 @receiver(post_save, sender=WorkingSchedule)
-def generate_slots_for_new_schedule(sender, instance, **kwargs):
+def generate_slots_for_new_schedule(sender, instance, raw, **kwargs):
     """When a working day is added or edited, first retract any still-open
     slots this rule previously generated — its old start/end/break/duration
     may no longer apply — then re-materialize across the horizon so what's
-    bookable always matches the rule currently in force (idempotent)."""
+    bookable always matches the rule currently in force (idempotent).
+
+    Skipped entirely when raw=True: a fixture/data-migration load of
+    WorkingSchedule rows also brings its own already-generated TimeSlot rows
+    in the same dump. Running this for real would delete/regenerate slots
+    around *today's* date around the load, corrupting or duplicating exactly
+    the data the load is trying to faithfully replay.
+    """
+    if raw:
+        return
+
     from .services import slot_generator
 
     with transaction.atomic():
@@ -98,7 +115,12 @@ def generate_slots_for_new_schedule(sender, instance, **kwargs):
 def clear_slots_for_deleted_schedule(sender, instance, **kwargs):
     """Deleting a working day should retract its still-open slots immediately
     instead of leaving stale AVAILABLE rows visible to patients until the
-    next generate_all sweep."""
+    next generate_all sweep.
+
+    No raw guard: Django's `raw` flag only exists for pre_save/post_save
+    (loaddata deserializes and *saves* rows — it never deletes anything), so
+    there is nothing to guard against here.
+    """
     from .services import slot_generator
 
     slot_generator.clear_unbooked_slots(source_schedule=instance)
