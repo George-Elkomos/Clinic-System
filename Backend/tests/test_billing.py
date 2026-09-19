@@ -5,6 +5,7 @@ totals recalculation, FeeValidity window logic.
 Week 2: the appointment-completion billing hook (auto-invoice + free follow-up),
 payment recording, object-level isolation, and the manager report.
 """
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
@@ -25,6 +26,12 @@ from apps.core.enums import (
 )
 
 pytestmark = pytest.mark.django_db
+
+
+def _idem():
+    """A fresh Idempotency-Key header for one logical API call — every
+    financial write endpoint now requires one (see apps/billing/idempotency.py)."""
+    return {"Idempotency-Key": str(uuid.uuid4())}
 
 
 @pytest.fixture
@@ -404,7 +411,7 @@ class TestPaymentAPI:
         api.force_authenticate(secretary)
         resp = api.post(reverse("payment-list"), {
             "invoice": issued_invoice.id, "amount": "20.00", "payment_method": "CASH",
-        }, format="json")
+        }, format="json", headers=_idem())
         assert resp.status_code == 201
         issued_invoice.refresh_from_db()
         assert issued_invoice.status == InvoiceStatus.PARTIALLY_PAID
@@ -416,10 +423,10 @@ class TestPaymentAPI:
         api.force_authenticate(secretary)
         api.post(reverse("payment-list"), {
             "invoice": issued_invoice.id, "amount": "20.00", "payment_method": "CASH",
-        }, format="json")
+        }, format="json", headers=_idem())
         resp = api.post(reverse("payment-list"), {
             "invoice": issued_invoice.id, "amount": "30.00", "payment_method": "CARD",
-        }, format="json")
+        }, format="json", headers=_idem())
         assert resp.status_code == 201
         issued_invoice.refresh_from_db()
         assert issued_invoice.status == InvoiceStatus.PAID
@@ -432,7 +439,7 @@ class TestPaymentAPI:
         api.force_authenticate(secretary)
         resp = api.post(reverse("payment-list"), {
             "invoice": issued_invoice.id, "amount": "999.00", "payment_method": "CASH",
-        }, format="json")
+        }, format="json", headers=_idem())
         assert resp.status_code == 201
         issued_invoice.refresh_from_db()
         assert issued_invoice.status == InvoiceStatus.PAID
@@ -446,7 +453,7 @@ class TestPaymentAPI:
         api.force_authenticate(patient)
         resp = api.post(reverse("payment-list"), {
             "invoice": issued_invoice.id, "amount": "50.00", "payment_method": "CASH",
-        }, format="json")
+        }, format="json", headers=_idem())
         assert resp.status_code == 403
 
 
@@ -459,7 +466,7 @@ class TestBillingReport:
         api.force_authenticate(secretary)
         api.post(reverse("payment-list"), {
             "invoice": invoice.id, "amount": "20.00", "payment_method": "CASH",
-        }, format="json")
+        }, format="json", headers=_idem())
 
         api.force_authenticate(manager)
         resp = api.get(reverse("reports-billing"), {"period": "month"})

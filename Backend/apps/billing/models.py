@@ -28,14 +28,17 @@ from django.utils import timezone
 from apps.core.enums import (
     BillingSourceType,
     CashierShiftStatus,
+    CashMovementType,
     DepositStatus,
+    FinancialOperation,
+    IdempotencyStatus,
     InvoiceStatus,
     PaymentMethod,
     ServiceItemType,
 )
 from apps.core.models import TimeStampedModel
 
-from .exceptions import ClosedShiftError, InvoiceNumberImmutableError
+from .exceptions import CashMovementImmutableError, ClosedShiftError, InvoiceNumberImmutableError
 
 
 class ServiceItem(TimeStampedModel):
@@ -598,3 +601,121 @@ class CashierShift(TimeStampedModel):
 
     def delete(self, *args, **kwargs):
         raise ClosedShiftError("cashier shifts cannot be deleted")
+
+
+class CashMovement(TimeStampedModel):
+    """Cash moving in/out of a till that is *not* a patient payment or refund
+    (financial roadmap Task 17). The roadmap's own framing: "the float put
+    into a drawer and the day's takings banked... neither is posted today, so
+    the ledger's cash balance differs from the drawer by any float that was
+    never a patient receipt."
+
+    Deliberately scoped to movements *during* an already-open shift
+    (`FLOAT_IN` — a mid-shift top-up — and `BANK_DEPOSIT` — cash physically
+    removed to the bank). The shift's own *opening* float is not modelled as
+    a `CashMovement`: `CashierShift.opening_float` already is that record (an
+    immutable-once-closed column, exactly like `counted_amount`/`variance`),
+    and `services.open_shift` posts its ledger entry directly. Duplicating it
+    here would either double-count it in `services.expected_cash` or require
+    excluding it from this table's own aggregate — solving a problem that
+    doesn't otherwise exist. See `services.expected_cash`'s docstring for the
+    exact formula this feeds into.
+
+    Never deleted (`delete()` raises); a posted cash movement is corrected
+    with a new, offsetting movement, the same rule as every other financial
+    record here. `save()` is deliberately not similarly locked down: like
+    `CreditNote`/`Refund`, the row is created once and then updated exactly
+    once more, in the same request, to attach its `journal_entry` (the
+    posting's own idempotency key needs this row's pk first) — never edited
+    again after that by any code path in this system.
+    """
+
+    shift = models.ForeignKey(
+        CashierShift, on_delete=models.PROTECT, related_name="cash_movements",
+    )
+    movement_type = models.CharField(max_length=16, choices=CashMovementType.choices)
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    reason = models.CharField(max_length=255)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="cash_movements_logged",
+    )
+    journal_entry = models.ForeignKey(
+        "accounting.JournalEntry", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(reason=""), name="cash_movement_reason_required",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.movement_type} {self.amount} — shift #{self.shift_id}"
+
+    def delete(self, *args, **kwargs):
+        raise CashMovementImmutableError("cash movements cannot be deleted")
+
+
+class IdempotentRequest(TimeStampedModel):
+    """One claimed client `Idempotency-Key` for one financial write operation.
+
+    This is *API/business-level* idempotency — distinct from, and layered on
+    top of, the ledger's own `accounting.JournalEntry.idempotency_key`. That
+    layer prevents two *identical ledger postings*; it does nothing to stop a
+    retried HTTP request from creating a second, distinct `Refund`/
+    `CreditNote`/`CashMovement`/`Payment` row (each with its own new pk, and
+    therefore its own new — and equally "idempotent" — ledger key). This
+    table closes that gap. See `apps/billing/idempotency.py` for the
+    claim/replay/conflict logic built on top of it.
+
+    Scope is `(user, operation, key)`: the same raw key from a different
+    caller, or used for a different operation type, never collides — only a
+    literal retry of the *same* logical request by the *same* caller does.
+
+    `fingerprint` is a normalized hash of the request's business-significant
+    fields (never the full payload, never who approved it — that's already
+    part of the scope) — a replay with a different amount/invoice/reason is
+    rejected rather than silently matched.
+
+    Lifecycle: a row is inserted `IN_PROGRESS` and updated to `COMPLETED`
+    (with `result_id` set) inside the *same* `transaction.atomic()` block
+    that performs the actual operation — so a rollback (a validation failure,
+    a crash) undoes the claim along with everything else. A row is never
+    observably left `IN_PROGRESS` by one transaction and then read by
+    another: Postgres blocks a concurrent conflicting INSERT until the first
+    transaction resolves, so anything a second caller ever *sees* here is
+    either fully `COMPLETED` or doesn't exist at all (rolled back).
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+",
+    )
+    operation = models.CharField(max_length=32, choices=FinancialOperation.choices)
+    key = models.CharField(max_length=255)
+    fingerprint = models.CharField(max_length=64)  # sha256 hex digest
+    status = models.CharField(
+        max_length=16, choices=IdempotencyStatus.choices, default=IdempotencyStatus.IN_PROGRESS,
+    )
+    # Resolved back to a domain row by the service function that owns
+    # `operation` (e.g. RECORD_PAYMENT -> Payment.objects.get(pk=result_id)) —
+    # no generic content-type machinery needed since each operation maps to
+    # exactly one model.
+    result_id = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "operation", "key"], name="uniq_idempotent_request",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(key=""), name="idempotent_request_key_required",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.operation}:{self.key} ({self.status})"

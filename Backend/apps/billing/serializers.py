@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
+from apps.core.enums import CashMovementType
 from apps.core.i18n import get_request_locale, localized_name
 
-from .models import FeeValidity, Invoice, InvoiceItem, Payment, ServiceItem
+from .models import CashierShift, CashMovement, FeeValidity, Invoice, InvoiceItem, Payment, ServiceItem
 
 
 class ServiceItemSerializer(serializers.ModelSerializer):
@@ -93,3 +96,77 @@ class FeeValiditySerializer(serializers.ModelSerializer):
             "id", "patient", "doctor", "invoice", "valid_from", "valid_until",
             "used_count", "max_free_visits",
         ]
+
+
+# --- Task 11 API surface: cashier shifts --------------------------------------
+
+class OpenShiftSerializer(serializers.Serializer):
+    till_id = serializers.CharField(max_length=32, required=False)
+    opening_float = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, default=Decimal("0.00"),
+    )
+
+
+class CloseShiftSerializer(serializers.Serializer):
+    counted_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.00"),
+    )
+    reason_code = serializers.CharField(max_length=64, required=False, allow_blank=True, default="")
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class CashierShiftSerializer(serializers.ModelSerializer):
+    cashier_name = serializers.SerializerMethodField()
+    closed_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CashierShift
+        fields = [
+            "id", "cashier", "cashier_name", "till_id", "status",
+            "opened_at", "closed_at", "closed_by", "closed_by_name",
+            "opening_float", "expected_amount", "counted_amount", "variance",
+            "variance_reason_code", "approved_by", "approved_by_name",
+            "journal_entry", "currency", "notes",
+        ]
+        # Fully read-only via the serializer: every state change goes through
+        # the `open`/`close` actions (services.open_shift/close_shift), never
+        # a generic PATCH — a closed shift must not become editable through a
+        # ModelViewSet's default update path (there isn't one registered, but
+        # this also protects against a future accidental `CreateModelMixin`).
+        read_only_fields = fields
+
+    def get_cashier_name(self, obj):
+        return obj.cashier.get_full_name()
+
+    def get_closed_by_name(self, obj):
+        return obj.closed_by.get_full_name() if obj.closed_by else None
+
+    def get_approved_by_name(self, obj):
+        return obj.approved_by.get_full_name() if obj.approved_by else None
+
+
+# --- Task 17 API surface: cash movements --------------------------------------
+
+class CashMovementCreateSerializer(serializers.Serializer):
+    shift = serializers.PrimaryKeyRelatedField(queryset=CashierShift.objects.all())
+    movement_type = serializers.ChoiceField(choices=CashMovementType.choices)
+    amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"),
+    )
+    reason = serializers.CharField(max_length=255)
+
+
+class CashMovementSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CashMovement
+        fields = [
+            "id", "shift", "movement_type", "amount", "reason",
+            "created_by", "created_by_name", "journal_entry", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name()

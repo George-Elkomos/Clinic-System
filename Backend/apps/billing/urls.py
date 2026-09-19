@@ -4,6 +4,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     BillingReportView,
     BillingSummaryView,
+    CashierShiftViewSet,
+    CashMovementViewSet,
     InvoiceViewSet,
     PaymentViewSet,
     ServiceItemViewSet,
@@ -13,6 +15,8 @@ router = DefaultRouter()
 router.register("invoices", InvoiceViewSet, basename="invoice")
 router.register("payments", PaymentViewSet, basename="payment")
 router.register("service-items", ServiceItemViewSet, basename="service-item")
+router.register("cashier-shifts", CashierShiftViewSet, basename="cashier-shift")
+router.register("cash-movements", CashMovementViewSet, basename="cash-movement")
 
 urlpatterns = [
     path("reports/billing/", BillingReportView.as_view(), name="reports-billing"),

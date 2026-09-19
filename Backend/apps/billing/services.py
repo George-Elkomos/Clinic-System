@@ -43,14 +43,18 @@ from apps.accounting.models import AccountMap, JournalEntry
 from apps.core.enums import (
     BillingSourceType,
     CashierShiftStatus,
+    CashMovementType,
+    FinancialOperation,
     InvoiceStatus,
     PaymentMethod,
     ServiceItemType,
 )
 
+from . import idempotency
 from .models import (
     DEFAULT_TILL_ID,
     CashierShift,
+    CashMovement,
     CreditNote,
     FeeValidity,
     Invoice,
@@ -431,6 +435,7 @@ def handle_lab_order_completed(order, *, user):
 @transaction.atomic
 def record_payment(
     *, invoice, amount, payment_method, received_by, reference="", shift=None,
+    idempotency_key=None,
 ):
     """Apply a payment and keep the invoice's money fields + status in sync.
 
@@ -443,14 +448,31 @@ def record_payment(
     with whatever shift `received_by` currently has open. Having no open shift
     is not an error: money is still taken, it simply reconciles against no
     drawer count.
+
+    `idempotency_key` (optional — see `apps/billing/idempotency.py`) protects
+    against a retried request creating a second `Payment` row: the ledger's
+    own idempotency only protects the *posting*, which is keyed off this
+    row's own pk and therefore can't help until the row already exists.
     """
+    amount = Decimal(amount)
+    if idempotency_key:
+        fingerprint = idempotency.compute_fingerprint(
+            invoice_id=invoice.pk, amount=amount,
+            payment_method=payment_method, reference=reference,
+        )
+        existing = idempotency.claim(
+            user=received_by, operation=FinancialOperation.RECORD_PAYMENT,
+            key=idempotency_key, fingerprint=fingerprint,
+        )
+        if existing is not None:
+            return Payment.objects.get(pk=existing.result_id)
+
     invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
 
     if invoice.status not in PAYABLE_STATUSES:
         raise ValidationError(
             {"invoice": f"Payments cannot be recorded on a {invoice.status} invoice."}
         )
-    amount = Decimal(amount)
     if amount <= 0:
         raise ValidationError({"amount": "Payment amount must be greater than zero."})
 
@@ -481,6 +503,12 @@ def record_payment(
         else InvoiceStatus.PARTIALLY_PAID
     )
     invoice.save(update_fields=["paid_amount", "status", "updated_at"])  # save() re-derives balance
+
+    if idempotency_key:
+        idempotency.complete(
+            user=received_by, operation=FinancialOperation.RECORD_PAYMENT,
+            key=idempotency_key, result_id=payment.id,
+        )
     return payment
 
 
@@ -514,15 +542,31 @@ def _revenue_by_category(invoice):
 
 
 @transaction.atomic
-def issue_credit_note(*, invoice, amount, reason_code, approved_by):
+def issue_credit_note(*, invoice, amount, reason_code, approved_by, idempotency_key=None):
     """Reduce what's owed on `invoice` by `amount` (full or partial — financial
     roadmap Task 7). Posts Dr revenue / Cr AR, proportionally reversing
     whatever service categories made up the invoice; the discount line (if
     any) is untouched — a credit note is relief beyond the original terms,
     not a correction of the original discount decision.
+
+    `idempotency_key` (optional — see `apps/billing/idempotency.py`) protects
+    against a retried request creating a second `CreditNote`: the ledger's
+    own idempotency is keyed off this row's own pk, so it can't help until
+    the row already exists.
     """
-    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
     amount = Decimal(amount)
+    if idempotency_key:
+        fingerprint = idempotency.compute_fingerprint(
+            invoice_id=invoice.pk, amount=amount, reason_code=reason_code,
+        )
+        existing = idempotency.claim(
+            user=approved_by, operation=FinancialOperation.ISSUE_CREDIT_NOTE,
+            key=idempotency_key, fingerprint=fingerprint,
+        )
+        if existing is not None:
+            return CreditNote.objects.get(pk=existing.result_id)
+
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
     if amount <= 0:
         raise ValidationError({"amount": "Credit note amount must be greater than zero."})
     if not reason_code:
@@ -570,13 +614,19 @@ def issue_credit_note(*, invoice, amount, reason_code, approved_by):
 
     invoice.credited_amount = invoice.credited_amount + amount
     invoice.save(update_fields=["credited_amount", "updated_at"])
+
+    if idempotency_key:
+        idempotency.complete(
+            user=approved_by, operation=FinancialOperation.ISSUE_CREDIT_NOTE,
+            key=idempotency_key, result_id=credit_note.id,
+        )
     return credit_note
 
 
 @transaction.atomic
 def issue_refund(
     *, invoice, amount, payment_method, reason_code, approved_by,
-    paid_by=None, shift=None,
+    paid_by=None, shift=None, idempotency_key=None,
 ):
     """Pay back money already collected on `invoice`. Can never exceed what
     was actually collected and not already refunded (financial roadmap Task 7).
@@ -596,9 +646,27 @@ def issue_refund(
     than guessed at: the cashier's own close will then show a real short that
     needs explaining, which is a truthful signal — unlike quietly corrupting
     a different cashier's count.
+
+    `idempotency_key` (optional — see `apps/billing/idempotency.py`) protects
+    against a retried request creating a second `Refund`: the ledger's own
+    idempotency is keyed off this row's own pk, so it can't help until the
+    row already exists. This is especially important here — cash physically
+    leaves a till on every cash refund.
     """
-    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
     amount = Decimal(amount)
+    if idempotency_key:
+        fingerprint = idempotency.compute_fingerprint(
+            invoice_id=invoice.pk, amount=amount, payment_method=payment_method,
+            reason_code=reason_code, paid_by_id=paid_by.id if paid_by else None,
+        )
+        existing = idempotency.claim(
+            user=approved_by, operation=FinancialOperation.ISSUE_REFUND,
+            key=idempotency_key, fingerprint=fingerprint,
+        )
+        if existing is not None:
+            return Refund.objects.get(pk=existing.result_id)
+
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
     if amount <= 0:
         raise ValidationError({"amount": "Refund amount must be greater than zero."})
     if not reason_code:
@@ -641,6 +709,12 @@ def issue_refund(
 
     invoice.refunded_amount = already_refunded + amount
     invoice.save(update_fields=["refunded_amount", "updated_at"])  # save() re-derives balance
+
+    if idempotency_key:
+        idempotency.complete(
+            user=approved_by, operation=FinancialOperation.ISSUE_REFUND,
+            key=idempotency_key, result_id=refund.id,
+        )
     return refund
 
 
@@ -722,6 +796,34 @@ def _resolve_shift(shift, user):
     return None
 
 
+def _post_opening_float(shift, *, user):
+    """Post the shift's opening float to the ledger (financial roadmap Task
+    17): "the float put into a drawer... is not posted today, so the
+    ledger's cash balance differs from the drawer by any float that was
+    never a patient receipt." The float is treated as drawn from the bank/
+    safe into the till — the same two accounts every other cash posting in
+    this module already uses, so no new chart-of-accounts entry is needed.
+
+    Idempotent like every other posting here; a zero float posts nothing
+    (the ledger refuses a zero-amount line anyway, and there is nothing to
+    reconcile for a till that opened empty).
+    """
+    if not shift.opening_float:
+        return None
+    return accounting_services.post(
+        posting_date=timezone.localdate(),
+        source_type="CashierShift",
+        source_id=shift.id,
+        description=f"Opening float — shift #{shift.id} ({shift.till_id})",
+        lines=[
+            {"account": AccountMap.resolve("CASH_DEFAULT"), "debit": shift.opening_float},
+            {"account": AccountMap.resolve("BANK_DEFAULT"), "credit": shift.opening_float},
+        ],
+        idempotency_key=f"CashierShift:{shift.id}:open",
+        user=user,
+    )
+
+
 @transaction.atomic
 def open_shift(*, cashier, till_id=DEFAULT_TILL_ID, opening_float=Decimal("0.00")):
     """Open a till session for `cashier`.
@@ -737,29 +839,39 @@ def open_shift(*, cashier, till_id=DEFAULT_TILL_ID, opening_float=Decimal("0.00"
 
     try:
         with transaction.atomic():
-            return CashierShift.objects.create(
+            shift = CashierShift.objects.create(
                 cashier=cashier,
                 till_id=till_id,
                 opening_float=opening_float,
                 currency=settings.BILLING_CURRENCY,
             )
     except IntegrityError:
-        pass
+        # One of the two partial unique constraints fired — say which.
+        if current_shift(cashier) is not None:
+            raise ValidationError(
+                {"cashier": "This cashier already has an open shift — close it first."}
+            )
+        raise ValidationError({"till_id": f"Till {till_id} already has an open shift."})
 
-    # One of the two partial unique constraints fired — say which.
-    if current_shift(cashier) is not None:
-        raise ValidationError(
-            {"cashier": "This cashier already has an open shift — close it first."}
-        )
-    raise ValidationError({"till_id": f"Till {till_id} already has an open shift."})
+    _post_opening_float(shift, user=cashier)
+    return shift
 
 
 def expected_cash(shift):
-    """What the drawer should hold: opening float + cash in − cash out.
+    """What the drawer should hold: opening float + cash in − cash out
+    (+ mid-shift float top-ups − takings banked mid-shift, Task 17).
 
     Derived with `aggregate(Sum(...))` over this shift's own rows every time
-    it is asked for, never kept as a running column. Only CASH counts — a card
-    or transfer never passes through the drawer.
+    it is asked for, never kept as a running column. Only CASH payments/
+    refunds count — a card or transfer never passes through the drawer.
+    `CashMovement` rows are always cash by definition (that is the entire
+    point of the model), so no payment-method filter applies to them.
+
+    The opening float itself is deliberately *not* re-derived from
+    `CashMovement` here — it stays the plain `shift.opening_float` column it
+    always was (Task 11's own formula, untouched); only movements logged
+    *during* the shift are new (Task 17) — see `CashMovement`'s docstring for
+    why the two are kept separate instead of folding one into the other.
     """
     received = shift.payments.filter(
         payment_method=PaymentMethod.CASH,
@@ -767,7 +879,101 @@ def expected_cash(shift):
     paid_out = shift.refunds.filter(
         payment_method=PaymentMethod.CASH,
     ).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
-    return shift.opening_float + received - paid_out
+    float_in = shift.cash_movements.filter(
+        movement_type=CashMovementType.FLOAT_IN,
+    ).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    banked = shift.cash_movements.filter(
+        movement_type=CashMovementType.BANK_DEPOSIT,
+    ).aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    return shift.opening_float + received - paid_out + float_in - banked
+
+
+def post_cash_movement(movement, *, user):
+    """Post `CashMovement:{id}:post` (financial roadmap Task 17).
+
+    `FLOAT_IN` draws cash into the till from the bank/safe (mirrors the
+    opening float's own posting); `BANK_DEPOSIT` is the reverse — the day's
+    takings physically leaving the till for the bank. Both move between the
+    same two accounts `_post_opening_float`/`post_payment_received` already
+    use, so no new chart-of-accounts entry was needed for this task.
+    """
+    cash_account = AccountMap.resolve("CASH_DEFAULT")
+    bank_account = AccountMap.resolve("BANK_DEFAULT")
+    if movement.movement_type == CashMovementType.FLOAT_IN:
+        lines = [
+            {"account": cash_account, "debit": movement.amount},
+            {"account": bank_account, "credit": movement.amount},
+        ]
+    else:
+        lines = [
+            {"account": bank_account, "debit": movement.amount},
+            {"account": cash_account, "credit": movement.amount},
+        ]
+
+    return accounting_services.post(
+        posting_date=timezone.localdate(),
+        source_type="CashMovement",
+        source_id=movement.id,
+        description=(
+            f"{movement.get_movement_type_display()} — shift #{movement.shift_id}"
+        ),
+        lines=lines,
+        idempotency_key=f"CashMovement:{movement.id}:post",
+        user=user,
+    )
+
+
+@transaction.atomic
+def record_cash_movement(
+    *, shift, movement_type, amount, reason, created_by, idempotency_key=None,
+):
+    """Log and post a mid-shift cash movement (financial roadmap Task 17) —
+    a float top-up or a bank deposit against an *open* shift. Refused on a
+    closed shift for the same reason `_resolve_shift` refuses a payment onto
+    one: a closed shift's `expected_cash` was already counted and posted, and
+    this would silently change a figure that has already been reconciled.
+
+    `idempotency_key` (optional — see `apps/billing/idempotency.py`) protects
+    against a retried request creating a second `CashMovement`: the ledger's
+    own idempotency is keyed off this row's own pk, so it can't help until
+    the row already exists. Especially important here — a duplicate
+    FLOAT_IN/BANK_DEPOSIT would corrupt physical cash reconciliation.
+    """
+    amount = Decimal(amount)
+    if idempotency_key:
+        fingerprint = idempotency.compute_fingerprint(
+            shift_id=shift.pk, movement_type=movement_type, amount=amount, reason=reason,
+        )
+        existing = idempotency.claim(
+            user=created_by, operation=FinancialOperation.RECORD_CASH_MOVEMENT,
+            key=idempotency_key, fingerprint=fingerprint,
+        )
+        if existing is not None:
+            return CashMovement.objects.get(pk=existing.result_id)
+
+    shift = CashierShift.objects.select_for_update().get(pk=shift.pk)
+    if shift.status != CashierShiftStatus.OPEN:
+        raise ValidationError({"shift": f"Shift #{shift.pk} is not open."})
+
+    if amount <= 0:
+        raise ValidationError({"amount": "The amount must be greater than zero."})
+    if not reason:
+        raise ValidationError({"reason": "A cash movement requires a reason."})
+
+    movement = CashMovement.objects.create(
+        shift=shift, movement_type=movement_type, amount=amount,
+        reason=reason, created_by=created_by,
+    )
+    entry = post_cash_movement(movement, user=created_by)
+    movement.journal_entry = entry
+    movement.save(update_fields=["journal_entry", "updated_at"])
+
+    if idempotency_key:
+        idempotency.complete(
+            user=created_by, operation=FinancialOperation.RECORD_CASH_MOVEMENT,
+            key=idempotency_key, result_id=movement.id,
+        )
+    return movement
 
 
 def post_shift_variance(shift, *, variance, reason_code, user, posting_date=None):

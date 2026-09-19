@@ -242,6 +242,37 @@ class CashierShiftStatus(models.TextChoices):
     CLOSED = "CLOSED", _("Closed")
 
 
+class FinancialOperation(models.TextChoices):
+    """Financial write operations protected by API/business-level
+    idempotency (distinct from the ledger's own JournalEntry.idempotency_key
+    — see apps.billing.idempotency's module docstring). Part of the
+    (user, operation, key) uniqueness scope on `IdempotentRequest`: the same
+    raw client key never collides across two different operation types."""
+    ISSUE_REFUND = "ISSUE_REFUND", _("Issue refund")
+    ISSUE_CREDIT_NOTE = "ISSUE_CREDIT_NOTE", _("Issue credit note")
+    RECORD_CASH_MOVEMENT = "RECORD_CASH_MOVEMENT", _("Record cash movement")
+    RECORD_PAYMENT = "RECORD_PAYMENT", _("Record payment")
+
+
+class IdempotencyStatus(models.TextChoices):
+    IN_PROGRESS = "IN_PROGRESS", _("In progress")
+    COMPLETED = "COMPLETED", _("Completed")
+
+
+class CashMovementType(models.TextChoices):
+    """Financial roadmap Task 17 — cash moving in/out of a till that is
+    *not* a patient payment or refund (those already post through
+    `record_payment`/`issue_refund`). Only the two events the roadmap itself
+    names (`clinic-accounting-events.md`§3's `CashDeposited`, plus the float
+    put into a drawer that the roadmap explicitly calls out as unposted) are
+    modelled — a generic "cash in"/"cash out" pair is deliberately not added:
+    the roadmap gives no debit/credit rule for an arbitrary till adjustment,
+    and inventing one would be exactly the kind of unrequested requirement
+    CLAUDE.md warns against."""
+    FLOAT_IN = "FLOAT_IN", _("Float added to till")
+    BANK_DEPOSIT = "BANK_DEPOSIT", _("Takings deposited to bank")
+
+
 class ReferralType(models.TextChoices):
     INTERNAL = "INTERNAL", _("Internal")
     EXTERNAL = "EXTERNAL", _("External")
