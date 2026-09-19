@@ -18,3 +18,9 @@ class ClosedShiftError(BillingError):
     was posted for the difference; a correction is a new shift or a reversing
     journal entry, never an edit.
     """
+
+
+class InvoiceNumberImmutableError(BillingError):
+    """Raised when `Invoice.invoice_number` is changed after it was first set
+    (financial roadmap Task 14) — a real, gapless, tax-relevant sequence
+    number is never renumbered once issued."""

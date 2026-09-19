@@ -55,6 +55,7 @@ from .models import (
     FeeValidity,
     Invoice,
     InvoiceItem,
+    InvoiceNumberSequence,
     PatientDeposit,
     Payment,
     Refund,
@@ -101,6 +102,24 @@ def _consultation_price(doctor_profile, service_item):
     if doctor_profile and doctor_profile.consultation_fee is not None:
         return doctor_profile.consultation_fee
     return service_item.default_price
+
+
+def allocate_invoice_number(scope="default"):
+    """Draw the next gapless invoice number (financial roadmap Task 14).
+
+    MUST be called from inside the same `transaction.atomic()` block that
+    creates the `Invoice` it will be assigned to (every call site in this
+    module already does — see `handle_appointment_completed`,
+    `bill_ad_hoc_service`). `select_for_update()` on the single sequence row
+    serialises concurrent invoice creations onto it one at a time; if that
+    surrounding transaction later rolls back (e.g. Task 1's IntegrityError
+    race), the increment rolls back with it — unlike a database `SEQUENCE`,
+    whose `nextval()` is never transactional and would leave a permanent gap.
+    """
+    seq = InvoiceNumberSequence.objects.select_for_update().get_or_create(scope=scope)[0]
+    seq.last_value = seq.last_value + 1
+    seq.save(update_fields=["last_value", "updated_at"])
+    return f"INV-{seq.last_value:05d}"
 
 
 def _overdue_balance(patient_user, today):
@@ -261,6 +280,7 @@ def handle_appointment_completed(appointment, *, user):
                 due_date=today + timedelta(days=settings.BILLING_INVOICE_DUE_DAYS),
                 status=InvoiceStatus.ISSUED,
                 currency=settings.BILLING_CURRENCY,
+                invoice_number=allocate_invoice_number(),
             )
             InvoiceItem.objects.create(
                 invoice=invoice,
@@ -345,6 +365,7 @@ def bill_ad_hoc_service(
                 due_date=today + timedelta(days=settings.BILLING_INVOICE_DUE_DAYS),
                 status=InvoiceStatus.ISSUED,
                 currency=settings.BILLING_CURRENCY,
+                invoice_number=allocate_invoice_number(),
             )
             InvoiceItem.objects.create(
                 invoice=invoice,

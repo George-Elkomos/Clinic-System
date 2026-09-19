@@ -157,6 +157,7 @@ class Command(BaseCommand):
             patient=patient_user, doctor=doctor_user,
             due_date=today + timedelta(days=7), status=InvoiceStatus.ISSUED,
             notes=f"{SEED_TAG} target={status}",
+            invoice_number=billing_services.allocate_invoice_number(),
         )
         InvoiceItem.objects.create(
             invoice=invoice,

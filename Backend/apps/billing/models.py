@@ -35,7 +35,7 @@ from apps.core.enums import (
 )
 from apps.core.models import TimeStampedModel
 
-from .exceptions import ClosedShiftError
+from .exceptions import ClosedShiftError, InvoiceNumberImmutableError
 
 
 class ServiceItem(TimeStampedModel):
@@ -58,6 +58,32 @@ class ServiceItem(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} ({self.default_price})"
+
+
+class InvoiceNumberSequence(TimeStampedModel):
+    """A transaction-safe, gapless counter for `Invoice.invoice_number`
+    (financial roadmap Task 14).
+
+    Deliberately *not* a Postgres `SEQUENCE`: `nextval()` is non-transactional
+    — a rolled-back transaction still consumes the value it drew, leaving a
+    permanent gap, which is exactly what a gapless requirement forbids. This
+    row is incremented with `select_for_update()` inside the *same*
+    `transaction.atomic()` block that creates the `Invoice` (see
+    `services._allocate_invoice_number`), so a rollback (e.g. the Task-1
+    duplicate-billing race) undoes the increment along with everything else —
+    the number is never actually consumed unless the invoice it belongs to is.
+
+    `scope` exists so a future need for more than one independent sequence
+    (e.g. per branch) doesn't require a schema change — not used today, and
+    the roadmap doesn't ask for branch/year dimensions, so every invoice
+    currently allocates from the single `"default"` scope.
+    """
+
+    scope = models.CharField(max_length=32, unique=True, default="default")
+    last_value = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.scope} @ {self.last_value}"
 
 
 class Invoice(TimeStampedModel):
@@ -106,6 +132,16 @@ class Invoice(TimeStampedModel):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     currency = models.CharField(max_length=8, default="EGP")
     notes = models.TextField(blank=True)
+    # A real, gapless, immutable sequence number (financial roadmap Task 14) —
+    # allocated by services._allocate_invoice_number() at creation time, never
+    # here. Blank (not null) for the same reason InvoiceItem's source_id
+    # partial-unique constraint uses a condition rather than nullable+unique:
+    # it matches this codebase's existing convention for "unique unless
+    # blank". Every invoice created through the service layer gets one;
+    # historical rows from before Task 14 were backfilled in migration 0010
+    # with their existing pk-derived display number, so nothing already shown
+    # to a patient/printed on a receipt ever changes.
+    invoice_number = models.CharField(max_length=20, blank=True, default="")
 
     class Meta:
         ordering = ["-invoice_date", "-id"]
@@ -114,16 +150,36 @@ class Invoice(TimeStampedModel):
             models.Index(fields=["doctor", "invoice_date"]),
             models.Index(fields=["status", "invoice_date"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["invoice_number"],
+                condition=~models.Q(invoice_number=""),
+                name="uniq_invoice_number",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.number} — {self.patient} ({self.status})"
 
     @property
     def number(self):
-        """Display number, e.g. INV-00042 (derived from pk, no extra column)."""
-        return f"INV-{self.pk:05d}" if self.pk else "INV-(unsaved)"
+        """Display number: the real allocated sequence (`invoice_number`) once
+        set, else the old pk-derived fallback for rows that predate Task 14
+        or were created outside the normal service layer (e.g. in a shell)."""
+        return self.invoice_number or (f"INV-{self.pk:05d}" if self.pk else "INV-(unsaved)")
 
     def save(self, *args, **kwargs):
+        if self.pk:
+            previous_number = (
+                Invoice.objects.filter(pk=self.pk)
+                .values_list("invoice_number", flat=True)
+                .first()
+            )
+            if previous_number and self.invoice_number != previous_number:
+                raise InvoiceNumberImmutableError(
+                    f"Invoice #{self.pk}'s number ({previous_number}) is immutable — "
+                    f"attempted to change it to {self.invoice_number!r}."
+                )
         # A credit note reduces what's owed; a refund of already-collected
         # money increases it again. Neither ever rewrites `total`/`paid_amount`
         # — those stay the historical record of what was billed and collected.
@@ -151,7 +207,11 @@ class Invoice(TimeStampedModel):
 class InvoiceItem(TimeStampedModel):
     """A single billed line on an invoice."""
 
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="items")
+    # PROTECT, not CASCADE (CLAUDE.md's "PROTECT on every financial FK"): an
+    # invoice is never hard-deleted (cancel-only, see services.cancel_invoice),
+    # and a stray `Invoice.delete()` must not be able to silently take its
+    # billed line items — a financial detail record — down with it.
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="items")
     description = models.CharField(max_length=255)
     service_item = models.ForeignKey(
         ServiceItem, on_delete=models.SET_NULL, null=True, blank=True,
@@ -235,15 +295,24 @@ class FeeValidity(TimeStampedModel):
     pair increments used_count instead of issuing a new invoice.
     """
 
+    # PROTECT, not CASCADE, on all three (CLAUDE.md's "PROTECT on every
+    # financial FK") — a free-follow-up entitlement is itself a financial
+    # record (it represents value given away, see the roadmap's optional
+    # ENTITLEMENT_FORGONE ledger line), so losing it as a side effect of
+    # deleting a patient/doctor/invoice row would silently erase that history.
+    # In practice `patient`/`doctor` are already unreachable here — Invoice.patient
+    # is PROTECT, so a patient with a FeeValidity can never be deleted anyway —
+    # but that must not depend on `invoice` always being required; PROTECT
+    # everywhere is the one invariant that stays true on its own.
     patient = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="fee_validities"
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="fee_validities"
     )
     doctor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name="doctor_fee_validities",
     )
     invoice = models.ForeignKey(
-        Invoice, on_delete=models.CASCADE, related_name="fee_validities"
+        Invoice, on_delete=models.PROTECT, related_name="fee_validities"
     )
     valid_from = models.DateField()
     valid_until = models.DateField()
