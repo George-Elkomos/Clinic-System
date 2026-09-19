@@ -11,6 +11,7 @@ import {
   Folder,
   FlaskConical,
   Inbox,
+  Landmark,
   LayoutGrid,
   LogOut,
   Menu,
@@ -235,6 +236,10 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
       ],
     },
     {
+      headerKey: 'nav.sectionFinance',
+      items: [{ to: '/finance', labelKey: 'nav.finance', icon: fromLucide(Landmark) }],
+    },
+    {
       headerKey: 'nav.sectionSettings',
       items: [{ to: '/account/settings', labelKey: 'nav.settings', icon: fromLucide(Bell) }],
     },
@@ -250,6 +255,10 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
         { to: '/manager/reviews', labelKey: 'nav.reviews', icon: fromLucide(Star) },
         { to: '/manager/audit', labelKey: 'nav.auditLog', icon: fromLucide(ScrollText) },
       ],
+    },
+    {
+      headerKey: 'nav.sectionFinance',
+      items: [{ to: '/finance', labelKey: 'nav.finance', icon: fromLucide(Landmark) }],
     },
     {
       headerKey: 'nav.sectionSettings',
@@ -297,7 +306,7 @@ const EXTRA_HEADER_TITLES: { pattern: RegExp; labelKey: string }[] = [
 // LabOrderDetailsPage renders at both /doctor/lab-orders/:id and
 // /secretary/lab/:id. /secretary now covers every Secretary page (including
 // that shared one), redesigned as its own phase after Doctor.
-const REDESIGNED_PATH_PREFIXES = ['/patient', '/doctor', '/secretary', '/manager', '/account']
+const REDESIGNED_PATH_PREFIXES = ['/patient', '/doctor', '/secretary', '/manager', '/account', '/finance']
 
 function isRedesignedPath(pathname: string) {
   return REDESIGNED_PATH_PREFIXES.some((prefix) =>

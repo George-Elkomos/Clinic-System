@@ -77,9 +77,11 @@
     "viewProfile": "View Profile",
     "accountMenu": "Account menu",
     "patientDashboard": "Dashboard",
+    "finance": "Finance",
     "sectionMain": "Main",
     "sectionRecords": "Medical Records",
     "sectionServices": "Services",
+    "sectionFinance": "Finance",
     "sectionSettings": "Settings"
   },
   "roles": {
@@ -1349,6 +1351,31 @@
     "periodDay": "Today",
     "periodMonth": "This Month",
     "periodYear": "This Year"
+  },
+  "finance": {
+    "invoicesTitle": "Invoices",
+    "filters": {
+      "statusLabel": "Status",
+      "statusAll": "All statuses",
+      "patientLabel": "Patient",
+      "patientPlaceholder": "Search patients…",
+      "clearFilters": "Clear filters"
+    },
+    "columns": {
+      "number": "Invoice #",
+      "date": "Date",
+      "patient": "Patient",
+      "doctor": "Doctor",
+      "status": "Status",
+      "total": "Total",
+      "paid": "Paid",
+      "credited": "Credited",
+      "refunded": "Refunded",
+      "balance": "Balance"
+    },
+    "noInvoicesFiltered": "No invoices match these filters.",
+    "loadError": "We couldn't load invoices.",
+    "detailComingSoon": "Invoice detail is coming soon."
   },
   "referrals": {
     "referPatient": "Refer Patient",

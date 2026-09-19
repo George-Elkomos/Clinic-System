@@ -886,6 +886,11 @@ export interface Invoice {
   discount: string
   total: string
   paid_amount: string
+  // Present on InvoiceSerializer (Backend/apps/billing/serializers.py) since
+  // Task 7/15 (credit notes / refunds) but not yet read by the existing
+  // Billing screens — added here for the Finance invoice list.
+  credited_amount: string
+  refunded_amount: string
   balance: string
   currency: string
   notes: string
@@ -916,6 +921,74 @@ export interface BillingReport {
   total_collected: string
   total_outstanding: string
   revenue_by_doctor: DoctorRevenue[]
+}
+
+// --- Finance (Finance Frontend Foundation) ---
+// Mirrors Backend/apps/billing/{models,serializers}.py on financial-foundation.
+// `reason_code` is free text server-side (no backend enum) — the frontend owns
+// its own fixed vocabulary once the correction screens are built.
+
+export interface CreditNote {
+  id: number
+  invoice: number
+  amount: string
+  reason_code: string
+  approved_by: number | null
+  approved_by_name: string | null
+  journal_entry: number | null
+  created_at: string
+}
+
+export interface Refund {
+  id: number
+  invoice: number
+  amount: string
+  payment_method: PaymentMethod
+  reason_code: string
+  approved_by: number | null
+  approved_by_name: string | null
+  paid_by: number | null
+  shift: number | null
+  journal_entry: number | null
+  created_at: string
+}
+
+export type CashierShiftStatus = 'OPEN' | 'CLOSED'
+
+export interface CashierShift {
+  id: number
+  cashier: number
+  cashier_name: string
+  till_id: string
+  status: CashierShiftStatus
+  opened_at: string
+  closed_at: string | null
+  closed_by: number | null
+  closed_by_name: string | null
+  opening_float: string
+  expected_amount: string | null
+  counted_amount: string | null
+  variance: string | null
+  variance_reason_code: string
+  approved_by: number | null
+  approved_by_name: string | null
+  journal_entry: number | null
+  currency: string
+  notes: string
+}
+
+export type CashMovementType = 'FLOAT_IN' | 'BANK_DEPOSIT'
+
+export interface CashMovement {
+  id: number
+  shift: number
+  movement_type: CashMovementType
+  amount: string
+  reason: string
+  created_by: number | null
+  created_by_name: string | null
+  journal_entry: number | null
+  created_at: string
 }
 
 // --- Referrals (Phase 13) ---

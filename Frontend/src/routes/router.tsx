@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { PortalShell } from '../components/layout/PortalShell'
 import { ForbiddenPage, NotFoundPage } from '../pages/public/ErrorPages'
@@ -48,6 +48,7 @@ import { PatientDirectoryPage } from '../pages/secretary/PatientDirectoryPage'
 import { BillingDeskPage } from '../pages/secretary/BillingDeskPage'
 import { MyInvoicesPage } from '../pages/patient/MyInvoicesPage'
 import { BillingReportsPage } from '../pages/manager/BillingReportsPage'
+import { FinanceInvoicesPage } from '../pages/finance/FinanceInvoicesPage'
 import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
 import { AccountSettingsPage } from '../pages/account/AccountSettingsPage'
 import { PatientNotificationSettingsPage } from '../pages/patient/PatientNotificationSettingsPage'
@@ -134,6 +135,18 @@ export const router = createBrowserRouter([
       { path: 'billing', element: <BillingDeskPage /> },
       { path: 'referrals', element: <SecretaryReferralsPage /> },
       { path: 'radiology', element: <RadiologyWorklistPage /> },
+    ],
+  },
+
+  // Finance — Secretary + Manager, shared module (Manager-only actions are
+  // gated inline via useFinanceAccess, not by a separate route tree).
+  {
+    path: '/finance',
+    element: <RoleRoute roles={['SECRETARY', 'MANAGER']}><PortalShell /></RoleRoute>,
+    children: [
+      // No dedicated Finance home yet — Invoices is the only screen so far.
+      { index: true, element: <Navigate to="invoices" replace /> },
+      { path: 'invoices', element: <FinanceInvoicesPage /> },
     ],
   },
 

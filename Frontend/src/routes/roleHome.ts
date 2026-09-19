@@ -18,6 +18,7 @@ const GATED_PREFIXES: Array<{ prefix: string; roles: Role[] }> = [
   { prefix: '/doctor', roles: ['DOCTOR'] },
   { prefix: '/secretary', roles: ['SECRETARY', 'MANAGER'] },
   { prefix: '/manager', roles: ['MANAGER'] },
+  { prefix: '/finance', roles: ['SECRETARY', 'MANAGER'] },
   { prefix: '/account', roles: ['PATIENT', 'DOCTOR', 'SECRETARY', 'MANAGER'] },
   { prefix: '/change-password', roles: ['PATIENT', 'DOCTOR', 'SECRETARY', 'MANAGER'] },
 ]

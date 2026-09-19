@@ -77,9 +77,11 @@
     "viewProfile": "عرض الملف الشخصي",
     "accountMenu": "قائمة الحساب",
     "patientDashboard": "الرئيسية",
+    "finance": "الشؤون المالية",
     "sectionMain": "الرئيسية",
     "sectionRecords": "السجلات الطبية",
     "sectionServices": "الخدمات",
+    "sectionFinance": "الشؤون المالية",
     "sectionSettings": "الإعدادات"
   },
   "roles": {
@@ -1349,6 +1351,31 @@
     "periodDay": "اليوم",
     "periodMonth": "هذا الشهر",
     "periodYear": "هذه السنة"
+  },
+  "finance": {
+    "invoicesTitle": "الفواتير",
+    "filters": {
+      "statusLabel": "الحالة",
+      "statusAll": "كل الحالات",
+      "patientLabel": "المريض",
+      "patientPlaceholder": "ابحث عن مريض…",
+      "clearFilters": "مسح الفلاتر"
+    },
+    "columns": {
+      "number": "رقم الفاتورة",
+      "date": "التاريخ",
+      "patient": "المريض",
+      "doctor": "الطبيب",
+      "status": "الحالة",
+      "total": "الإجمالي",
+      "paid": "المدفوع",
+      "credited": "المخصوم",
+      "refunded": "المسترد",
+      "balance": "المتبقي"
+    },
+    "noInvoicesFiltered": "لا توجد فواتير مطابقة لهذه الفلاتر.",
+    "loadError": "تعذّر تحميل الفواتير.",
+    "detailComingSoon": "تفاصيل الفاتورة ستتوفر قريبًا."
   },
   "referrals": {
     "referPatient": "إحالة المريض",
