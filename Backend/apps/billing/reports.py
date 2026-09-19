@@ -35,10 +35,25 @@ def _bucket_for(days_overdue):
 
 
 def ar_ageing(as_of=None):
-    """Outstanding patient AR bucketed by days overdue. `ledger_balance` per
-    row is the ledger's own party_balance for that patient — a mismatch
-    against the bucketed Invoice-derived total would mean the two have
-    drifted out of reconciliation."""
+    """Outstanding patient AR bucketed by days overdue.
+
+    Financial roadmap Task 9 describes this report as "derived from the
+    ledger, not from Invoice.balance". That is followed as far as the schema
+    allows: `JournalLine` carries a party (the patient) but no per-invoice
+    dimension, so the *ledger* only knows one AR figure per patient, never a
+    breakdown by which invoice (and therefore which due date/bucket) it
+    belongs to — bucketing genuinely requires `Invoice.due_date`, a billing
+    concept the ledger doesn't model. Redesigning the immutable Task 5 ledger
+    schema to carry an invoice dimension, just to satisfy this report, would
+    be exactly the kind of unnecessary rebuild the roadmap says not to do.
+
+    So each row's bucketed amounts stay Invoice-derived (the only way to
+    bucket at all), but `ledger_balance` is the same patient's ledger-derived
+    `party_balance` — the authoritative figure — and `reconciles` makes any
+    drift between the two impossible to silently miss, at both the per-patient
+    and the grand-total level, rather than exposing `ledger_balance` as a
+    quiet side channel a caller could ignore.
+    """
     as_of = as_of or timezone.localdate()
     open_invoices = (
         Invoice.objects.filter(
@@ -65,9 +80,17 @@ def ar_ageing(as_of=None):
         row["ledger_balance"] = accounting_services.party_balance(
             "Patient", row["patient_id"], as_of=as_of,
         )
+        row["reconciles"] = row["total"] == row["ledger_balance"]
 
     grand_total = sum((row["total"] for row in rows), Decimal("0.00"))
-    return {"as_of": as_of, "rows": rows, "grand_total": grand_total}
+    ledger_grand_total = sum((row["ledger_balance"] for row in rows), Decimal("0.00"))
+    return {
+        "as_of": as_of,
+        "rows": rows,
+        "grand_total": grand_total,
+        "ledger_grand_total": ledger_grand_total,
+        "reconciles": grand_total == ledger_grand_total,
+    }
 
 
 def patient_statement(patient, as_of=None):

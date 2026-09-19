@@ -82,6 +82,67 @@ class TestIncomeStatement:
 
         assert statement["total_revenue"] == report["total_billed"]
 
+    def test_agrees_with_billing_report_with_a_discount(
+        self, patient, doctor_profile, secretary,
+    ):
+        """`billing_report()["total_billed"]` sums `Invoice.total`, which is
+        already net of discount (`total = subtotal - discount`); the ledger's
+        income_statement reaches the same figure a different way (gross
+        revenue lines minus the DISCOUNT contra line). Same concept, same
+        number, two independent code paths — this is the roadmap's Task 9
+        DoD item ("the existing billing_report() agrees with the new
+        reports") for the one case where the two really do represent the
+        same thing."""
+        from apps.billing.models import Invoice as InvoiceModel
+        from apps.billing.models import InvoiceItem
+
+        from apps.core.enums import InvoiceStatus
+
+        item = ServiceItem.objects.create(
+            name="Consult", item_type=ServiceItemType.CONSULTATION, default_price=Decimal("100.00"),
+        )
+        invoice = InvoiceModel.objects.create(
+            patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.ISSUED,
+        )
+        InvoiceItem.objects.create(
+            invoice=invoice, description=item.name, service_item=item,
+            quantity=1, unit_price=item.default_price,
+        )
+        invoice.discount = Decimal("20.00")
+        invoice.recalculate_totals()
+        billing_services.post_invoice_issued(invoice, user=secretary)
+
+        today = timezone.localdate()
+        statement = accounting_reports.income_statement(today, today)
+        report = billing_services.billing_report(period="day")
+        assert statement["total_revenue"] == report["total_billed"] == Decimal("80.00")
+
+    def test_diverges_from_billing_report_after_a_credit_note_by_design(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        """A credit note never edits `Invoice.total` (financial roadmap Task 7
+        — corrections never rewrite the original historical totals), so
+        `billing_report()["total_billed"]` stays at what was originally
+        invoiced. The ledger's income_statement, by contrast, nets the credit
+        note's revenue reversal straight out of the REVENUE_BY_SERVICE_CATEGORY
+        balance. Once a correction exists, these two numbers are no longer the
+        same concept — "what was originally billed" vs. "revenue actually
+        recognised after corrections" — so they are expected to diverge, and
+        this test documents that instead of asserting a fake equality."""
+        _complete_visit(patient, doctor_profile, secretary)
+        invoice = Invoice.objects.get(patient=patient)
+        billing_services.issue_credit_note(
+            invoice=invoice, amount=Decimal("30.00"), reason_code="test", approved_by=manager,
+        )
+
+        today = timezone.localdate()
+        statement = accounting_reports.income_statement(today, today)
+        report = billing_services.billing_report(period="day")
+
+        assert report["total_billed"] == Decimal("100.00")  # unchanged historical total
+        assert statement["total_revenue"] == Decimal("70.00")  # net of the credit note
+        assert statement["total_revenue"] != report["total_billed"]
+
     def test_discount_reduces_revenue_in_the_statement(
         self, patient, doctor_profile, secretary,
     ):
@@ -136,6 +197,34 @@ class TestArAgeing:
         ageing = billing_reports.ar_ageing()
         assert ageing["rows"] == []
         assert ageing["grand_total"] == Decimal("0.00")
+
+    def test_reconciles_flag_is_true_in_the_normal_case(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        _complete_visit(patient, doctor_profile, secretary)
+        ageing = billing_reports.ar_ageing()
+        assert ageing["reconciles"] is True
+        assert ageing["rows"][0]["reconciles"] is True
+        assert ageing["grand_total"] == ageing["ledger_grand_total"]
+
+    def test_reconciles_flag_catches_a_forced_drift(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        """Proves the reconciliation check actually detects a mismatch rather
+        than trivially always passing: force `Invoice.balance` out of step
+        with the ledger (bypassing the normal save()/posting path entirely,
+        the way a hypothetical bug elsewhere might) and confirm the report
+        surfaces it instead of silently reporting a clean number."""
+        _complete_visit(patient, doctor_profile, secretary)
+        invoice = Invoice.objects.get(patient=patient)
+        Invoice.objects.filter(pk=invoice.pk).update(balance=Decimal("999.00"))
+
+        ageing = billing_reports.ar_ageing()
+        row = ageing["rows"][0]
+        assert row["total"] == Decimal("999.00")
+        assert row["ledger_balance"] == Decimal("100.00")  # the ledger never moved
+        assert row["reconciles"] is False
+        assert ageing["reconciles"] is False
 
 
 class TestPatientStatement:
