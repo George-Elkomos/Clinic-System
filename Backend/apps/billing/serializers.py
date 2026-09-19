@@ -2,10 +2,26 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from apps.core.enums import CashMovementType
+from apps.core.enums import CashMovementType, PaymentMethod, RoleChoices
 from apps.core.i18n import get_request_locale, localized_name
+from apps.users.models import User
 
-from .models import CashierShift, CashMovement, FeeValidity, Invoice, InvoiceItem, Payment, ServiceItem
+from .models import (
+    CashierShift,
+    CashMovement,
+    CreditNote,
+    FeeValidity,
+    Invoice,
+    InvoiceItem,
+    Payment,
+    Refund,
+    ServiceItem,
+)
+
+# Cash handed back on a refund (`paid_by`) or a shift a manager closes always
+# comes from a staff account — never a patient. Reused by every serializer
+# below that accepts a user reference for financial-correction attribution.
+_STAFF_ROLES = (RoleChoices.SECRETARY, RoleChoices.MANAGER)
 
 
 class ServiceItemSerializer(serializers.ModelSerializer):
@@ -73,11 +89,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "number", "patient", "patient_name", "doctor", "doctor_name",
             "invoice_date", "due_date", "status", "subtotal", "discount",
-            "total", "paid_amount", "balance", "currency", "notes",
-            "items", "payments",
+            "total", "paid_amount", "credited_amount", "refunded_amount",
+            "balance", "currency", "notes", "items", "payments",
         ]
         read_only_fields = [
-            "invoice_date", "subtotal", "total", "paid_amount", "balance",
+            "invoice_date", "subtotal", "total", "paid_amount",
+            "credited_amount", "refunded_amount", "balance",
         ]
 
     def get_patient_name(self, obj):
@@ -96,6 +113,69 @@ class FeeValiditySerializer(serializers.ModelSerializer):
             "id", "patient", "doctor", "invoice", "valid_from", "valid_until",
             "used_count", "max_free_visits",
         ]
+
+
+# --- Task 7 API surface: credit notes, refunds, cancellation ------------------
+# Input serializers deliberately never accept `approved_by`/`cancelled_by` —
+# the view always supplies `request.user` for those (financial roadmap Task 15:
+# never trust a client-supplied approver id). Only `paid_by` (refund cash
+# attribution — distinct from who *approved* it) is client-settable, and even
+# that is restricted to an existing staff account.
+
+class CreditNoteCreateSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"),
+    )
+    reason_code = serializers.CharField(max_length=64)
+
+
+class RefundCreateSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"),
+    )
+    payment_method = serializers.ChoiceField(choices=PaymentMethod.choices)
+    reason_code = serializers.CharField(max_length=64)
+    # Who physically hands the cash back — may differ from the approving
+    # manager (services.issue_refund's own `paid_by` parameter). Optional:
+    # the view defaults it to the requesting manager when omitted.
+    paid_by = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(role__in=_STAFF_ROLES),
+        required=False, allow_null=True,
+    )
+
+
+class CancelInvoiceSerializer(serializers.Serializer):
+    reason_code = serializers.CharField(max_length=64)
+
+
+class CreditNoteSerializer(serializers.ModelSerializer):
+    approved_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CreditNote
+        fields = [
+            "id", "invoice", "amount", "reason_code",
+            "approved_by", "approved_by_name", "journal_entry", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_approved_by_name(self, obj):
+        return obj.approved_by.get_full_name()
+
+
+class RefundSerializer(serializers.ModelSerializer):
+    approved_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Refund
+        fields = [
+            "id", "invoice", "amount", "payment_method", "reason_code",
+            "approved_by", "approved_by_name", "shift", "journal_entry", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_approved_by_name(self, obj):
+        return obj.approved_by.get_full_name()
 
 
 # --- Task 11 API surface: cashier shifts --------------------------------------

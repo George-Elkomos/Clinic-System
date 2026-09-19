@@ -16,14 +16,19 @@ from . import services
 from .models import CashierShift, CashMovement, Invoice, Payment, ServiceItem
 from .permissions import ServiceItemPermission
 from .serializers import (
+    CancelInvoiceSerializer,
     CashierShiftSerializer,
     CashMovementCreateSerializer,
     CashMovementSerializer,
     CloseShiftSerializer,
+    CreditNoteCreateSerializer,
+    CreditNoteSerializer,
     InvoiceSerializer,
     OpenShiftSerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
+    RefundCreateSerializer,
+    RefundSerializer,
     ServiceItemSerializer,
 )
 
@@ -92,6 +97,12 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
 
     Patients see only their own invoices (missing rows 404, never leak);
     doctors see invoices for their consultations; secretary/manager see all.
+
+    The three correction actions below (financial roadmap Task 7) are manager-
+    only: `approved_by`/`cancelled_by` is always `request.user`, never taken
+    from the request body, so restricting the endpoint to MANAGER *is* the
+    authorization check (Task 15 — this project has no separate finance/
+    supervisor role to delegate approval to).
     """
 
     serializer_class = InvoiceSerializer
@@ -109,6 +120,81 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         if user.role == RoleChoices.DOCTOR:
             return qs.filter(doctor=user)
         return qs.none()
+
+    def get_permissions(self):
+        if self.action in ("credit_note", "refund", "cancel"):
+            return [IsManager()]
+        return super().get_permissions()
+
+    @action(detail=True, methods=["post"], url_path="credit-note")
+    def credit_note(self, request, pk=None):
+        """POST /api/invoices/{id}/credit-note/ — reuses services.issue_credit_note;
+        all validation (amount > 0, cannot exceed remaining creditable amount,
+        reason_code required) lives there, not here."""
+        invoice = self.get_object()
+        idempotency_key = _require_idempotency_key(request)
+        serializer = CreditNoteCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        note = services.issue_credit_note(
+            invoice=invoice,
+            amount=serializer.validated_data["amount"],
+            reason_code=serializer.validated_data["reason_code"],
+            approved_by=request.user,
+            idempotency_key=idempotency_key,
+        )
+        return Response(
+            {
+                **CreditNoteSerializer(note).data,
+                "invoice": InvoiceSerializer(note.invoice, context={"request": request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="refund")
+    def refund(self, request, pk=None):
+        """POST /api/invoices/{id}/refund/ — reuses services.issue_refund. The
+        refund cap (paid_amount - already_refunded, never invoice.total) and
+        the till attribution (paid_by, distinct from approved_by) are both
+        enforced there."""
+        invoice = self.get_object()
+        idempotency_key = _require_idempotency_key(request)
+        serializer = RefundCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        refund = services.issue_refund(
+            invoice=invoice,
+            amount=data["amount"],
+            payment_method=data["payment_method"],
+            reason_code=data["reason_code"],
+            approved_by=request.user,
+            paid_by=data.get("paid_by") or request.user,
+            idempotency_key=idempotency_key,
+        )
+        return Response(
+            {
+                **RefundSerializer(refund).data,
+                "invoice": InvoiceSerializer(refund.invoice, context={"request": request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        """POST /api/invoices/{id}/cancel/ — reuses services.cancel_invoice,
+        which refuses invoices with anything collected (refund first) and
+        reverses the original posting rather than editing/deleting it."""
+        invoice = self.get_object()
+        serializer = CancelInvoiceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        cancelled = services.cancel_invoice(
+            invoice=invoice,
+            reason_code=serializer.validated_data["reason_code"],
+            cancelled_by=request.user,
+        )
+        return Response(
+            InvoiceSerializer(cancelled, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class PaymentViewSet(
