@@ -16,7 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(pre_save, sender=Appointment)
-def capture_old_status(sender, instance, **kwargs):
+def capture_old_status(sender, instance, raw, **kwargs):
+    # A fixture/data-migration load (`loaddata`) passes raw=True and supplies
+    # every field verbatim from the dump — there is no real "status
+    # transition" happening, just a row being replayed. Skipping the extra
+    # lookup query here is also what makes it safe for the paired
+    # `notify_on_status_change` below to skip on raw too: nothing reads
+    # `_old_status` in that case (see `getattr(..., default=None)` there).
+    if raw:
+        return
     if instance.pk:
         old = Appointment.objects.filter(pk=instance.pk).values_list("status", flat=True).first()
         instance._old_status = old
@@ -25,7 +33,7 @@ def capture_old_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Appointment)
-def broadcast_queue_update(sender, instance, **kwargs):
+def broadcast_queue_update(sender, instance, raw, **kwargs):
     """Wake up the doctor's live queue page (DoctorQueuePage) via WebSocket.
 
     Unconditional on every save — not just status changes — because a
@@ -35,7 +43,15 @@ def broadcast_queue_update(sender, instance, **kwargs):
     so a redundant push is harmless, unlike a missed one.
 
     Never let a real-time hiccup break the appointment save itself.
+
+    Skipped entirely when raw=True (fixture/data-migration load): there is
+    no live doctor to wake up for a row being mechanically replayed from a
+    dump, and doing it anyway would fire one WebSocket broadcast per loaded
+    appointment for no reason.
     """
+    if raw:
+        return
+
     from .consumers import group_for_doctor
 
     try:
@@ -50,7 +66,17 @@ def broadcast_queue_update(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Appointment)
-def notify_on_status_change(sender, instance, created, **kwargs):
+def notify_on_status_change(sender, instance, created, raw, **kwargs):
+    # The most important raw guard in this file: without it, loading a
+    # fixture/data-migration dump of historical appointments would send a
+    # real "appointment requested/confirmed/cancelled" notification (and
+    # whatever channel — email/SMS/WhatsApp — that fans out to) to a real
+    # patient for every single row, years after the fact. `created` and
+    # `_old_status` are both meaningless for a raw-deserialized row anyway —
+    # loaddata doesn't model a "transition", it just replays a value.
+    if raw:
+        return
+
     from apps.notifications.services import notify
 
     recipient = instance.patient.user

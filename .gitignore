@@ -6,6 +6,10 @@ Backend/db.sqlite3
 Backend/db.sqlite3-wal
 Backend/db.sqlite3-shm
 Backend/.env
+# Also ignore env variants and backups (.env.local, .env.bak, .env.old-laptop-bak, ...)
+# so a copy of the real secrets can never be committed by accident.
+Backend/.env.*
+!Backend/.env.example
 Backend/media/
 Backend/staticfiles/
 .pytest_cache/

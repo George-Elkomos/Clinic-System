@@ -57,7 +57,12 @@ def _compute_changes(old, new):
     return changes
 
 
-def audit_pre_save(sender, instance, **kwargs):
+def audit_pre_save(sender, instance, raw, **kwargs):
+    # A fixture/data-migration load (loaddata) replays historical rows
+    # verbatim — it isn't a real edit, so it must not be diffed or logged as
+    # one. Paired with the same guard in audit_post_save below.
+    if raw:
+        return
     if not instance.pk:
         instance._audit_changes = None
         return
@@ -65,7 +70,15 @@ def audit_pre_save(sender, instance, **kwargs):
     instance._audit_changes = _compute_changes(old, instance) if old else None
 
 
-def audit_post_save(sender, instance, created, **kwargs):
+def audit_post_save(sender, instance, created, raw, **kwargs):
+    # Without this, restoring/migrating data (e.g. `loaddata`, or the
+    # SQLite -> PostgreSQL cutover's dumpdata/loaddata step) would write a
+    # fake AuditLog "CREATE" row — attributed to no one, since there is no
+    # request/actor in that context — for every single loaded row across all
+    # 13 audited models, permanently polluting the real audit trail with
+    # events that never happened.
+    if raw:
+        return
     if created:
         record_event(action=AuditAction.CREATE, instance=instance)
     else:
@@ -76,6 +89,9 @@ def audit_post_save(sender, instance, created, **kwargs):
 
 
 def audit_post_delete(sender, instance, **kwargs):
+    # No raw guard: Django's `raw` flag only exists for pre_save/post_save
+    # (loaddata deserializes and *saves* rows — it never deletes anything),
+    # so post_delete has no raw concept to guard against here.
     record_event(action=AuditAction.DELETE, instance=instance)
 
 

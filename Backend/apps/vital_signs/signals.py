@@ -10,7 +10,15 @@ from django.dispatch import receiver
 
 
 @receiver(post_save, sender="vital_signs.VitalSigns")
-def sync_vitals_to_medical_record(sender, instance, **kwargs):
+def sync_vitals_to_medical_record(sender, instance, raw, **kwargs):
+    # Skipped on raw=True: a fixture/data-migration load of VitalSigns rows
+    # would otherwise silently overwrite a *different* model's row
+    # (MedicalRecord.vitals) with a freshly recomputed snapshot, instead of
+    # leaving that record's own historical `vitals` value — already present
+    # elsewhere in the same dump — untouched. A migration must replay data
+    # faithfully, not recompute derived fields as a side effect of loading.
+    if raw:
+        return
     if not instance.appointment_id:
         return
 
