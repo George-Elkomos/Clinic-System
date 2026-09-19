@@ -93,6 +93,29 @@ class TestCreditNote:
                 reason_code="too_much", approved_by=manager,
             )
 
+    def test_credit_note_cannot_exceed_the_balance_after_a_prior_payment(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        """Financial roadmap Task 15 hardening. total=100, a $60 payment
+        leaves balance=40 — a $50 credit note must be refused, not silently
+        clamped, even though $50 is well within `total - credited_amount`
+        (the old, payment-blind cap this regression guards against)."""
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("60.00"),
+            payment_method=PaymentMethod.CASH, received_by=secretary,
+        )
+        invoice.refresh_from_db()
+        assert invoice.balance == Decimal("40.00")
+
+        with pytest.raises(ValidationError):
+            billing_services.issue_credit_note(
+                invoice=invoice, amount=Decimal("50.00"),
+                reason_code="too_much_after_payment", approved_by=manager,
+            )
+        invoice.refresh_from_db()
+        assert invoice.balance == Decimal("40.00")  # untouched, never went negative
+
     def test_credit_note_requires_a_reason_code(
         self, consultation_item, patient, doctor_profile, secretary, manager,
     ):
@@ -230,6 +253,95 @@ class TestOverpaymentDeposit:
         assert accounting_services.account_balance(deposit_account) == Decimal("-50.00")  # credit balance
 
 
+class TestPaymentBalanceGuard:
+    """Financial roadmap Task 15 hardening. Before this fix, `paid_amount`
+    was capped against bare `invoice.total`, ignoring that a credit note (or,
+    later, a write-off) can already have reduced what's genuinely still
+    payable — a further payment could then drive `Invoice.balance` negative
+    even though `applied`/`overpayment` were already being split correctly.
+    Every scenario reloads the invoice from the database, not the in-memory
+    object, to prove the fix is actually persisted."""
+
+    def test_fully_credited_invoice_payment_becomes_a_deposit_without_going_negative(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.issue_credit_note(
+            invoice=invoice, amount=invoice.total, reason_code="full_void", approved_by=manager,
+        )
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("40.00"),
+            payment_method=PaymentMethod.CASH, received_by=secretary,
+        )
+        reloaded = Invoice.objects.get(pk=invoice.pk)
+        assert reloaded.balance == Decimal("0.00")
+        assert reloaded.paid_amount == Decimal("0.00")
+        deposit = PatientDeposit.objects.get(patient=patient)
+        assert deposit.amount == Decimal("40.00")
+
+    def test_partially_credited_invoice_payment_is_capped_at_remaining_balance(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.issue_credit_note(
+            invoice=invoice, amount=Decimal("40.00"),
+            reason_code="partial_adjustment", approved_by=manager,
+        )
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("70.00"),
+            payment_method=PaymentMethod.CASH, received_by=secretary,
+        )
+        reloaded = Invoice.objects.get(pk=invoice.pk)
+        assert reloaded.paid_amount == Decimal("60.00")
+        assert reloaded.balance == Decimal("0.00")
+        deposit = PatientDeposit.objects.get(patient=patient)
+        assert deposit.amount == Decimal("10.00")
+
+    def test_payment_of_exactly_the_remaining_balance_succeeds_cleanly(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.issue_credit_note(
+            invoice=invoice, amount=Decimal("30.00"),
+            reason_code="partial_adjustment", approved_by=manager,
+        )
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("70.00"),
+            payment_method=PaymentMethod.CASH, received_by=secretary,
+        )
+        reloaded = Invoice.objects.get(pk=invoice.pk)
+        assert reloaded.paid_amount == Decimal("70.00")
+        assert reloaded.balance == Decimal("0.00")
+        assert not PatientDeposit.objects.filter(patient=patient).exists()
+
+    def test_refund_reopens_receivable_and_a_matching_repayment_zeroes_it(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("60.00"),
+            payment_method=PaymentMethod.CASH, received_by=secretary,
+        )
+        invoice.refresh_from_db()
+        assert invoice.balance == Decimal("40.00")
+
+        billing_services.issue_refund(
+            invoice=invoice, amount=Decimal("20.00"), payment_method=PaymentMethod.CASH,
+            reason_code="overcharge", approved_by=manager,
+        )
+        invoice.refresh_from_db()
+        assert invoice.balance == Decimal("60.00")  # refunded_amount reopens the receivable
+
+        billing_services.record_payment(
+            invoice=invoice, amount=Decimal("60.00"),
+            payment_method=PaymentMethod.CASH, received_by=secretary,
+        )
+        reloaded = Invoice.objects.get(pk=invoice.pk)
+        assert reloaded.paid_amount == Decimal("120.00")
+        assert reloaded.balance == Decimal("0.00")
+        assert not PatientDeposit.objects.filter(patient=patient).exists()
+
+
 class TestCancellation:
     def test_cancelling_an_unpaid_invoice_reverses_the_entry(
         self, consultation_item, patient, doctor_profile, secretary, manager,
@@ -265,6 +377,26 @@ class TestCancellation:
             billing_services.cancel_invoice(
                 invoice=invoice, reason_code="try_cancel", cancelled_by=manager,
             )
+
+    def test_cancelling_an_invoice_with_a_credit_note_is_refused(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        """Financial roadmap Task 15 hardening. Without this guard,
+        cancelling silently overwrote `credited_amount` (losing the real
+        figure) while leaving the credit note's own ledger entry unreversed
+        — a phantom AR drift. `paid_amount` alone was never enough."""
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.issue_credit_note(
+            invoice=invoice, amount=Decimal("30.00"),
+            reason_code="goodwill_adjustment", approved_by=manager,
+        )
+        with pytest.raises(ValidationError):
+            billing_services.cancel_invoice(
+                invoice=invoice, reason_code="try_cancel", cancelled_by=manager,
+            )
+        invoice.refresh_from_db()
+        assert invoice.status != "CANCELLED"
+        assert invoice.credited_amount == Decimal("30.00")  # never overwritten
 
     def test_cancelling_twice_is_refused(
         self, consultation_item, patient, doctor_profile, secretary, manager,

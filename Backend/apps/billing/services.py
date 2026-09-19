@@ -494,8 +494,21 @@ def record_payment(
             patient=invoice.patient, amount=overpayment, journal_entry=entry,
         )
 
+    # The ceiling is not bare `invoice.total`: a credit note or refund can
+    # already have moved how much of this invoice is truly still payable
+    # (financial roadmap Task 15 hardening). Capping against `total` alone
+    # let `paid_amount` climb past what a corrected invoice can actually
+    # absorb, driving `balance` negative once any correction existed —
+    # `applied`/`overpayment` above were always correct; this is the only
+    # place that wasn't. The eligible-overpayment path itself (excess ->
+    # PatientDeposit) is untouched: this only bounds what counts as *applied*
+    # to this invoice's own AR.
+    eligible_ceiling = max(
+        invoice.total - invoice.credited_amount + invoice.refunded_amount,
+        Decimal("0.00"),
+    )
     invoice.paid_amount = min(
-        invoice.payments.aggregate(s=Sum("amount"))["s"] or Decimal("0.00"), invoice.total,
+        invoice.payments.aggregate(s=Sum("amount"))["s"] or Decimal("0.00"), eligible_ceiling,
     )
     invoice.status = (
         InvoiceStatus.PAID
@@ -572,12 +585,19 @@ def issue_credit_note(*, invoice, amount, reason_code, approved_by, idempotency_
     if not reason_code:
         raise ValidationError({"reason_code": "A credit note requires a reason_code."})
 
-    remaining = invoice.total - invoice.credited_amount
+    # Capped against the invoice's actual current balance, not a bare
+    # total-minus-credited figure (financial roadmap Task 15 hardening): the
+    # latter ignores `paid_amount`/`refunded_amount` and could credit more
+    # than is genuinely still owed, driving `balance` negative. `balance` is
+    # already the correct, up-to-date figure (recomputed on every save), so
+    # capping against it is automatically correct for every combination of
+    # prior payments/credit notes/refunds without hand-assembling the terms.
+    remaining = invoice.balance
     if amount > remaining:
         raise ValidationError({
             "amount": (
                 f"Credit note ({amount}) exceeds the invoice's remaining "
-                f"creditable amount ({remaining})."
+                f"balance ({remaining})."
             ),
         })
 
@@ -735,6 +755,10 @@ def cancel_invoice(*, invoice, reason_code, cancelled_by):
     if invoice.paid_amount:
         raise ValidationError({
             "invoice": "Cannot cancel an invoice with payments recorded — issue a refund first.",
+        })
+    if invoice.credited_amount:
+        raise ValidationError({
+            "invoice": "Cannot cancel an invoice with credit notes already issued.",
         })
 
     original_entry = JournalEntry.objects.filter(
