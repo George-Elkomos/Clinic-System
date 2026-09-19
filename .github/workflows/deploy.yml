@@ -42,6 +42,7 @@ jobs:
           retention-days: 14
 
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     # Without this, two pushes close together trigger two independent
     # workflow runs that both SSH into the same server and run deploy.sh at
