@@ -95,6 +95,14 @@ export function isConnectivityError(error: unknown): boolean {
   return !error.response || error.response.status >= 500
 }
 
+/** True when the request failed because the resource doesn't exist (or, for a
+ * scoped list like /invoices/, exists but is outside the caller's access) —
+ * distinct from a connectivity/server failure, so the UI can show "not found"
+ * instead of a generic "couldn't load" + retry (retrying a 404 never helps). */
+export function isNotFoundError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 404
+}
+
 /**
  * Turns any Axios error into a human-readable string for toast notifications.
  *

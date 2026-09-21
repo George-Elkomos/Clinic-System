@@ -1375,7 +1375,22 @@
     },
     "noInvoicesFiltered": "No invoices match these filters.",
     "loadError": "We couldn't load invoices.",
-    "detailComingSoon": "Invoice detail is coming soon."
+    "detail": {
+      "backToInvoices": "Back to Invoices",
+      "notFound": "Invoice not found.",
+      "notFoundHint": "It may have been removed, or the link is incorrect.",
+      "summaryTitle": "Financial Summary",
+      "lineItemsTitle": "Line Items",
+      "noLineItems": "No line items on this invoice.",
+      "paymentsTitle": "Payment History",
+      "noPayments": "No payments recorded yet.",
+      "receivedBy": "Received By",
+      "actionsTitle": "Corrections",
+      "creditNote": "Issue Credit Note",
+      "refund": "Issue Refund",
+      "cancelInvoice": "Cancel Invoice",
+      "actionsComingSoon": "Coming in a later phase."
+    }
   },
   "referrals": {
     "referPatient": "Refer Patient",

@@ -49,6 +49,7 @@ import { BillingDeskPage } from '../pages/secretary/BillingDeskPage'
 import { MyInvoicesPage } from '../pages/patient/MyInvoicesPage'
 import { BillingReportsPage } from '../pages/manager/BillingReportsPage'
 import { FinanceInvoicesPage } from '../pages/finance/FinanceInvoicesPage'
+import { FinanceInvoiceDetailPage } from '../pages/finance/FinanceInvoiceDetailPage'
 import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
 import { AccountSettingsPage } from '../pages/account/AccountSettingsPage'
 import { PatientNotificationSettingsPage } from '../pages/patient/PatientNotificationSettingsPage'
@@ -147,6 +148,7 @@ export const router = createBrowserRouter([
       // No dedicated Finance home yet — Invoices is the only screen so far.
       { index: true, element: <Navigate to="invoices" replace /> },
       { path: 'invoices', element: <FinanceInvoicesPage /> },
+      { path: 'invoices/:id', element: <FinanceInvoiceDetailPage /> },
     ],
   },
 

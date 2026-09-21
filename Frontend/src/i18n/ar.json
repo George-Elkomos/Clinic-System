@@ -1375,7 +1375,22 @@
     },
     "noInvoicesFiltered": "لا توجد فواتير مطابقة لهذه الفلاتر.",
     "loadError": "تعذّر تحميل الفواتير.",
-    "detailComingSoon": "تفاصيل الفاتورة ستتوفر قريبًا."
+    "detail": {
+      "backToInvoices": "العودة إلى الفواتير",
+      "notFound": "الفاتورة غير موجودة.",
+      "notFoundHint": "ربما تم حذفها، أو أن الرابط غير صحيح.",
+      "summaryTitle": "الملخص المالي",
+      "lineItemsTitle": "بنود الفاتورة",
+      "noLineItems": "لا توجد بنود في هذه الفاتورة.",
+      "paymentsTitle": "سجل المدفوعات",
+      "noPayments": "لا توجد مدفوعات مسجلة بعد.",
+      "receivedBy": "استلمها",
+      "actionsTitle": "التصحيحات",
+      "creditNote": "إصدار إشعار دائن",
+      "refund": "إصدار استرداد",
+      "cancelInvoice": "إلغاء الفاتورة",
+      "actionsComingSoon": "متوفر في مرحلة لاحقة."
+    }
   },
   "referrals": {
     "referPatient": "إحالة المريض",

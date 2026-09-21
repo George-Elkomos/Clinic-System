@@ -94,6 +94,15 @@ describe('FinanceInvoicesPage', () => {
     expect(screen.getByText('Omar Hassan')).toBeInTheDocument()
   })
 
+  it('links "View Invoice" to that row\'s detail route', async () => {
+    invoicesMock.mockResolvedValue(paginated([buildInvoice({ id: 42, number: 'INV-00042' })]))
+
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: 'View Invoice' })
+    expect(link).toHaveAttribute('href', '/finance/invoices/42')
+  })
+
   it('shows a loading state before the first response arrives', () => {
     invoicesMock.mockReturnValue(new Promise(() => {})) // never resolves
 

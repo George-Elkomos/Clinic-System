@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { FileText } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 
 import { InvoiceStatusBadge } from '../../components/finance/InvoiceStatusBadge'
 import { AsyncCombobox, type ComboOption } from '../../components/primitives/AsyncCombobox'
@@ -220,14 +221,12 @@ export function FinanceInvoicesPage() {
                       <BidiText>{formatCurrency(inv.balance, language)}</BidiText>
                     </td>
                     <td className={TD}>
-                      <button
-                        type="button"
-                        disabled
-                        title={t('finance.detailComingSoon')}
-                        className="cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-400"
+                      <Link
+                        to={`/finance/invoices/${inv.id}`}
+                        className="inline-flex items-center justify-center rounded-xl border border-[#0D9488]/30 bg-[#0D9488]/5 px-3 py-1.5 text-xs font-semibold text-[#0D9488] transition-colors hover:bg-[#0D9488]/10"
                       >
                         {t('billing.viewInvoice')}
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}
