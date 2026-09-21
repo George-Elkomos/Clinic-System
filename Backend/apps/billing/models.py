@@ -34,11 +34,17 @@ from apps.core.enums import (
     IdempotencyStatus,
     InvoiceStatus,
     PaymentMethod,
+    RoleChoices,
     ServiceItemType,
 )
 from apps.core.models import TimeStampedModel
 
-from .exceptions import CashMovementImmutableError, ClosedShiftError, InvoiceNumberImmutableError
+from .exceptions import (
+    CashMovementImmutableError,
+    ClosedShiftError,
+    InvoiceNumberImmutableError,
+    WriteOffImmutableError,
+)
 
 
 class ServiceItem(TimeStampedModel):
@@ -131,6 +137,15 @@ class Invoice(TimeStampedModel):
         max_digits=10, decimal_places=2, default=Decimal("0.00"),
         validators=[MinValueValidator(Decimal("0.00"))],
     )
+    # Financial roadmap Task 15 — the *net active* write-off amount: always
+    # recomputed fresh from `Sum(write_offs where reversal is null)`, never
+    # incremented/decremented, so a reversal is reflected automatically (see
+    # services._recompute_written_off_amount). Same convention as
+    # paid_amount/credited_amount/refunded_amount above.
+    written_off_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
     # Always derived: never written directly, recomputed on every save().
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     currency = models.CharField(max_length=8, default="EGP")
@@ -190,6 +205,7 @@ class Invoice(TimeStampedModel):
             (self.total or Decimal("0.00"))
             - (self.paid_amount or Decimal("0.00"))
             - (self.credited_amount or Decimal("0.00"))
+            - (self.written_off_amount or Decimal("0.00"))
             + (self.refunded_amount or Decimal("0.00"))
         )
         if "update_fields" in kwargs and kwargs["update_fields"] is not None:
@@ -361,6 +377,17 @@ class CreditNote(TimeStampedModel):
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="approved_credit_notes",
     )
+    # Financial roadmap Task 15 — a frozen snapshot of `approved_by.role` at
+    # the moment this row was created. `User.role` is mutable (e.g. via the
+    # Django admin), so looking up `approved_by.role` later is not reliable
+    # historical evidence once threshold-based SECRETARY self-approval makes
+    # that role meaningful. NULL means "predates this snapshot" — it is never
+    # backfilled from a user's current role, which would misrepresent an
+    # unverified guess as a verified historical fact. Populated server-side
+    # only, in `services.issue_credit_note`, and never updated afterward.
+    approved_by_role = models.CharField(
+        max_length=20, choices=RoleChoices.choices, null=True, blank=True,
+    )
     journal_entry = models.ForeignKey(
         "accounting.JournalEntry", null=True, blank=True,
         on_delete=models.PROTECT, related_name="+",
@@ -392,6 +419,11 @@ class Refund(TimeStampedModel):
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="approved_refunds",
     )
+    # Financial roadmap Task 15 — same frozen-snapshot convention as
+    # `CreditNote.approved_by_role`; see that field's docstring.
+    approved_by_role = models.CharField(
+        max_length=20, choices=RoleChoices.choices, null=True, blank=True,
+    )
     # The till session the money was paid out of (Task 11) — a cash refund
     # takes money *out* of the drawer, so it counts against expected cash.
     shift = models.ForeignKey(
@@ -413,6 +445,102 @@ class Refund(TimeStampedModel):
 
     def __str__(self):
         return f"Refund {self.amount} on {self.invoice.number}"
+
+
+class WriteOff(TimeStampedModel):
+    """Abandons part or all of `invoice`'s remaining balance as uncollectable
+    (financial roadmap Task 15). Posts Dr `BAD_DEBT_PATIENT` / Cr `AR_PATIENT`
+    through `services.write_off_invoice` — the ledger's usual one door — and
+    is never edited or deleted afterward: a mistaken write-off is corrected
+    by an explicit `WriteOffReversal`, never by touching this row.
+
+    `journal_entry` is nullable only because the ledger entry's idempotency
+    key needs this row's own pk first; `services.write_off_invoice` always
+    fills it in before returning, in the same transaction — same convention
+    as `CreditNote`/`Refund`.
+
+    Repeated partial write-offs on the same invoice are supported (each is
+    its own row); the invoice's current *net* write-off exposure is always
+    `Invoice.written_off_amount`, derived from the still-active (non-reversed)
+    rows, never summed ad hoc from this model directly.
+    """
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="write_offs")
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    reason_code = models.CharField(max_length=64)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="approved_write_offs",
+    )
+    # Financial roadmap Task 15 — frozen snapshot of `approved_by.role` at
+    # creation (see `CreditNote.approved_by_role`'s docstring for why). No
+    # legacy rows exist for this brand-new model, so — unlike the retrofit on
+    # CreditNote/Refund/CashierShift — this can be required from day one.
+    approved_by_role = models.CharField(max_length=20, choices=RoleChoices.choices)
+    journal_entry = models.ForeignKey(
+        "accounting.JournalEntry", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(reason_code=""), name="writeoff_reason_code_required",
+            ),
+        ]
+
+    def __str__(self):
+        return f"WriteOff {self.amount} on {self.invoice.number}"
+
+    def delete(self, *args, **kwargs):
+        raise WriteOffImmutableError(
+            "write-offs cannot be deleted — post a WriteOffReversal instead"
+        )
+
+
+class WriteOffReversal(TimeStampedModel):
+    """Reinstates the receivable a `WriteOff` abandoned (financial roadmap
+    Task 15) — full reversal only, one per `WriteOff` (enforced by the
+    `OneToOneField` below at the database level, not just in application
+    code). Never edits or deletes the original `WriteOff`; posts a genuine
+    reversing ledger entry through the existing, untouched
+    `accounting.services.reverse()` — the same mechanism `cancel_invoice`
+    already uses to reverse an invoice-issue posting — which automatically
+    produces `Dr AR_PATIENT / Cr BAD_DEBT_PATIENT` by mirroring the original
+    entry's own lines (including its patient party), so no bespoke reversal
+    posting logic is needed here.
+    """
+
+    write_off = models.OneToOneField(
+        WriteOff, on_delete=models.PROTECT, related_name="reversal",
+    )
+    reason_code = models.CharField(max_length=64)
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="reversed_write_offs",
+    )
+    # Financial roadmap Task 15 — frozen snapshot of `reversed_by.role`;
+    # required from day one, same reasoning as `WriteOff.approved_by_role`.
+    reversed_by_role = models.CharField(max_length=20, choices=RoleChoices.choices)
+    journal_entry = models.ForeignKey(
+        "accounting.JournalEntry", null=True, blank=True,
+        on_delete=models.PROTECT, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(reason_code=""), name="writeoffreversal_reason_code_required",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Reversal of {self.write_off}"
+
+    def delete(self, *args, **kwargs):
+        raise WriteOffImmutableError("write-off reversals cannot be deleted")
 
 
 class PatientDeposit(TimeStampedModel):
@@ -495,6 +623,16 @@ class CashierShift(TimeStampedModel):
     closed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
         related_name="closed_cashier_shifts",
+    )
+    # Financial roadmap Task 15 — frozen snapshot of `closed_by.role` at close
+    # time (same convention as `CreditNote.approved_by_role`; see that
+    # field's docstring). `approved_by` is always the same identity as
+    # `closed_by` whenever it is set at all, so one snapshot field here is
+    # sufficient — a separate `approved_by_role` would be redundant in every
+    # case it could be populated. Null while OPEN and for pre-Task-15 closed
+    # rows.
+    closed_by_role = models.CharField(
+        max_length=20, choices=RoleChoices.choices, null=True, blank=True,
     )
     opening_float = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal("0.00"),

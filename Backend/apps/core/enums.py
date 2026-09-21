@@ -252,6 +252,8 @@ class FinancialOperation(models.TextChoices):
     ISSUE_CREDIT_NOTE = "ISSUE_CREDIT_NOTE", _("Issue credit note")
     RECORD_CASH_MOVEMENT = "RECORD_CASH_MOVEMENT", _("Record cash movement")
     RECORD_PAYMENT = "RECORD_PAYMENT", _("Record payment")
+    WRITE_OFF_INVOICE = "WRITE_OFF_INVOICE", _("Write off invoice")
+    REVERSE_WRITE_OFF = "REVERSE_WRITE_OFF", _("Reverse write-off")
 
 
 class IdempotencyStatus(models.TextChoices):

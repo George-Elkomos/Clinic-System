@@ -13,7 +13,7 @@ from apps.core.enums import AuditAction, CashierShiftStatus, RoleChoices
 from apps.users.permissions import IsManager, IsSecretaryOrManager
 
 from . import services
-from .models import CashierShift, CashMovement, Invoice, Payment, ServiceItem
+from .models import CashierShift, CashMovement, Invoice, Payment, ServiceItem, WriteOff
 from .permissions import ServiceItemPermission
 from .serializers import (
     CancelInvoiceSerializer,
@@ -30,6 +30,10 @@ from .serializers import (
     RefundCreateSerializer,
     RefundSerializer,
     ServiceItemSerializer,
+    WriteOffCreateSerializer,
+    WriteOffReversalCreateSerializer,
+    WriteOffReversalSerializer,
+    WriteOffSerializer,
 )
 
 VALID_PERIODS = {"day", "month", "year"}
@@ -98,11 +102,14 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     Patients see only their own invoices (missing rows 404, never leak);
     doctors see invoices for their consultations; secretary/manager see all.
 
-    The three correction actions below (financial roadmap Task 7) are manager-
-    only: `approved_by`/`cancelled_by` is always `request.user`, never taken
-    from the request body, so restricting the endpoint to MANAGER *is* the
-    authorization check (Task 15 — this project has no separate finance/
-    supervisor role to delegate approval to).
+    The correction actions below (financial roadmap Tasks 7/15) always take
+    `approved_by`/`cancelled_by` from `request.user`, never the request body.
+    `credit_note`/`refund`/`write_off` are open to SECRETARY *or* MANAGER at
+    the view layer — the actual amount-vs-threshold decision is enforced
+    inside the service function itself (`apps.billing.approvals.
+    require_authorization`), not here, so it can't be bypassed by a direct
+    service call outside DRF. `cancel` stays MANAGER-only at both layers —
+    it has no threshold concept at all.
     """
 
     serializer_class = InvoiceSerializer
@@ -122,15 +129,19 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         return qs.none()
 
     def get_permissions(self):
-        if self.action in ("credit_note", "refund", "cancel"):
+        if self.action in ("credit_note", "refund", "write_off"):
+            return [IsSecretaryOrManager()]
+        if self.action == "cancel":
             return [IsManager()]
         return super().get_permissions()
 
     @action(detail=True, methods=["post"], url_path="credit-note")
     def credit_note(self, request, pk=None):
         """POST /api/invoices/{id}/credit-note/ — reuses services.issue_credit_note;
-        all validation (amount > 0, cannot exceed remaining creditable amount,
-        reason_code required) lives there, not here."""
+        all validation (amount > 0, cannot exceed remaining balance,
+        reason_code required, threshold/role authorization) lives there, not
+        here — a SECRETARY above FINANCE_APPROVAL_THRESHOLD_CREDIT_NOTE gets a
+        clean 403 from the service itself."""
         invoice = self.get_object()
         idempotency_key = _require_idempotency_key(request)
         serializer = CreditNoteCreateSerializer(data=request.data)
@@ -194,6 +205,75 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(
             InvoiceSerializer(cancelled, context={"request": request}).data,
             status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="write-off")
+    def write_off(self, request, pk=None):
+        """POST /api/invoices/{id}/write-off/ — reuses services.write_off_invoice;
+        all validation (amount > 0, cannot exceed remaining balance,
+        eligible invoice status, reason_code required, threshold/role
+        authorization) lives there, not here."""
+        invoice = self.get_object()
+        idempotency_key = _require_idempotency_key(request)
+        serializer = WriteOffCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        write_off = services.write_off_invoice(
+            invoice=invoice,
+            amount=serializer.validated_data["amount"],
+            reason_code=serializer.validated_data["reason_code"],
+            approved_by=request.user,
+            idempotency_key=idempotency_key,
+        )
+        return Response(
+            {
+                **WriteOffSerializer(write_off).data,
+                "invoice": InvoiceSerializer(write_off.invoice, context={"request": request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class WriteOffViewSet(
+    mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet,
+):
+    """Financial roadmap Task 15 API surface for write-offs.
+
+    No generic create: a `WriteOff` is only ever created through
+    `InvoiceViewSet.write_off` (it needs the invoice's own locked balance to
+    validate against). This ViewSet is read access plus the one lifecycle
+    action a write-off has after creation — reversing it.
+    """
+
+    serializer_class = WriteOffSerializer
+    permission_classes = [IsSecretaryOrManager]
+    filterset_fields = ["invoice"]
+
+    def get_queryset(self):
+        return WriteOff.objects.select_related("invoice", "approved_by", "reversal")
+
+    @action(detail=True, methods=["post"], url_path="reverse")
+    def reverse(self, request, pk=None):
+        """POST /api/write-offs/{id}/reverse/ — MANAGER-only (enforced inside
+        services.reverse_write_off itself, not only by this view's coarse
+        RBAC); full reversal only, one per write-off."""
+        write_off = self.get_object()
+        idempotency_key = _require_idempotency_key(request)
+        serializer = WriteOffReversalCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        reversal = services.reverse_write_off(
+            write_off=write_off,
+            reason_code=serializer.validated_data["reason_code"],
+            reversed_by=request.user,
+            idempotency_key=idempotency_key,
+        )
+        return Response(
+            {
+                **WriteOffReversalSerializer(reversal).data,
+                "invoice": InvoiceSerializer(
+                    reversal.write_off.invoice, context={"request": request},
+                ).data,
+            },
+            status=status.HTTP_201_CREATED,
         )
 
 
@@ -297,18 +377,14 @@ class CashierShiftViewSet(
         """POST /api/cashier-shifts/{id}/close/ — counts the drawer and posts
         the variance via services.close_shift.
 
-        A variance is a financial correction (financial roadmap Task 15): only
-        a MANAGER may close a shift that comes out uneven — a secretary
-        closing their own shift may only do so when the count matches exactly.
-        `approved_by` is always `request.user`, never client-supplied, and is
-        only set at all when a manager is actually the one closing with a
-        variance (never for an exact count, matching services.close_shift's
-        own "no variance -> no approver" contract).
-
-        The shift row is locked once, up front, inside one transaction — the
-        permission decision (is there a variance? does the actor outrank it?)
-        and the actual close happen against the same locked snapshot, so nothing
-        can change between deciding "no manager needed" and committing the close.
+        Whether the variance is small enough for a SECRETARY to close alone,
+        or needs a MANAGER (financial roadmap Task 15, `abs(variance)` vs
+        `FINANCE_APPROVAL_THRESHOLD_CASHIER_VARIANCE`), is decided inside
+        `close_shift` itself against the freshly-locked shift — not here, and
+        not by this view pre-computing the variance the way it used to. That
+        keeps the rule enforced even for a direct service call outside DRF.
+        This view keeps only the object-level scoping check (whose shift is
+        this?), which is a different concern from the amount-based one.
         """
         shift = self.get_object()  # queryset scoping already 404s a cross-cashier attempt
         serializer = CloseShiftSerializer(data=request.data)
@@ -324,18 +400,11 @@ class CashierShiftViewSet(
             if not (is_manager or locked.cashier_id == request.user.id):
                 raise PermissionDenied("You may only close your own cashier shift.")
 
-            variance = data["counted_amount"] - services.expected_cash(locked)
-            if variance and not is_manager:
-                raise PermissionDenied(
-                    "Closing this shift shows a variance — a manager must close it."
-                )
-
             closed = services.close_shift(
                 shift=locked,
                 counted_amount=data["counted_amount"],
                 closed_by=request.user,
                 reason_code=data.get("reason_code", ""),
-                approved_by=request.user if (variance and is_manager) else None,
                 notes=data.get("notes", ""),
             )
         return Response(self.get_serializer(closed).data, status=status.HTTP_200_OK)

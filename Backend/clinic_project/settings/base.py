@@ -35,6 +35,16 @@ env = environ.Env(
     BILLING_INVOICE_DUE_DAYS=(int, 7),
     BILLING_DEFAULT_CONSULTATION_PRICE=(str, "50.00"),
     BILLING_CURRENCY=(str, "EGP"),
+    # Financial roadmap Task 15 — a SECRETARY may act alone at or below these
+    # amounts; above them a MANAGER is required. All default to "0.00", which
+    # preserves today's behavior exactly (manager-only for any positive
+    # amount / any nonzero cashier variance) until the business supplies real
+    # limits. Stored as str, parsed as Decimal at the point of use — never a
+    # float (see apps.billing.checks for the startup validation).
+    FINANCE_APPROVAL_THRESHOLD_REFUND=(str, "0.00"),
+    FINANCE_APPROVAL_THRESHOLD_CREDIT_NOTE=(str, "0.00"),
+    FINANCE_APPROVAL_THRESHOLD_WRITE_OFF=(str, "0.00"),
+    FINANCE_APPROVAL_THRESHOLD_CASHIER_VARIANCE=(str, "0.00"),
 )
 
 # Read .env if present (sibling of manage.py).
@@ -268,6 +278,13 @@ BILLING_FOLLOWUP_DAYS = env("BILLING_FOLLOWUP_DAYS")            # free follow-up
 BILLING_INVOICE_DUE_DAYS = env("BILLING_INVOICE_DUE_DAYS")      # invoice_date -> due_date
 BILLING_DEFAULT_CONSULTATION_PRICE = env("BILLING_DEFAULT_CONSULTATION_PRICE")
 BILLING_CURRENCY = env("BILLING_CURRENCY")
+
+# Financial roadmap Task 15 — approval thresholds. See apps.billing.checks
+# for startup validation (must parse as Decimal, must be >= 0).
+FINANCE_APPROVAL_THRESHOLD_REFUND = env("FINANCE_APPROVAL_THRESHOLD_REFUND")
+FINANCE_APPROVAL_THRESHOLD_CREDIT_NOTE = env("FINANCE_APPROVAL_THRESHOLD_CREDIT_NOTE")
+FINANCE_APPROVAL_THRESHOLD_WRITE_OFF = env("FINANCE_APPROVAL_THRESHOLD_WRITE_OFF")
+FINANCE_APPROVAL_THRESHOLD_CASHIER_VARIANCE = env("FINANCE_APPROVAL_THRESHOLD_CASHIER_VARIANCE")
 
 # --- AI Scribe (apps/ai_scribe) ---------------------------------------------
 # Records a doctor-patient session -> Whisper transcript -> Gemini structured

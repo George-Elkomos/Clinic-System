@@ -18,11 +18,12 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from django.test import override_settings
 from django.urls import reverse
 
 from apps.accounting import services as accounting_services
 from apps.appointments import services as appointment_services
-from apps.billing.models import CashierShift, CreditNote, Invoice, Refund, ServiceItem
+from apps.billing.models import CashierShift, CreditNote, Invoice, Refund, ServiceItem, WriteOff
 from apps.core.enums import CashierShiftStatus, InvoiceStatus, RoleChoices, ServiceItemType
 
 pytestmark = pytest.mark.django_db
@@ -265,6 +266,170 @@ class TestCancelInvoiceAPI:
             {"reason_code": "x"}, format="json", headers=_idem(),
         )
         assert resp.status_code == 403
+
+    def test_secretary_cannot_cancel_via_direct_service_call_either(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        """Financial roadmap Task 15: the DRF view's IsManager gate is not
+        the only thing standing between a SECRETARY and a cancellation — the
+        service itself refuses, so a shell/admin/background call is bound by
+        the same rule."""
+        from apps.billing import services
+        from apps.billing.exceptions import ApprovalThresholdExceededError
+
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        with pytest.raises(ApprovalThresholdExceededError):
+            services.cancel_invoice(
+                invoice=invoice, reason_code="x", cancelled_by=secretary,
+            )
+
+
+class TestWriteOffAPI:
+    def test_manager_can_write_off_part_of_an_invoice(
+        self, api, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(manager)
+        resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "30.00", "reason_code": "uncollectable"},
+            format="json", headers=_idem(),
+        )
+        assert resp.status_code == 201
+        assert resp.data["amount"] == "30.00"
+        assert resp.data["approved_by"] == manager.id
+        assert resp.data["approved_by_role"] == RoleChoices.MANAGER
+        assert resp.data["invoice"]["written_off_amount"] == "30.00"
+
+    def test_secretary_is_rejected_at_the_default_zero_threshold(
+        self, api, consultation_item, patient, doctor_profile, secretary,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(secretary)
+        resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "10.00", "reason_code": "x"}, format="json", headers=_idem(),
+        )
+        assert resp.status_code == 403
+
+    @override_settings(FINANCE_APPROVAL_THRESHOLD_WRITE_OFF="20.00")
+    def test_secretary_within_a_raised_threshold_succeeds(
+        self, api, consultation_item, patient, doctor_profile, secretary,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(secretary)
+        resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "20.00", "reason_code": "small"}, format="json", headers=_idem(),
+        )
+        assert resp.status_code == 201
+        assert resp.data["approved_by_role"] == RoleChoices.SECRETARY
+
+    def test_patient_cannot_write_off(
+        self, api, consultation_item, patient, doctor_profile, secretary,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(patient)
+        resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "10.00", "reason_code": "x"}, format="json", headers=_idem(),
+        )
+        assert resp.status_code == 403
+
+    def test_amount_exceeding_the_balance_returns_400_not_500(
+        self, api, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(manager)
+        resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "9999.00", "reason_code": "x"}, format="json", headers=_idem(),
+        )
+        assert resp.status_code == 400
+
+    def test_missing_idempotency_key_is_400(
+        self, api, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(manager)
+        resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "10.00", "reason_code": "x"}, format="json",
+        )
+        assert resp.status_code == 400
+        assert not WriteOff.objects.filter(invoice=invoice).exists()
+
+    def test_approved_by_is_never_taken_from_the_request_body(
+        self, api, consultation_item, patient, doctor_profile, secretary, manager, other_secretary,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(manager)
+        resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "10.00", "reason_code": "x", "approved_by": other_secretary.id},
+            format="json", headers=_idem(),
+        )
+        assert resp.status_code == 201
+        assert WriteOff.objects.get(invoice=invoice).approved_by == manager
+
+    def test_manager_can_reverse_a_write_off(
+        self, api, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(manager)
+        create_resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "30.00", "reason_code": "uncollectable"},
+            format="json", headers=_idem(),
+        )
+        write_off_id = create_resp.data["id"]
+
+        resp = api.post(
+            reverse("write-off-reverse", args=[write_off_id]),
+            {"reason_code": "reconsidered"}, format="json", headers=_idem(),
+        )
+        assert resp.status_code == 201
+        assert resp.data["reversed_by"] == manager.id
+        assert resp.data["reversed_by_role"] == RoleChoices.MANAGER
+        assert resp.data["invoice"]["written_off_amount"] == "0.00"
+
+    def test_secretary_cannot_reverse_a_write_off(
+        self, api, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(manager)
+        create_resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "10.00", "reason_code": "x"}, format="json", headers=_idem(),
+        )
+        write_off_id = create_resp.data["id"]
+
+        api.force_authenticate(secretary)
+        resp = api.post(
+            reverse("write-off-reverse", args=[write_off_id]),
+            {"reason_code": "try_reverse"}, format="json", headers=_idem(),
+        )
+        assert resp.status_code == 403
+
+    def test_a_write_off_cannot_be_reversed_twice_via_the_api(
+        self, api, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        api.force_authenticate(manager)
+        create_resp = api.post(
+            reverse("invoice-write-off", args=[invoice.id]),
+            {"amount": "10.00", "reason_code": "x"}, format="json", headers=_idem(),
+        )
+        write_off_id = create_resp.data["id"]
+        api.post(
+            reverse("write-off-reverse", args=[write_off_id]),
+            {"reason_code": "first"}, format="json", headers=_idem(),
+        )
+        resp = api.post(
+            reverse("write-off-reverse", args=[write_off_id]),
+            {"reason_code": "second"}, format="json", headers=_idem(),
+        )
+        assert resp.status_code == 400
 
 
 class TestCashierShiftAPI:

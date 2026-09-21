@@ -16,6 +16,8 @@ from .models import (
     Payment,
     Refund,
     ServiceItem,
+    WriteOff,
+    WriteOffReversal,
 )
 
 # Cash handed back on a refund (`paid_by`) or a shift a manager closes always
@@ -89,12 +91,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "number", "patient", "patient_name", "doctor", "doctor_name",
             "invoice_date", "due_date", "status", "subtotal", "discount",
-            "total", "paid_amount", "credited_amount", "refunded_amount",
-            "balance", "currency", "notes", "items", "payments",
+            "total", "paid_amount", "credited_amount", "written_off_amount",
+            "refunded_amount", "balance", "currency", "notes", "items", "payments",
         ]
         read_only_fields = [
             "invoice_date", "subtotal", "total", "paid_amount",
-            "credited_amount", "refunded_amount", "balance",
+            "credited_amount", "written_off_amount", "refunded_amount", "balance",
         ]
 
     def get_patient_name(self, obj):
@@ -154,9 +156,11 @@ class CreditNoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditNote
         fields = [
-            "id", "invoice", "amount", "reason_code",
-            "approved_by", "approved_by_name", "journal_entry", "created_at",
+            "id", "invoice", "amount", "reason_code", "approved_by",
+            "approved_by_name", "approved_by_role", "journal_entry", "created_at",
         ]
+        # approved_by_role is server-populated only (services.issue_credit_note);
+        # never client-writable, same as approved_by itself.
         read_only_fields = fields
 
     def get_approved_by_name(self, obj):
@@ -170,7 +174,53 @@ class RefundSerializer(serializers.ModelSerializer):
         model = Refund
         fields = [
             "id", "invoice", "amount", "payment_method", "reason_code",
-            "approved_by", "approved_by_name", "shift", "journal_entry", "created_at",
+            "approved_by", "approved_by_name", "approved_by_role", "shift",
+            "journal_entry", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_approved_by_name(self, obj):
+        return obj.approved_by.get_full_name()
+
+
+# --- Task 15 API surface: write-offs and their reversal -----------------------
+
+class WriteOffCreateSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"),
+    )
+    reason_code = serializers.CharField(max_length=64)
+
+
+class WriteOffReversalCreateSerializer(serializers.Serializer):
+    reason_code = serializers.CharField(max_length=64)
+
+
+class WriteOffReversalSerializer(serializers.ModelSerializer):
+    reversed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WriteOffReversal
+        fields = [
+            "id", "write_off", "reason_code", "reversed_by", "reversed_by_name",
+            "reversed_by_role", "journal_entry", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_reversed_by_name(self, obj):
+        return obj.reversed_by.get_full_name()
+
+
+class WriteOffSerializer(serializers.ModelSerializer):
+    approved_by_name = serializers.SerializerMethodField()
+    reversal = WriteOffReversalSerializer(read_only=True)
+
+    class Meta:
+        model = WriteOff
+        fields = [
+            "id", "invoice", "amount", "reason_code", "approved_by",
+            "approved_by_name", "approved_by_role", "journal_entry",
+            "created_at", "reversal",
         ]
         read_only_fields = fields
 

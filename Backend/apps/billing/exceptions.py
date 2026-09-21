@@ -41,6 +41,12 @@ class CashMovementImmutableError(BillingError):
     financial record here is: a new, offsetting movement, never an edit."""
 
 
+class WriteOffImmutableError(BillingError):
+    """Raised when a `WriteOff` or `WriteOffReversal` (financial roadmap
+    Task 15) is deleted. A write-off is corrected only by an explicit
+    `WriteOffReversal` — never by editing or deleting either record."""
+
+
 class IdempotencyKeyConflictError(BillingError):
     """Raised when a client's Idempotency-Key was already used for a request
     with a different fingerprint (different invoice, amount, reason, shift,
@@ -48,6 +54,24 @@ class IdempotencyKeyConflictError(BillingError):
 
     http_status = status.HTTP_409_CONFLICT
     code = "idempotency_key_reused_with_different_request"
+
+
+class ApprovalThresholdExceededError(BillingError):
+    """Raised when the acting user's role/amount combination doesn't meet a
+    financial operation's approval policy (financial roadmap Task 15) — e.g.
+    a SECRETARY attempting a refund/credit-note/write-off above its
+    configured threshold, a non-manager attempting an unconditionally
+    manager-only operation (cancellation, write-off reversal), or any role
+    other than SECRETARY/MANAGER attempting any of these at all.
+
+    Raised from inside the service function itself, under the same lock the
+    operation's own invariants are checked against — never only from the
+    DRF view — so a direct call from a shell, the admin, or a background job
+    cannot bypass this policy the way a view-only permission class could be.
+    """
+
+    http_status = status.HTTP_403_FORBIDDEN
+    code = "approval_threshold_exceeded"
 
 
 class IdempotencyRequestInProgressError(BillingError):

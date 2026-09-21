@@ -51,6 +51,7 @@ from apps.core.enums import (
 )
 
 from . import idempotency
+from .approvals import require_authorization
 from .models import (
     DEFAULT_TILL_ID,
     CashierShift,
@@ -64,6 +65,8 @@ from .models import (
     Payment,
     Refund,
     ServiceItem,
+    WriteOff,
+    WriteOffReversal,
 )
 
 # payment_method -> (AccountMap purpose, qualifier) for the debit side of a receipt.
@@ -504,7 +507,8 @@ def record_payment(
     # PatientDeposit) is untouched: this only bounds what counts as *applied*
     # to this invoice's own AR.
     eligible_ceiling = max(
-        invoice.total - invoice.credited_amount + invoice.refunded_amount,
+        invoice.total - invoice.credited_amount - invoice.written_off_amount
+        + invoice.refunded_amount,
         Decimal("0.00"),
     )
     invoice.paid_amount = min(
@@ -601,12 +605,19 @@ def issue_credit_note(*, invoice, amount, reason_code, approved_by, idempotency_
             ),
         })
 
+    require_authorization(
+        actor=approved_by, amount=amount,
+        threshold=Decimal(settings.FINANCE_APPROVAL_THRESHOLD_CREDIT_NOTE),
+        operation_label="Issuing this credit note",
+    )
+
     revenue_totals = _revenue_by_category(invoice)
     categories = list(revenue_totals)
     shares = _allocate_proportionally(amount, [revenue_totals[c] for c in categories])
 
     credit_note = CreditNote.objects.create(
         invoice=invoice, amount=amount, reason_code=reason_code, approved_by=approved_by,
+        approved_by_role=approved_by.role,
     )
     lines = [{
         "account": AccountMap.resolve("AR_PATIENT"), "credit": amount,
@@ -702,9 +713,16 @@ def issue_refund(
             ),
         })
 
+    require_authorization(
+        actor=approved_by, amount=amount,
+        threshold=Decimal(settings.FINANCE_APPROVAL_THRESHOLD_REFUND),
+        operation_label="Issuing this refund",
+    )
+
     refund = Refund.objects.create(
         invoice=invoice, amount=amount, payment_method=payment_method,
         reason_code=reason_code, approved_by=approved_by,
+        approved_by_role=approved_by.role,
         shift=_resolve_shift(shift, paid_by),
     )
     purpose, qualifier = _CASH_PURPOSE_BY_PAYMENT_METHOD[payment_method]
@@ -738,6 +756,170 @@ def issue_refund(
     return refund
 
 
+def _recompute_written_off_amount(invoice):
+    """Recompute `Invoice.written_off_amount` from its still-active
+    (non-reversed) `WriteOff` rows (financial roadmap Task 15) — never
+    incremented/decremented, so a `WriteOffReversal` is reflected
+    automatically the next time this runs, exactly the same
+    always-fresh-aggregate convention `paid_amount`/`credited_amount`/
+    `refunded_amount` already use. Called from both `write_off_invoice` and
+    `reverse_write_off`."""
+    invoice.written_off_amount = (
+        invoice.write_offs.filter(reversal__isnull=True)
+        .aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+    )
+    invoice.save(update_fields=["written_off_amount", "updated_at"])  # save() re-derives balance
+
+
+@transaction.atomic
+def write_off_invoice(*, invoice, amount, reason_code, approved_by, idempotency_key=None):
+    """Abandon part or all of `invoice`'s remaining balance as uncollectable
+    (financial roadmap Task 15). Posts Dr `BAD_DEBT_PATIENT` / Cr `AR_PATIENT`;
+    repeated partial write-offs on the same invoice are supported (each is
+    its own row, capped against the invoice's current balance at the moment
+    it's created).
+
+    `idempotency_key` (optional — see `apps/billing/idempotency.py`) protects
+    against a retried request creating a second `WriteOff`: the ledger's own
+    idempotency is keyed off this row's own pk, so it can't help until the
+    row already exists.
+    """
+    amount = Decimal(amount)
+    if idempotency_key:
+        fingerprint = idempotency.compute_fingerprint(
+            invoice_id=invoice.pk, amount=amount, reason_code=reason_code,
+        )
+        existing = idempotency.claim(
+            user=approved_by, operation=FinancialOperation.WRITE_OFF_INVOICE,
+            key=idempotency_key, fingerprint=fingerprint,
+        )
+        if existing is not None:
+            return WriteOff.objects.get(pk=existing.result_id)
+
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    if amount <= 0:
+        raise ValidationError({"amount": "Write-off amount must be greater than zero."})
+    if not reason_code:
+        raise ValidationError({"reason_code": "A write-off requires a reason_code."})
+    if invoice.status not in PAYABLE_STATUSES:
+        raise ValidationError({
+            "invoice": f"An invoice in {invoice.status} status cannot be written off.",
+        })
+
+    remaining = invoice.balance
+    if amount > remaining:
+        raise ValidationError({
+            "amount": (
+                f"Write-off ({amount}) exceeds the invoice's remaining "
+                f"balance ({remaining})."
+            ),
+        })
+
+    require_authorization(
+        actor=approved_by, amount=amount,
+        threshold=Decimal(settings.FINANCE_APPROVAL_THRESHOLD_WRITE_OFF),
+        operation_label="Writing off this amount",
+    )
+
+    write_off = WriteOff.objects.create(
+        invoice=invoice, amount=amount, reason_code=reason_code, approved_by=approved_by,
+        approved_by_role=approved_by.role,
+    )
+    entry = accounting_services.post(
+        posting_date=timezone.localdate(),
+        source_type="WriteOff",
+        source_id=write_off.id,
+        description=f"Write-off for {invoice.number}",
+        lines=[
+            {"account": AccountMap.resolve("BAD_DEBT_PATIENT"), "debit": amount},
+            {
+                "account": AccountMap.resolve("AR_PATIENT"), "credit": amount,
+                "party_type": "Patient", "party_id": invoice.patient_id,
+            },
+        ],
+        idempotency_key=f"WriteOff:{write_off.id}:post",
+        reason_code=reason_code,
+        user=approved_by,
+    )
+    write_off.journal_entry = entry
+    write_off.save(update_fields=["journal_entry", "updated_at"])
+
+    _recompute_written_off_amount(invoice)
+
+    if idempotency_key:
+        idempotency.complete(
+            user=approved_by, operation=FinancialOperation.WRITE_OFF_INVOICE,
+            key=idempotency_key, result_id=write_off.id,
+        )
+    return write_off
+
+
+@transaction.atomic
+def reverse_write_off(*, write_off, reason_code, reversed_by, idempotency_key=None):
+    """Reinstate the receivable `write_off` abandoned (financial roadmap
+    Task 15) — full reversal only (there is no partial-reversal concept),
+    MANAGER-only regardless of amount, and at most one reversal per
+    write-off (enforced both here and by `WriteOffReversal.write_off`'s
+    `OneToOneField`, which is the final backstop against a race).
+
+    The ledger reversal reuses the existing, untouched
+    `accounting.services.reverse()` — the same mechanism `cancel_invoice`
+    already uses — which mirrors every line of the original write-off entry
+    with debit/credit swapped, automatically producing
+    `Dr AR_PATIENT / Cr BAD_DEBT_PATIENT` with the same patient party. No
+    bespoke reversal-posting logic is needed here.
+
+    `idempotency_key` (optional) protects against a retried request creating
+    a second `WriteOffReversal`.
+    """
+    if idempotency_key:
+        fingerprint = idempotency.compute_fingerprint(
+            write_off_id=write_off.pk, reason_code=reason_code,
+        )
+        existing = idempotency.claim(
+            user=reversed_by, operation=FinancialOperation.REVERSE_WRITE_OFF,
+            key=idempotency_key, fingerprint=fingerprint,
+        )
+        if existing is not None:
+            return WriteOffReversal.objects.get(pk=existing.result_id)
+
+    write_off = WriteOff.objects.select_for_update().get(pk=write_off.pk)
+    if not reason_code:
+        raise ValidationError({"reason_code": "A write-off reversal requires a reason_code."})
+    if WriteOffReversal.objects.filter(write_off=write_off).exists():
+        raise ValidationError({"write_off": "This write-off has already been reversed."})
+
+    require_authorization(
+        actor=reversed_by, threshold=None, operation_label="Reversing this write-off",
+    )
+
+    entry = None
+    if write_off.journal_entry_id is not None:
+        entry = accounting_services.reverse(
+            write_off.journal_entry, reason_code=reason_code, user=reversed_by,
+        )
+
+    try:
+        reversal = WriteOffReversal.objects.create(
+            write_off=write_off, reason_code=reason_code, reversed_by=reversed_by,
+            reversed_by_role=reversed_by.role, journal_entry=entry,
+        )
+    except IntegrityError:
+        # Race: another request reversed this write-off first — the
+        # OneToOneField's own unique constraint is the final backstop behind
+        # the select_for_update() lock above.
+        return WriteOffReversal.objects.get(write_off=write_off)
+
+    _recompute_written_off_amount(write_off.invoice)
+
+    if idempotency_key:
+        idempotency.complete(
+            user=reversed_by, operation=FinancialOperation.REVERSE_WRITE_OFF,
+            key=idempotency_key, result_id=reversal.id,
+        )
+    return reversal
+
+
 @transaction.atomic
 def cancel_invoice(*, invoice, reason_code, cancelled_by):
     """Cancel `invoice`: reverse its posting entry, never edit or delete it.
@@ -760,6 +942,15 @@ def cancel_invoice(*, invoice, reason_code, cancelled_by):
         raise ValidationError({
             "invoice": "Cannot cancel an invoice with credit notes already issued.",
         })
+    if invoice.written_off_amount:
+        raise ValidationError({
+            "invoice": "Cannot cancel an invoice with an active write-off — "
+                       "reverse the write-off first.",
+        })
+
+    require_authorization(
+        actor=cancelled_by, threshold=None, operation_label="Cancelling this invoice",
+    )
 
     original_entry = JournalEntry.objects.filter(
         idempotency_key=f"Invoice:{invoice.id}:issue"
@@ -1049,15 +1240,23 @@ def post_shift_variance(shift, *, variance, reason_code, user, posting_date=None
 
 
 @transaction.atomic
-def close_shift(
-    *, shift, counted_amount, closed_by, reason_code="", approved_by=None, notes="",
-):
+def close_shift(*, shift, counted_amount, closed_by, reason_code="", notes=""):
     """Count the drawer, post the difference, and close the shift for good.
 
     `counted_amount` is what was physically counted. Anything other than the
-    expected figure is a financial correction, so it needs a `reason_code` and
-    an `approved_by` — refused here, and refused again by the database
+    expected figure is a financial correction, so it needs a `reason_code` —
+    refused here, and refused again by the database
     (`shift_variance_requires_reason_and_approval`).
+
+    Authorization (financial roadmap Task 15) is decided *inside* this
+    function, against the freshly-locked shift's own `abs(variance)` — not by
+    the caller pre-computing it and handing in an `approved_by`. That closed
+    a real bypass: nothing previously stopped a direct call from setting
+    `approved_by` to a non-manager for an arbitrarily large variance. There is
+    no separate approver identity in this model: whoever closes the shift
+    *is* the approver whenever there's a variance to approve (`closed_by` and
+    `approved_by` are always the same person here), so this function no
+    longer takes `approved_by` as a parameter at all.
 
     Returns the closed shift; `shift.journal_entry` is the variance posting, or
     None when the count came out exactly right.
@@ -1080,11 +1279,13 @@ def close_shift(
                     f"{abs(variance)} — closing with a variance requires a reason_code."
                 ),
             })
-        if approved_by is None:
-            raise ValidationError(
-                {"approved_by": "Closing with a variance requires an approver."}
-            )
+        require_authorization(
+            actor=closed_by, amount=abs(variance),
+            threshold=Decimal(settings.FINANCE_APPROVAL_THRESHOLD_CASHIER_VARIANCE),
+            operation_label="Closing this shift with a variance",
+        )
 
+    approved_by = closed_by if variance else None
     entry = post_shift_variance(
         shift, variance=variance, reason_code=reason_code, user=approved_by,
     )
@@ -1092,17 +1293,18 @@ def close_shift(
     shift.status = CashierShiftStatus.CLOSED
     shift.closed_at = timezone.now()
     shift.closed_by = closed_by
+    shift.closed_by_role = closed_by.role
     shift.expected_amount = expected
     shift.counted_amount = counted_amount
     shift.variance = variance
     shift.variance_reason_code = reason_code if variance else ""
-    shift.approved_by = approved_by if variance else None
+    shift.approved_by = approved_by
     shift.journal_entry = entry
     shift.notes = notes
     shift.save(update_fields=[
-        "status", "closed_at", "closed_by", "expected_amount", "counted_amount",
-        "variance", "variance_reason_code", "approved_by", "journal_entry",
-        "notes", "updated_at",
+        "status", "closed_at", "closed_by", "closed_by_role", "expected_amount",
+        "counted_amount", "variance", "variance_reason_code", "approved_by",
+        "journal_entry", "notes", "updated_at",
     ])
     return shift
 

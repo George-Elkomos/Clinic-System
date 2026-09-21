@@ -19,7 +19,7 @@ from apps.accounting import services as accounting_services
 from apps.accounting.models import AccountMap, JournalEntry
 from apps.appointments import services as appointment_services
 from apps.billing import services as billing_services
-from apps.billing.exceptions import ClosedShiftError
+from apps.billing.exceptions import ApprovalThresholdExceededError, ClosedShiftError
 from apps.billing.models import CashierShift, Invoice, ServiceItem
 from apps.core.enums import CashierShiftStatus, PaymentMethod, RoleChoices, ServiceItemType
 
@@ -266,8 +266,8 @@ class TestCloseShift:
         self, shift, cashier, manager,
     ):
         closed = billing_services.close_shift(
-            shift=shift, counted_amount=Decimal("215.00"), closed_by=cashier,
-            reason_code="unexplained_over", approved_by=manager,
+            shift=shift, counted_amount=Decimal("215.00"), closed_by=manager,
+            reason_code="unexplained_over",
         )
         assert closed.variance == Decimal("15.00")
 
@@ -286,8 +286,8 @@ class TestCloseShift:
         self, shift, cashier, manager,
     ):
         closed = billing_services.close_shift(
-            shift=shift, counted_amount=Decimal("180.00"), closed_by=cashier,
-            reason_code="till_short", approved_by=manager,
+            shift=shift, counted_amount=Decimal("180.00"), closed_by=manager,
+            reason_code="till_short",
         )
         assert closed.variance == Decimal("-20.00")
 
@@ -313,33 +313,37 @@ class TestCloseShift:
         receipt_cash_line = receipt.lines.exclude(debit=Decimal("0.00")).get()
 
         closed = billing_services.close_shift(
-            shift=shift, counted_amount=Decimal("295.00"), closed_by=cashier,
-            reason_code="till_short", approved_by=manager,
+            shift=shift, counted_amount=Decimal("295.00"), closed_by=manager,
+            reason_code="till_short",
         )
         variance_cash_line = closed.journal_entry.lines.exclude(credit=Decimal("0.00")).get()
         assert variance_cash_line.account_id == receipt_cash_line.account_id
 
-    def test_a_variance_needs_a_reason_code(self, shift, cashier, manager):
+    def test_a_variance_needs_a_reason_code(self, shift, manager):
         with pytest.raises(ValidationError):
             billing_services.close_shift(
-                shift=shift, counted_amount=Decimal("190.00"), closed_by=cashier,
-                approved_by=manager,
+                shift=shift, counted_amount=Decimal("190.00"), closed_by=manager,
             )
         shift.refresh_from_db()
         assert shift.status == CashierShiftStatus.OPEN  # nothing half-done
 
-    def test_a_variance_needs_an_approver(self, shift, cashier):
-        with pytest.raises(ValidationError):
+    def test_a_variance_above_the_threshold_needs_a_manager(self, shift, cashier):
+        """Financial roadmap Task 15: with the default 0.00 threshold, a
+        SECRETARY closing with *any* nonzero variance is rejected — the
+        service itself enforces this now, not just the view."""
+        with pytest.raises(ApprovalThresholdExceededError):
             billing_services.close_shift(
                 shift=shift, counted_amount=Decimal("190.00"), closed_by=cashier,
                 reason_code="till_short",
             )
+        shift.refresh_from_db()
+        assert shift.status == CashierShiftStatus.OPEN  # nothing half-done
 
-    def test_a_negative_count_is_refused(self, shift, cashier, manager):
+    def test_a_negative_count_is_refused(self, shift, cashier):
         with pytest.raises(ValidationError):
             billing_services.close_shift(
                 shift=shift, counted_amount=Decimal("-1.00"), closed_by=cashier,
-                reason_code="nonsense", approved_by=manager,
+                reason_code="nonsense",
             )
 
     def test_a_shift_cannot_be_closed_twice(self, shift, cashier):
@@ -351,10 +355,10 @@ class TestCloseShift:
                 shift=shift, counted_amount=Decimal("200.00"), closed_by=cashier,
             )
 
-    def test_variance_posting_is_idempotent(self, shift, cashier, manager):
+    def test_variance_posting_is_idempotent(self, shift, manager):
         closed = billing_services.close_shift(
-            shift=shift, counted_amount=Decimal("210.00"), closed_by=cashier,
-            reason_code="unexplained_over", approved_by=manager,
+            shift=shift, counted_amount=Decimal("210.00"), closed_by=manager,
+            reason_code="unexplained_over",
         )
         again = billing_services.post_shift_variance(
             closed, variance=Decimal("10.00"),
@@ -412,8 +416,8 @@ class TestTrialBalance:
             approved_by=manager, shift=shift,
         )
         billing_services.close_shift(
-            shift=shift, counted_amount=Decimal("280.00"), closed_by=cashier,
-            reason_code="till_short", approved_by=manager,
+            shift=shift, counted_amount=Decimal("280.00"), closed_by=manager,
+            reason_code="till_short",
         )
 
         tb = accounting_services.trial_balance()
@@ -431,8 +435,8 @@ class TestTrialBalance:
         )
         cash_before = accounting_services.account_balance(AccountMap.resolve("CASH_DEFAULT"))
         closed = billing_services.close_shift(
-            shift=shift, counted_amount=Decimal("293.00"), closed_by=cashier,
-            reason_code="till_short", approved_by=manager,
+            shift=shift, counted_amount=Decimal("293.00"), closed_by=manager,
+            reason_code="till_short",
         )
         cash_after = accounting_services.account_balance(AccountMap.resolve("CASH_DEFAULT"))
         assert closed.variance == Decimal("-7.00")

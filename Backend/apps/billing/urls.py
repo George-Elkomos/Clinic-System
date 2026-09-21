@@ -9,6 +9,7 @@ from .views import (
     InvoiceViewSet,
     PaymentViewSet,
     ServiceItemViewSet,
+    WriteOffViewSet,
 )
 
 router = DefaultRouter()
@@ -17,6 +18,7 @@ router.register("payments", PaymentViewSet, basename="payment")
 router.register("service-items", ServiceItemViewSet, basename="service-item")
 router.register("cashier-shifts", CashierShiftViewSet, basename="cashier-shift")
 router.register("cash-movements", CashMovementViewSet, basename="cash-movement")
+router.register("write-offs", WriteOffViewSet, basename="write-off")
 
 urlpatterns = [
     path("reports/billing/", BillingReportView.as_view(), name="reports-billing"),
