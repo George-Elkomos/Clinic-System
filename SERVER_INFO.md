@@ -108,11 +108,67 @@ to `main`:
 ### Automatic rollback
 `deploy.sh` records the commit before pulling. Step order is deliberate:
 `git pull` → `pip install` → `collectstatic` → **`npm ci`/`npm run build`**
-→ **`migrate`** → sync config → restart + health-check. Frontend build runs
-*before* the database migration on purpose — it's the step most likely to
-fail (e.g. a `package-lock.json` drift), and it doesn't touch the database,
-so a frontend failure rolls back with zero database risk. `migrate` is the
-last thing that can still fail before the schema actually changes.
+→ **`migrate`** → **`seed_chart_of_accounts` + `finance_preflight`** → sync
+config → restart + health-check. Frontend build runs *before* the database
+migration on purpose — it's the step most likely to fail (e.g. a
+`package-lock.json` drift), and it doesn't touch the database, so a frontend
+failure rolls back with zero database risk. `migrate` is the last thing that
+can still fail before the schema actually changes.
+
+### The accounting app's first deploy is a one-time, partly-manual exception
+
+`apps.accounting` has never been deployed before this branch. `migrate` only
+creates the ledger's *tables*; without a seeded chart of accounts and an
+OPEN `Period` covering today, the first ledger posting — including the
+pre-existing appointment-completion billing flow — raises
+`UnmappedPurposeError`/`NoPeriodForDateError`. `deploy.sh` runs
+`seed_chart_of_accounts` (idempotent — only ever adds missing
+accounts/mappings, never edits an existing one) and `finance_preflight`
+(read-only) automatically, right after `migrate`, on *every* deploy —
+but neither `bootstrap_period` nor its FiscalYear/Period can be created
+until the *new* code (the one carrying these commands) is actually on disk,
+which only happens partway through the very deploy that needs them. That
+command cannot be run "before deploying" — it does not exist yet at that
+point. Concretely:
+
+- **`bootstrap_period` is deliberately not automated** — it needs an
+  explicit fiscal-year start/end the first time, a business decision this
+  tooling will not guess at. It is a required *manual* step, run once, in
+  the middle of the first deploy — not before it, not fully automated.
+- **If the normal CI-triggered deploy simply runs for this commit** (the
+  default, no special handling needed), it will safely reach `migrate` and
+  `seed_chart_of_accounts` successfully, then `finance_preflight` will
+  correctly fail (no Period yet) and trigger `rollback()`. On PostgreSQL
+  with migrations already applied, `rollback()`'s own phase-aware guard
+  (see below) refuses to auto-revert the code and — critically — services
+  are never restarted, since that step comes after the failed one. **The
+  currently-running OLD process keeps serving OLD code against the schema
+  it already understood, completely unaffected.** This is the existing
+  zero/minimal-downtime property of `deploy.sh`, not a new mechanism this
+  branch adds — there is no separate "gate traffic" step in this stack
+  because none is needed: nothing user-facing changes until the final
+  restart, which this failure never reaches.
+- **Finish the one-time bootstrap manually, over SSH, with the new code
+  already on disk from the paused deploy attempt above**:
+  ```bash
+  cd /var/www/clinic_app/Backend && source venv/bin/activate
+  # Replace with this clinic's real fiscal year — never invented by tooling.
+  python manage.py bootstrap_period --fiscal-year-start <YYYY>-01-01 --fiscal-year-end <YYYY>-12-31
+  python manage.py finance_preflight   # must print "Finance preflight OK"
+  ```
+- **Then re-run the same failed GitHub Actions workflow run** (Actions tab →
+  the failed run → "Re-run failed jobs", or `gh run rerun <run-id> --failed`)
+  — do **not** push the commit again: pushing an unchanged SHA can report
+  "Everything up-to-date" and may not trigger a new workflow run at all.
+  Re-running the existing run re-executes `deploy.sh` for the exact same
+  commit; `migrate`/`seed_chart_of_accounts` are no-ops the second time, and
+  `finance_preflight` now passes, so the deploy proceeds through the normal
+  pipeline to restart services and health-check — the final cutover still
+  goes through CI rather than an ad-hoc manual restart.
+
+Every later month only needs `python manage.py bootstrap_period` with no
+arguments (reuses the already-created fiscal year) — safe to run manually or
+add to `deploy.sh`'s automated sequence once the first one exists.
 
 If **any** step fails, `rollback()`:
 1. `git reset --hard` back to the previous commit.
@@ -202,7 +258,8 @@ python manage.py <command>
   `Server-Documentation/02-access-and-security.md`).
 - **Single Daphne instance only** — do not attempt to scale horizontally
   without first replacing `InMemoryChannelLayer` with `channels_redis`.
-- **Still on SQLite in production** — local dev runs PostgreSQL now (see the
-  `DATABASE_URL` row above). Cutting this server over needs installing
-  PostgreSQL on the VPS, a data migration step, and a maintenance window;
-  none of that has happened yet.
+- **PostgreSQL in production since 2026-09-15** (see the `DATABASE_URL` row
+  above and `docs/postgres-production-cutover-runbook-2026-09-15.md`) — this
+  bullet previously said "still on SQLite"; that cutover has since happened.
+  The old SQLite file is kept on the server only as a rollback artifact (see
+  the runbook's own Rollback section), not in live use.

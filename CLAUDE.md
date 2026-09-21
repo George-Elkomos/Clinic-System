@@ -2,7 +2,7 @@
 
 Clinic management system.
 **Backend:** Django 5.2 + DRF + SimpleJWT + django-q2 + django-simple-history.
-**Frontend:** React + TypeScript + Vite. **DB:** PostgreSQL (dev, since financial roadmap Task 3) — production is still SQLite pending a separate cutover, see `SERVER_INFO.md`.
+**Frontend:** React + TypeScript + Vite. **DB:** PostgreSQL — dev since financial roadmap Task 3, production since the 2026-09-15 cutover (see `SERVER_INFO.md` and `docs/postgres-production-cutover-runbook-2026-09-15.md`).
 
 ```
 Backend/apps/       18 apps: ai_scribe appointments audit billing core doctors encounters

@@ -104,9 +104,9 @@ restart_and_verify() {
 # Reads the *actual* configured database engine/connection info out of
 # Django's own settings (DATABASE_URL in .env, parsed by django-environ) —
 # never assumed or hardcoded here, so this script keeps working correctly
-# whether the server is on SQLite (today) or PostgreSQL (after the planned
-# cutover, see docs/postgres-production-cutover-plan.md) without itself
-# needing to change again.
+# regardless of engine (SQLite before the 2026-09-15 cutover, PostgreSQL
+# since — see docs/postgres-production-cutover-runbook-2026-09-15.md)
+# without itself needing to change again.
 #
 # Prints ENGINE/HOST/PORT/NAME/USER/PASSWORD on five separate stdout lines,
 # in that fixed order, and nothing else — the caller reads them positionally,
@@ -427,8 +427,31 @@ python manage.py migrate || rollback
 # schema has now genuinely changed. See that guard's own comment for why.
 MIGRATIONS_APPLIED=true
 
-# --- Only reached once install/build/migrate all succeeded: sync config
-#     and restart the live services onto the new code. ---
+# --- Accounting bootstrap + preflight (financial roadmap pre-merge blocker
+#     resolution) — migrate() above only creates the accounting *tables*;
+#     without a seeded chart of accounts/AccountMap and an OPEN Period
+#     covering today, the very first ledger posting (including the
+#     pre-existing appointment-completion billing flow) raises
+#     UnmappedPurposeError/NoPeriodForDateError. Both steps below are safe to
+#     run on every deploy: seed_chart_of_accounts only ever adds missing
+#     accounts/mappings by code (get_or_create, never edits an existing row —
+#     see its own docstring), and finance_preflight is read-only.
+#
+#     finance_preflight failing here means the ledger genuinely is not ready
+#     to accept traffic — most commonly because `bootstrap_period` has never
+#     been run. That is deliberately NOT run automatically here: it needs an
+#     explicit fiscal-year start/end the first time (a business decision this
+#     script must not guess at — see the command's own --help). Run it once,
+#     manually, before/at the first deploy of the accounting app:
+#         python manage.py bootstrap_period --fiscal-year-start YYYY-01-01 --fiscal-year-end YYYY-12-31
+#     Every later month only needs `python manage.py bootstrap_period` (no
+#     arguments) to roll a new Period forward within the same fiscal year —
+#     safe to add to this automated sequence once the first one has run.
+python manage.py seed_chart_of_accounts || rollback
+python manage.py finance_preflight || rollback
+
+# --- Only reached once install/build/migrate/accounting-preflight all
+#     succeeded: sync config and restart the live services onto the new code. ---
 cp "$APP_DIR/deploy/clinic-daphne.service" /etc/systemd/system/clinic-daphne.service
 cp "$APP_DIR/deploy/clinic-qcluster.service" /etc/systemd/system/clinic-qcluster.service
 cp "$APP_DIR/deploy/nginx.conf" /etc/nginx/sites-available/clinic_app
