@@ -220,7 +220,7 @@ the option behind the engine check. SQLite behaviour is unchanged.
 > new rows after the verified backup and invalidating the manifest. **Any push made
 > during a maintenance window must carry `[skip ci]`.**
 
-## Blocker 2 — signal receivers ignore `raw` (⚠️ **still unfixed in the codebase**)
+## Blocker 2 — signal receivers ignored `raw` (✅ **fixed 2026-09-19 in `6da5a2f`**)
 
 `loaddata` failed with:
 
@@ -245,15 +245,10 @@ expected to opt out. **None of this project's 8 save-signal receivers check it:*
 held — any receiver firing would have inflated `notifications.notification` (33),
 `audit.auditlog` (326) or `users.notificationpreference` (9).
 
-**The fix still owed** — add to every receiver, then push normally so CI runs the tests:
-
-```python
-if kwargs.get("raw"):
-    return
-```
-
-> A behaviour change across 5 signal files deserves the test suite. It was deliberately
-> *not* bundled into the `[skip ci]` settings fix.
+**Fixed in `6da5a2f`** (2026-09-19) — every receiver now returns early on `raw`, with
+`Backend/tests/test_signal_raw_guards.py` covering both paths (raw must be a no-op; the
+normal path must behave exactly as before). It went through CI rather than being bundled
+into the `[skip ci]` settings fix, which is why it landed separately.
 
 ---
 
@@ -281,7 +276,7 @@ it as an emergency measure for the first day, not a standing escape hatch.
 
 ## Follow-ups
 
-- [ ] **Fix the `raw` guards** in the 5 signal files (Blocker 2) — push normally, CI runs.
+- [x] ~~Fix the `raw` guards in the 5 signal files (Blocker 2)~~ — done in `6da5a2f`, with tests.
 - [ ] Schedule `pg_dump` backups for `clinic_system`. The old SQLite file-copy backup no
       longer protects anything; `deploy/deploy.sh` already takes a pre-migrate `pg_dump`,
       but there is no routine scheduled backup.

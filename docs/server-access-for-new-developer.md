@@ -179,10 +179,10 @@ Both are in the repo:
 - **`SERVER_INFO.md`** — services, paths, environment variables, nginx layout,
   how deploy and rollback behave.
 - **`docs/postgres-production-cutover-runbook-2026-09-15.md`** — the PostgreSQL
-  migration, and two live bugs worth knowing about, including one that is
-  **still unfixed**: no signal receiver in this project checks Django's `raw`
-  flag, so any `loaddata` will create duplicate profiles, spurious audit rows,
-  and a notification per appointment.
+  migration and the two bugs it uncovered. Both are now fixed (`306a0d5` for the
+  SQLite-only `timeout` connect option, `6da5a2f` for the missing `raw` guards on
+  every save-signal receiver), but the runbook explains *why* they existed, which
+  is worth knowing before you write a signal receiver or load a fixture here.
 
 ---
 
