@@ -702,6 +702,17 @@ class TestCheckIsolation:
     def test_one_failing_check_does_not_prevent_the_rest(
         self, monkeypatch, patient, doctor_profile,
     ):
+        # Baseline from a real, healthy run — `checks_run` counts every
+        # *attempted* check regardless of outcome (see `_run_check`: it
+        # appends the name before the try/except), so this count must be
+        # identical whether or not one of them then fails. Deriving it live,
+        # rather than hardcoding the current number of registered checks,
+        # means this test never needs updating again as checks are added or
+        # removed — only the actual property under test (nothing gets
+        # skipped) is asserted.
+        baseline = integrity.run_revenue_integrity_check()
+        expected_checks_run = baseline["summary"]["checks_run"]
+
         def _boom():
             raise RuntimeError("simulated failure")
 
@@ -714,7 +725,7 @@ class TestCheckIsolation:
 
         result = integrity.run_revenue_integrity_check()
         assert "ledger_structure_and_balance" in result["checks_failed"]
-        assert result["summary"]["checks_run"] == 12
+        assert result["summary"]["checks_run"] == expected_checks_run
         assert any(f["category"] == "invoice_ledger" for f in result["findings"])
         assert result["ok"] is False
 

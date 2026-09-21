@@ -20,10 +20,21 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 
+from django.core.management import call_command
+
+from apps.accounting import integrity
 from apps.accounting.models import AccountMap, JournalEntry
 from apps.billing import services as billing_services
 from apps.billing.models import Invoice, InvoiceItem, ServiceItem
-from apps.core.enums import BillingSourceType, LabOrderStatus, RoleChoices, ServiceItemType
+from apps.core.enums import (
+    BillingSourceType,
+    InvoiceStatus,
+    LabOrderStatus,
+    ProcedureStatus,
+    RadiologyOrderStatus,
+    RoleChoices,
+    ServiceItemType,
+)
 from apps.medical_records.models import LabOrder, LabOrderItem
 from apps.medical_records.services.lab_orders import complete_order as complete_lab_order
 from apps.procedures.models import ClinicalProcedure, ProcedureTemplate
@@ -210,4 +221,216 @@ class TestZeroPriceCatalogBootstrap:
         # imbalanced/invalid entry.
         assert not JournalEntry.objects.filter(
             idempotency_key=f"Invoice:{invoice.id}:issue",
+        ).exists()
+
+
+class TestBillingFailureNeverBlocksClinicalCompletion:
+    """Pre-merge blocker resolution: a billing failure after a clinical
+    completion must never undo or block that completion, must be detectable
+    by Task 16, and must be safely retryable. See
+    apps.billing.services.bill_after_clinical_completion's own docstring."""
+
+    def test_procedure_completes_even_when_billing_raises(
+        self, patient, doctor_profile, monkeypatch,
+    ):
+        template = ProcedureTemplate.objects.create(name="Suturing")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+        )
+        procedure = start_procedure(procedure)
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated billing outage")
+
+        monkeypatch.setattr(billing_services, "handle_procedure_completed", _boom)
+        result = complete_procedure(
+            procedure, post_procedure_notes="Closed cleanly.", user=doctor_profile.user,
+        )
+        assert result.status == ProcedureStatus.COMPLETED
+
+        reloaded = ClinicalProcedure.objects.get(pk=procedure.pk)
+        assert reloaded.status == ProcedureStatus.COMPLETED
+        assert not InvoiceItem.objects.filter(
+            source_type=BillingSourceType.PROCEDURE, source_id=procedure.id,
+        ).exists()
+
+    def test_radiology_order_completes_even_when_billing_raises(
+        self, patient, doctor_profile, monkeypatch,
+    ):
+        order = RadiologyOrder.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, study_name="Chest X-Ray",
+        )
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated billing outage")
+
+        monkeypatch.setattr(billing_services, "handle_radiology_order_completed", _boom)
+        result = complete_radiology_order(order, file=_scan_file(), uploaded_by=doctor_profile.user)
+        assert result.status == RadiologyOrderStatus.COMPLETED
+
+        reloaded = RadiologyOrder.objects.get(pk=order.pk)
+        assert reloaded.status == RadiologyOrderStatus.COMPLETED
+        assert not InvoiceItem.objects.filter(
+            source_type=BillingSourceType.RADIOLOGY_ORDER, source_id=order.id,
+        ).exists()
+
+    def test_lab_order_completes_even_when_billing_raises(
+        self, patient, doctor_profile, secretary, monkeypatch,
+    ):
+        order = LabOrder.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, status=LabOrderStatus.PROCESSING,
+        )
+        LabOrderItem.objects.create(order=order, test_name="CBC")
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated billing outage")
+
+        monkeypatch.setattr(billing_services, "handle_lab_order_completed", _boom)
+        result = complete_lab_order(
+            order,
+            results_data=[{
+                "test_name": "CBC", "result_value": "Normal", "result_date": timezone.localdate(),
+            }],
+            entered_by=secretary,
+        )
+        assert result.status == LabOrderStatus.COMPLETED
+
+        reloaded = LabOrder.objects.get(pk=order.pk)
+        assert reloaded.status == LabOrderStatus.COMPLETED
+        # The lab results are unaffected — committed in their own atomic
+        # block before the billing call even runs.
+        assert reloaded.results.count() == 1
+        assert not InvoiceItem.objects.filter(
+            source_type=BillingSourceType.LAB_ORDER, source_id=order.id,
+        ).exists()
+
+    def test_task_16_detects_an_unbilled_completed_procedure(
+        self, patient, doctor_profile, monkeypatch,
+    ):
+        template = ProcedureTemplate.objects.create(name="Suturing")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+        )
+        procedure = start_procedure(procedure)
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated billing outage")
+
+        monkeypatch.setattr(billing_services, "handle_procedure_completed", _boom)
+        complete_procedure(procedure, post_procedure_notes="Closed cleanly.", user=doctor_profile.user)
+        monkeypatch.undo()  # restore the real hook before running the integrity check
+
+        result = integrity.run_revenue_integrity_check()
+        hits = [
+            f for f in result["findings"]
+            if f["object_type"] == "ClinicalProcedure" and f["object_id"] == procedure.id
+        ]
+        assert any(f["category"] == "unbilled_clinical_completion" for f in hits)
+
+    def test_healthy_completed_procedure_is_not_flagged_by_task_16(self, patient, doctor_profile):
+        template = ProcedureTemplate.objects.create(name="Suturing")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+        )
+        procedure = start_procedure(procedure)
+        complete_procedure(procedure, post_procedure_notes="Closed cleanly.", user=doctor_profile.user)
+
+        result = integrity.run_revenue_integrity_check()
+        hits = [
+            f for f in result["findings"]
+            if f["object_type"] == "ClinicalProcedure" and f["object_id"] == procedure.id
+        ]
+        assert hits == []
+
+    def test_an_invoice_item_on_a_draft_invoice_still_counts_as_captured(
+        self, patient, doctor_profile,
+    ):
+        """The check must only care whether an InvoiceItem exists for the
+        completed source — never require its parent Invoice to be ISSUED.
+        A DRAFT invoice (e.g. awaiting checkout in a future encounter-based
+        billing flow) still means the clinical item was captured, not lost."""
+        template = ProcedureTemplate.objects.create(name="Suturing")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+        )
+        procedure = start_procedure(procedure)
+        procedure.status = ProcedureStatus.COMPLETED
+        procedure.save(update_fields=["status"])
+
+        draft_invoice = Invoice.objects.create(
+            patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.DRAFT,
+        )
+        InvoiceItem.objects.create(
+            invoice=draft_invoice, description="Suturing", unit_price=Decimal("0.00"),
+            source_type=BillingSourceType.PROCEDURE, source_id=procedure.id,
+        )
+
+        result = integrity.run_revenue_integrity_check()
+        hits = [
+            f for f in result["findings"]
+            if f["object_type"] == "ClinicalProcedure" and f["object_id"] == procedure.id
+        ]
+        assert hits == []
+
+    def test_retry_command_bills_a_previously_failed_procedure_exactly_once(
+        self, patient, doctor_profile, monkeypatch,
+    ):
+        template = ProcedureTemplate.objects.create(name="Suturing")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+        )
+        procedure = start_procedure(procedure)
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated billing outage")
+
+        monkeypatch.setattr(billing_services, "handle_procedure_completed", _boom)
+        complete_procedure(procedure, post_procedure_notes="Closed cleanly.", user=doctor_profile.user)
+        monkeypatch.undo()  # the outage is over — the real hook works again
+
+        assert not InvoiceItem.objects.filter(
+            source_type=BillingSourceType.PROCEDURE, source_id=procedure.id,
+        ).exists()
+
+        call_command("retry_unbilled_clinical_items")
+
+        assert InvoiceItem.objects.filter(
+            source_type=BillingSourceType.PROCEDURE, source_id=procedure.id,
+        ).count() == 1
+
+        # Running it again must not double-bill (bill_ad_hoc_service's own
+        # idempotency, exercised via the retry path).
+        call_command("retry_unbilled_clinical_items")
+        assert InvoiceItem.objects.filter(
+            source_type=BillingSourceType.PROCEDURE, source_id=procedure.id,
+        ).count() == 1
+
+        # And Task 16 no longer flags it.
+        result = integrity.run_revenue_integrity_check()
+        hits = [
+            f for f in result["findings"]
+            if f["object_type"] == "ClinicalProcedure" and f["object_id"] == procedure.id
+        ]
+        assert hits == []
+
+    def test_retry_command_dry_run_does_not_bill_anything(
+        self, patient, doctor_profile, monkeypatch,
+    ):
+        template = ProcedureTemplate.objects.create(name="Suturing")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+        )
+        procedure = start_procedure(procedure)
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated billing outage")
+
+        monkeypatch.setattr(billing_services, "handle_procedure_completed", _boom)
+        complete_procedure(procedure, post_procedure_notes="Closed cleanly.", user=doctor_profile.user)
+        monkeypatch.undo()
+
+        call_command("retry_unbilled_clinical_items", "--dry-run")
+
+        assert not InvoiceItem.objects.filter(
+            source_type=BillingSourceType.PROCEDURE, source_id=procedure.id,
         ).exists()

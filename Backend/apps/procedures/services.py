@@ -59,9 +59,14 @@ def complete_procedure(
         "status", "end_time", "post_procedure_notes", "complications", "updated_at",
     ])
 
-    from apps.billing.services import handle_procedure_completed
+    # A billing failure here must never undo or block a completion that has
+    # already been saved — see bill_after_clinical_completion's own
+    # docstring (financial roadmap pre-merge blocker resolution). Task 16's
+    # revenue-integrity check independently detects an unbilled completed
+    # procedure; retry_unbilled_clinical_items can retry it safely.
+    from apps.billing.services import bill_after_clinical_completion, handle_procedure_completed
 
-    handle_procedure_completed(procedure, user=user)
+    bill_after_clinical_completion(handle_procedure_completed, procedure, user=user)
 
     notify(
         recipient=procedure.patient.user,

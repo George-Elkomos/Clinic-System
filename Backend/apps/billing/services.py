@@ -29,6 +29,7 @@ the clinic never configured one.
 Ledger direction: this module calls `apps.accounting.services.post()`;
 `apps.accounting` never imports anything from here.
 """
+import logging
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -68,6 +69,8 @@ from .models import (
     WriteOff,
     WriteOffReversal,
 )
+
+logger = logging.getLogger(__name__)
 
 # payment_method -> (AccountMap purpose, qualifier) for the debit side of a receipt.
 _CASH_PURPOSE_BY_PAYMENT_METHOD = {
@@ -433,6 +436,60 @@ def handle_lab_order_completed(order, *, user):
         description=f"Laboratory tests ({order.order_number})",
         user=user,
     )
+
+
+def bill_after_clinical_completion(fn, obj, *, user):
+    """Run a post-completion billing hook (`handle_appointment_completed`,
+    `handle_procedure_completed`, `handle_radiology_order_completed`,
+    `handle_lab_order_completed`) without letting a billing failure undo or
+    block the clinical work that has *already been committed* by the caller.
+
+    Pre-merge blocker resolution: previously, a billing exception (e.g.
+    `NoPeriodForDateError`/`UnmappedPurposeError` if the ledger isn't fully
+    bootstrapped yet, or any other posting failure) propagated straight out
+    of the appointment/procedure/radiology/lab-order completion call. For
+    appointments that meant the *entire* completion — including the clinical
+    status change — rolled back inside its own `@transaction.atomic` (a
+    correct but confusing "your completion failed" for what was really a
+    billing problem). For procedures/radiology/lab orders, whose clinical
+    save already happens in its own separate transaction before billing runs,
+    it was worse: the clinical data was already safely committed, but the
+    caller still saw an unhandled exception and a misleading 500 as if
+    nothing had been saved.
+
+    This function makes the behavior consistent and correct everywhere:
+    clinical completion always stays committed; a billing failure is logged
+    (searchable in `journalctl -u clinic-daphne`, full traceback via
+    `logger.exception`) and swallowed, never surfaced as an API error. The
+    log line identifies the failed object only by its class name and pk —
+    deliberately never the object itself (`%r`/`str()` could pull in a
+    patient's name via the model's own `__str__`) — enough to look it up,
+    nothing patient-identifying.
+
+    Nothing here silently "fixes" the gap it leaves — that gap is exactly
+    what `apps.accounting.integrity`'s Task 16 `unbilled_clinical_completions`
+    check exists to detect (for procedures/radiology/lab orders — see that
+    check's own docstring for why appointment completion is deliberately
+    excluded), and `apps.billing.management.commands.
+    retry_unbilled_clinical_items` exists to retry — retrying is always safe
+    because `bill_ad_hoc_service`'s own idempotency check (an existing
+    `InvoiceItem` for that source) means a successful retry, or a second
+    accidental one, can never double-bill.
+
+    Returns `fn`'s own return value, or `None` if it raised.
+    """
+    try:
+        return fn(obj, user=user)
+    except Exception:
+        logger.exception(
+            "Post-completion billing failed for %s pk=%s (hook=%s) — the "
+            "underlying clinical record was already saved and is NOT "
+            "affected. This will be caught by the Task 16 revenue-integrity "
+            "check and can be retried via `manage.py "
+            "retry_unbilled_clinical_items`.",
+            obj.__class__.__name__, obj.pk, getattr(fn, "__name__", fn),
+        )
+        return None
 
 
 @transaction.atomic

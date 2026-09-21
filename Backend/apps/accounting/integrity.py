@@ -34,12 +34,24 @@ from apps.billing.models import (
     CreditNote,
     IdempotentRequest,
     Invoice,
+    InvoiceItem,
     InvoiceNumberSequence,
     Payment,
     Refund,
     WriteOff,
 )
-from apps.core.enums import CashierShiftStatus, IdempotencyStatus, InvoiceStatus
+from apps.core.enums import (
+    BillingSourceType,
+    CashierShiftStatus,
+    IdempotencyStatus,
+    InvoiceStatus,
+    LabOrderStatus,
+    ProcedureStatus,
+    RadiologyOrderStatus,
+)
+from apps.medical_records.models import LabOrder
+from apps.procedures.models import ClinicalProcedure
+from apps.radiology.models import RadiologyOrder
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +146,7 @@ def run_revenue_integrity_check() -> dict:
         ("orphan_ledger_sources", _check_orphan_ledger_sources),
         ("invoice_write_off_aggregate", _check_invoice_write_off_aggregate),
         ("invoice_balance_non_negative", _check_invoice_balance_non_negative),
+        ("unbilled_clinical_completions", _check_unbilled_clinical_completions),
         ("ar_reconciliation", _check_ar_reconciliation),
     )
     for name, fn in checks:
@@ -332,6 +345,67 @@ def _check_correction_ledger() -> list[Finding]:
                 category="correction_ledger", severity="critical",
                 object_type=label, object_id=obj_id,
                 message=f"{label} {obj_id} has no linked ledger entry.",
+            ))
+    return findings
+
+
+def _check_unbilled_clinical_completions() -> list[Finding]:
+    """Every completed `ClinicalProcedure`/`RadiologyOrder`/`LabOrder` must
+    have a matching `InvoiceItem` (pre-merge blocker resolution —
+    `apps.billing.services.bill_after_clinical_completion` deliberately lets
+    the clinical completion succeed even when its billing call fails, so the
+    completed-but-unbilled state this check looks for is real and expected
+    to occasionally exist, not a schema bug).
+
+    Unlike appointment completion (which legitimately has *no* invoice when
+    a free follow-up is consumed — see `FeeValidity`), none of these three
+    sources has a "no invoice is expected" case: `bill_ad_hoc_service` always
+    bills exactly once per completed item. A missing `InvoiceItem` here is
+    therefore always either a still-in-flight retry or a real gap — appointment
+    completion is deliberately NOT checked here, since a missing invoice there
+    is ambiguous (free visit vs. a real failure) without extra signal this
+    system doesn't persist.
+
+    `RadiologyOrder`/`LabOrder` both have a further status *after*
+    `COMPLETED` (`REPORTED`/`REVIEWED`) that billing does not re-trigger —
+    both are included so an order billed at COMPLETED and then moved on
+    doesn't wrongly disappear from this check.
+    """
+    findings: list[Finding] = []
+    sources = (
+        (
+            ClinicalProcedure, (ProcedureStatus.COMPLETED,),
+            BillingSourceType.PROCEDURE, "ClinicalProcedure",
+        ),
+        (
+            RadiologyOrder, (RadiologyOrderStatus.COMPLETED, RadiologyOrderStatus.REPORTED),
+            BillingSourceType.RADIOLOGY_ORDER, "RadiologyOrder",
+        ),
+        (
+            LabOrder, (LabOrderStatus.COMPLETED, LabOrderStatus.REVIEWED),
+            BillingSourceType.LAB_ORDER, "LabOrder",
+        ),
+    )
+    for model, statuses, source_type, label in sources:
+        completed_ids = set(
+            model.objects.filter(status__in=statuses).values_list("id", flat=True)
+        )
+        if not completed_ids:
+            continue
+        billed_ids = set(
+            InvoiceItem.objects.filter(source_type=source_type, source_id__in=completed_ids)
+            .values_list("source_id", flat=True)
+        )
+        for missing_id in completed_ids - billed_ids:
+            findings.append(Finding(
+                category="unbilled_clinical_completion", severity="critical",
+                object_type=label, object_id=missing_id,
+                message=(
+                    f"{label} {missing_id} is completed but has no InvoiceItem — "
+                    "likely a billing posting failure that was caught and logged "
+                    "rather than blocking the completion; retry via "
+                    "`manage.py retry_unbilled_clinical_items`."
+                ),
             ))
     return findings
 

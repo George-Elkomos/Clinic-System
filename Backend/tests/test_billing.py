@@ -16,8 +16,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.appointments import services as appointment_services
+from apps.appointments.models import Appointment
+from apps.billing import services as billing_services
 from apps.billing.models import FeeValidity, Invoice, InvoiceItem, Payment, PatientDeposit, ServiceItem
 from apps.core.enums import (
+    AppointmentStatus,
     BillingSourceType,
     InvoiceStatus,
     PaymentMethod,
@@ -372,6 +375,37 @@ class TestCompletionBillingHook:
         assert fee_validity is None
         assert invoice == Invoice.objects.get(patient=patient)
         assert arrears == Decimal("0.00")
+
+    def test_appointment_completes_even_when_billing_raises(
+        self, consultation_item, patient, doctor_profile, secretary, monkeypatch,
+    ):
+        """Pre-merge blocker resolution: complete_appointment's own
+        @transaction.atomic previously meant a billing failure rolled back
+        the ENTIRE completion (status, DoctorPatient link, everything) — a
+        confusing "your completion failed" for what was really a billing
+        problem. bill_after_clinical_completion isolates it: the appointment
+        stays COMPLETED, with billing_invoice/billing_fee_validity/
+        billing_arrears_balance all left None — never Decimal("0.00"), which
+        would falsely read as "confirmed zero overdue balance" rather than
+        "unknown, billing failed"."""
+        appointment = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary,
+        )
+
+        def _boom(*a, **k):
+            raise RuntimeError("simulated billing outage")
+
+        monkeypatch.setattr(billing_services, "handle_appointment_completed", _boom)
+        result = appointment_services.complete_appointment(appointment, user=secretary)
+
+        assert result.status == AppointmentStatus.COMPLETED
+        assert result.billing_invoice is None
+        assert result.billing_fee_validity is None
+        assert result.billing_arrears_balance is None
+
+        reloaded = Appointment.objects.get(pk=appointment.pk)
+        assert reloaded.status == AppointmentStatus.COMPLETED
+        assert not Invoice.objects.filter(patient=patient).exists()
 
 
 class TestInvoiceIsolation:

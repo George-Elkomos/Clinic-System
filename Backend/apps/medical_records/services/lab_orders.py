@@ -136,9 +136,14 @@ def complete_order(order: LabOrder, results_data: list, entered_by) -> LabOrder:
             if result.is_critical:
                 has_critical = True
 
-    from apps.billing.services import handle_lab_order_completed
+    # A billing failure here must never undo or block a completion that has
+    # already been saved — see bill_after_clinical_completion's own
+    # docstring (financial roadmap pre-merge blocker resolution). Task 16's
+    # revenue-integrity check independently detects an unbilled completed
+    # order; retry_unbilled_clinical_items can retry it safely.
+    from apps.billing.services import bill_after_clinical_completion, handle_lab_order_completed
 
-    handle_lab_order_completed(order, user=entered_by)
+    bill_after_clinical_completion(handle_lab_order_completed, order, user=entered_by)
 
     notify(
         recipient=order.patient.user,

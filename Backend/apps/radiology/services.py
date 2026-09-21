@@ -63,9 +63,14 @@ def complete_order(order: RadiologyOrder, *, file, uploaded_by, description: str
     order.completed_at = timezone.now()
     order.save(update_fields=["status", "completed_at", "updated_at"])
 
-    from apps.billing.services import handle_radiology_order_completed
+    # A billing failure here must never undo or block a completion that has
+    # already been saved — see bill_after_clinical_completion's own
+    # docstring (financial roadmap pre-merge blocker resolution). Task 16's
+    # revenue-integrity check independently detects an unbilled completed
+    # order; retry_unbilled_clinical_items can retry it safely.
+    from apps.billing.services import bill_after_clinical_completion, handle_radiology_order_completed
 
-    handle_radiology_order_completed(order, user=uploaded_by)
+    bill_after_clinical_completion(handle_radiology_order_completed, order, user=uploaded_by)
 
     notify(
         recipient=order.patient.user,

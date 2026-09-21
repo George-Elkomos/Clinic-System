@@ -295,7 +295,7 @@ def complete_appointment(appointment, *, user):
     `user` is the actor recorded on the ledger entry an issued invoice posts
     (financial roadmap Task 6).
     """
-    from apps.billing.services import handle_appointment_completed
+    from apps.billing.services import bill_after_clinical_completion, handle_appointment_completed
     from apps.core.enums import DoctorPatientSource
     from apps.doctors.models import DoctorPatient
 
@@ -311,7 +311,34 @@ def complete_appointment(appointment, *, user):
     link.last_treated_at = appointment.completed_at
     link.save(update_fields=["last_treated_at", "updated_at"])
 
-    invoice, fee_validity, arrears_balance = handle_appointment_completed(appointment, user=user)
+    # A billing failure here must never undo the completion above — this
+    # function's own @transaction.atomic would otherwise roll the whole
+    # completion back for what is really a billing problem (financial
+    # roadmap pre-merge blocker resolution).
+    #
+    # Deliberately NOT covered by Task 16's unbilled_clinical_completions
+    # check (unlike procedures/radiology/lab orders): a legitimate free
+    # follow-up consumption also has no invoice for this appointment, and
+    # nothing persisted distinguishes "free visit, working as intended" from
+    # "billing failed" — both look identical from the database afterward
+    # (FeeValidity.used_count is a bare counter with no per-appointment
+    # record of which appointment consumed it). Adding that check here
+    # without a real signal to tell the two apart would flag every ordinary
+    # free visit as a critical finding. Retrying a *known* failure is still
+    # possible by calling handle_appointment_completed directly for a
+    # specific appointment id — there is just no automated detection of
+    # which ones need it, unlike the other three sources.
+    result = bill_after_clinical_completion(handle_appointment_completed, appointment, user=user)
+    if result is None:
+        # None, not Decimal("0.00") — a real overdue balance of "exactly
+        # zero" and "we don't know, billing failed" must not look the same.
+        # The existing API contract (AppointmentViewSet.complete /
+        # EncounterViewSet.submit) already renders `arrears_balance` as
+        # `null` for any falsy value, so this changes nothing about the
+        # response shape — only what a falsy value here actually means.
+        invoice, fee_validity, arrears_balance = None, None, None
+    else:
+        invoice, fee_validity, arrears_balance = result
     # Exposed (not persisted) so the API layer can tell the front desk what
     # happened: "Invoice #INV-XXXX generated" vs "free follow-up used", plus
     # any overdue balance to warn reception about (never a reason to refuse).
