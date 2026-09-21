@@ -37,6 +37,7 @@ from apps.billing.models import (
     InvoiceNumberSequence,
     Payment,
     Refund,
+    WriteOff,
 )
 from apps.core.enums import CashierShiftStatus, IdempotencyStatus, InvoiceStatus
 
@@ -51,6 +52,12 @@ STALE_IDEMPOTENT_REQUEST_AGE = timedelta(hours=1)
 # source_type -> model, for every value apps/billing/services.py actually
 # passes to `accounting.services.post(source_type=...)` today. A source_type
 # not in this map is skipped by the orphan check, never guessed at.
+#
+# "WriteOff" covers both a write-off's own original posting AND its
+# reversal — `accounting_services.reverse()` preserves the original entry's
+# source_type/source_id (financial roadmap Task 15), so a reversal never
+# emits a distinct "WriteOffReversal" source_type; adding one here would
+# check for a source_type the ledger never actually produces.
 _ORPHAN_SOURCE_MODELS: dict[str, Any] = {
     "Invoice": Invoice,
     "Payment": Payment,
@@ -58,6 +65,7 @@ _ORPHAN_SOURCE_MODELS: dict[str, Any] = {
     "Refund": Refund,
     "CashierShift": CashierShift,
     "CashMovement": CashMovement,
+    "WriteOff": WriteOff,
 }
 
 _INVOICE_NUMBER_RE = re.compile(r"^INV-(\d+)$")
@@ -119,10 +127,13 @@ def run_revenue_integrity_check() -> dict:
         ("invoice_ledger", _check_invoice_ledger),
         ("payment_ledger", _check_payment_ledger),
         ("correction_ledger", _check_correction_ledger),
+        ("write_off_ledger", _check_write_off_ledger),
         ("idempotency_anomalies", _check_idempotency_anomalies),
         ("invoice_number_integrity", _check_invoice_number_integrity),
         ("cashier_integrity", _check_cashier_integrity),
         ("orphan_ledger_sources", _check_orphan_ledger_sources),
+        ("invoice_write_off_aggregate", _check_invoice_write_off_aggregate),
+        ("invoice_balance_non_negative", _check_invoice_balance_non_negative),
         ("ar_reconciliation", _check_ar_reconciliation),
     )
     for name, fn in checks:
@@ -322,6 +333,238 @@ def _check_correction_ledger() -> list[Finding]:
                 object_type=label, object_id=obj_id,
                 message=f"{label} {obj_id} has no linked ledger entry.",
             ))
+    return findings
+
+
+def _check_write_off_ledger() -> list[Finding]:
+    """Every WriteOff must have a valid *original* ledger posting for
+    itself; when a WriteOffReversal exists, it must have a valid *reversing*
+    entry that actually reverses that original. Both directions of drift are
+    checked: a WriteOffReversal row with a missing/wrong ledger reversal, and
+    a ledger reversal that exists with no WriteOffReversal row to explain it.
+
+    `accounting_services.reverse()` preserves the original entry's
+    `source_type`/`source_id` on the reversal (financial roadmap Task 15,
+    same convention `_check_invoice_ledger` already relies on for
+    cancellation) — so an original + its reversal legitimately share one
+    (source_type, source_id) pair. This check never falls into the "two
+    postings = duplicate" trap that pattern would otherwise invite: it always
+    resolves each posting through the specific FK that names it
+    (`WriteOff.journal_entry`, `WriteOffReversal.journal_entry`), never by
+    counting how many JournalEntry rows share a source_id.
+    """
+    findings: list[Finding] = []
+    write_offs = list(
+        WriteOff.objects.values(
+            "id", "journal_entry_id", "reversal__id", "reversal__journal_entry_id",
+        )
+    )
+    if not write_offs:
+        return findings
+
+    original_entry_ids = {wo["journal_entry_id"] for wo in write_offs if wo["journal_entry_id"]}
+    reversal_entry_ids = {
+        wo["reversal__journal_entry_id"] for wo in write_offs if wo["reversal__journal_entry_id"]
+    }
+    entries = {
+        e["id"]: e
+        for e in JournalEntry.objects.filter(
+            id__in=original_entry_ids | reversal_entry_ids
+        ).values("id", "source_type", "source_id", "reverses_id", "idempotency_key")
+    }
+    # What does the ledger itself say reverses each original write-off entry?
+    reversed_by: dict[int, list[int]] = {}
+    for reverses_id, reversing_id in JournalEntry.objects.filter(
+        reverses_id__in=original_entry_ids,
+    ).values_list("reverses_id", "id"):
+        reversed_by.setdefault(reverses_id, []).append(reversing_id)
+
+    for wo in write_offs:
+        wo_id = wo["id"]
+        entry_id = wo["journal_entry_id"]
+
+        if entry_id is None:
+            findings.append(Finding(
+                category="write_off_ledger", severity="critical",
+                object_type="WriteOff", object_id=wo_id,
+                message=f"WriteOff {wo_id} has no linked ledger entry.",
+            ))
+        else:
+            entry = entries.get(entry_id)
+            if entry is None:
+                findings.append(Finding(
+                    category="write_off_ledger", severity="critical",
+                    object_type="WriteOff", object_id=wo_id,
+                    message=(
+                        f"WriteOff {wo_id} references JournalEntry {entry_id}, "
+                        "which does not exist."
+                    ),
+                ))
+            else:
+                if entry["reverses_id"] is not None:
+                    findings.append(Finding(
+                        category="write_off_ledger", severity="critical",
+                        object_type="WriteOff", object_id=wo_id,
+                        message=(
+                            f"WriteOff {wo_id}'s journal_entry ({entry_id}) is itself a "
+                            "reversal, not an original posting."
+                        ),
+                    ))
+                if entry["source_type"] != "WriteOff" or entry["source_id"] != wo_id:
+                    findings.append(Finding(
+                        category="write_off_ledger", severity="critical",
+                        object_type="WriteOff", object_id=wo_id,
+                        message=(
+                            f"WriteOff {wo_id}'s journal_entry ({entry_id}) has "
+                            f"source_type={entry['source_type']!r} "
+                            f"source_id={entry['source_id']} — expected "
+                            f"source_type='WriteOff' source_id={wo_id}."
+                        ),
+                    ))
+                expected_key = f"WriteOff:{wo_id}:post"
+                if entry["idempotency_key"] != expected_key:
+                    findings.append(Finding(
+                        category="write_off_ledger", severity="critical",
+                        object_type="WriteOff", object_id=wo_id,
+                        message=(
+                            f"WriteOff {wo_id}'s journal_entry has idempotency_key "
+                            f"{entry['idempotency_key']!r} — expected {expected_key!r}."
+                        ),
+                    ))
+
+        reversal_id = wo["reversal__id"]
+        reversal_entry_id = wo["reversal__journal_entry_id"]
+        actual_reversers = reversed_by.get(entry_id, []) if entry_id is not None else []
+
+        if reversal_id is not None:
+            if reversal_entry_id is None:
+                findings.append(Finding(
+                    category="write_off_reversal_ledger", severity="critical",
+                    object_type="WriteOffReversal", object_id=reversal_id,
+                    message=f"WriteOffReversal {reversal_id} has no linked ledger entry.",
+                ))
+            else:
+                reversal_entry = entries.get(reversal_entry_id)
+                if reversal_entry is None:
+                    findings.append(Finding(
+                        category="write_off_reversal_ledger", severity="critical",
+                        object_type="WriteOffReversal", object_id=reversal_id,
+                        message=(
+                            f"WriteOffReversal {reversal_id} references JournalEntry "
+                            f"{reversal_entry_id}, which does not exist."
+                        ),
+                    ))
+                else:
+                    if reversal_entry["reverses_id"] != entry_id:
+                        findings.append(Finding(
+                            category="write_off_reversal_ledger", severity="critical",
+                            object_type="WriteOffReversal", object_id=reversal_id,
+                            message=(
+                                f"WriteOffReversal {reversal_id}'s journal_entry "
+                                f"({reversal_entry_id}) reverses "
+                                f"{reversal_entry['reverses_id']!r}, not the original "
+                                f"write-off posting ({entry_id})."
+                            ),
+                        ))
+                    if (
+                        reversal_entry["source_type"] != "WriteOff"
+                        or reversal_entry["source_id"] != wo_id
+                    ):
+                        findings.append(Finding(
+                            category="write_off_reversal_ledger", severity="critical",
+                            object_type="WriteOffReversal", object_id=reversal_id,
+                            message=(
+                                f"WriteOffReversal {reversal_id}'s journal_entry "
+                                f"({reversal_entry_id}) has source_type="
+                                f"{reversal_entry['source_type']!r} source_id="
+                                f"{reversal_entry['source_id']} — expected "
+                                f"source_type='WriteOff' source_id={wo_id}."
+                            ),
+                        ))
+            if (
+                entry_id is not None and actual_reversers
+                and reversal_entry_id not in actual_reversers
+            ):
+                findings.append(Finding(
+                    category="write_off_reversal_ledger", severity="critical",
+                    object_type="WriteOffReversal", object_id=reversal_id,
+                    message=(
+                        f"WriteOffReversal {reversal_id} points at journal_entry "
+                        f"{reversal_entry_id}, but the ledger's actual reversal of "
+                        f"WriteOff {wo_id}'s posting is {actual_reversers}."
+                    ),
+                ))
+        elif actual_reversers:
+            findings.append(Finding(
+                category="write_off_reversal_ledger", severity="critical",
+                object_type="WriteOff", object_id=wo_id,
+                message=(
+                    f"WriteOff {wo_id}'s original posting ({entry_id}) has been "
+                    f"reversed at the ledger level (entry {actual_reversers}), but no "
+                    "WriteOffReversal record exists."
+                ),
+            ))
+    return findings
+
+
+def _check_invoice_write_off_aggregate() -> list[Finding]:
+    """`Invoice.written_off_amount` must equal `Sum(amount)` over that
+    invoice's own non-reversed `WriteOff` rows — derived independently here,
+    never by calling `apps.billing.services._recompute_written_off_amount`,
+    so this check can actually catch that helper being bypassed, skipped, or
+    itself buggy rather than silently agreeing with it."""
+    findings: list[Finding] = []
+    active_sums = dict(
+        WriteOff.objects.filter(reversal__isnull=True)
+        .values("invoice_id")
+        .annotate(total=Sum("amount"))
+        .values_list("invoice_id", "total")
+    )
+    nonzero_persisted_ids = set(
+        Invoice.objects.exclude(written_off_amount=Decimal("0.00")).values_list("id", flat=True)
+    )
+    candidate_ids = set(active_sums) | nonzero_persisted_ids
+    if not candidate_ids:
+        return findings
+
+    persisted = dict(
+        Invoice.objects.filter(id__in=candidate_ids).values_list("id", "written_off_amount")
+    )
+    for invoice_id in candidate_ids:
+        expected = active_sums.get(invoice_id, Decimal("0.00"))
+        actual = persisted.get(invoice_id, Decimal("0.00"))
+        if expected != actual:
+            findings.append(Finding(
+                category="write_off_aggregate", severity="critical",
+                object_type="Invoice", object_id=invoice_id,
+                message=(
+                    f"Invoice {invoice_id}.written_off_amount={actual} does not match "
+                    f"the sum of its active (non-reversed) write-offs ({expected})."
+                ),
+            ))
+    return findings
+
+
+def _check_invoice_balance_non_negative() -> list[Finding]:
+    """A negative `Invoice.balance` would mean the clinic owes the patient
+    money while the field is presented as a receivable — there is no
+    legitimate case for this in the current system (an overpayment routes to
+    `PatientDeposit` instead, never a negative balance; see the financial
+    roadmap Task 15 hardening of `record_payment`/`issue_credit_note` in
+    `apps.billing.services`, which exists specifically to prevent this).
+    Read-only defense-in-depth: this never corrects the value, only reports
+    it — a hit here means that hardening was bypassed or a new gap opened
+    elsewhere.
+    """
+    findings: list[Finding] = []
+    for invoice_id, balance in Invoice.objects.filter(
+        balance__lt=Decimal("0.00")
+    ).values_list("id", "balance"):
+        findings.append(Finding(
+            category="invoice_balance", severity="critical",
+            object_type="Invoice", object_id=invoice_id,
+            message=f"Invoice {invoice_id} has a negative balance ({balance}).",
+        ))
     return findings
 
 

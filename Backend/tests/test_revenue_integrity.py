@@ -31,6 +31,8 @@ from apps.billing.models import (
     Payment,
     Refund,
     ServiceItem,
+    WriteOff,
+    WriteOffReversal,
 )
 from apps.core.enums import (
     CashMovementType,
@@ -122,6 +124,8 @@ def _snapshot_counts():
         "JournalLine": JournalLine.objects.count(),
         "InvoiceNumberSequence": InvoiceNumberSequence.objects.count(),
         "IdempotentRequest": IdempotentRequest.objects.count(),
+        "WriteOff": WriteOff.objects.count(),
+        "WriteOffReversal": WriteOffReversal.objects.count(),
     }
 
 
@@ -302,6 +306,249 @@ class TestCorrectionLedger:
         result = integrity.run_revenue_integrity_check()
         assert _findings_for(result, "CreditNote", note.id) == []
 
+    def test_legacy_null_role_snapshot_is_not_flagged(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        """NULL on approved_by_role deliberately means "historical role not
+        captured" (financial roadmap Task 15) — never a finding on its own."""
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        note = billing_services.issue_credit_note(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+            idempotency_key=str(uuid.uuid4()),
+        )
+        CreditNote.objects.filter(pk=note.pk).update(approved_by_role=None)
+        result = integrity.run_revenue_integrity_check()
+        assert _findings_for(result, "CreditNote", note.id) == []
+
+
+# --- WriteOff / WriteOffReversal ledger integrity (financial roadmap Task 15) -
+
+class TestWriteOffLedger:
+    def test_healthy_write_off_is_not_flagged(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+            idempotency_key=str(uuid.uuid4()),
+        )
+        result = integrity.run_revenue_integrity_check()
+        assert _findings_for(result, "WriteOff", write_off.id) == []
+
+    def test_write_off_missing_journal_link_is_detected(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = WriteOff.objects.create(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test",
+            approved_by=manager, approved_by_role=RoleChoices.MANAGER,
+        )
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "WriteOff", write_off.id)
+        assert any(f["category"] == "write_off_ledger" for f in hit)
+
+    def test_write_off_journal_entry_with_wrong_source_is_detected(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = WriteOff.objects.create(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test",
+            approved_by=manager, approved_by_role=RoleChoices.MANAGER,
+        )
+        wrong_entry = _raw_entry(
+            user=manager, source_type="Invoice", source_id=invoice.id,
+            lines=[("BAD_DEBT_PATIENT", Decimal("10.00"), Decimal("0.00")),
+                   ("AR_PATIENT", Decimal("0.00"), Decimal("10.00"))],
+        )
+        write_off.journal_entry = wrong_entry
+        write_off.save(update_fields=["journal_entry"])
+
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "WriteOff", write_off.id)
+        messages = " ".join(f["message"] for f in hit)
+        assert "source_type" in messages
+        assert "idempotency_key" in messages  # the raw entry's key doesn't match the convention either
+
+    def test_write_off_journal_entry_that_is_itself_a_reversal_is_detected(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        original = _raw_entry(
+            user=manager, source_type="WriteOff", source_id=999998,
+            lines=[("BAD_DEBT_PATIENT", Decimal("10.00"), Decimal("0.00")),
+                   ("AR_PATIENT", Decimal("0.00"), Decimal("10.00"))],
+        )
+        fake_reversal = _raw_entry(
+            user=manager, source_type="WriteOff", source_id=999998, reverses=original,
+            lines=[("AR_PATIENT", Decimal("10.00"), Decimal("0.00")),
+                   ("BAD_DEBT_PATIENT", Decimal("0.00"), Decimal("10.00"))],
+        )
+        write_off = WriteOff.objects.create(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test",
+            approved_by=manager, approved_by_role=RoleChoices.MANAGER,
+            journal_entry=fake_reversal,
+        )
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "WriteOff", write_off.id)
+        assert any("itself a reversal" in f["message"] for f in hit)
+
+    def test_healthy_reversed_write_off_is_not_flagged(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        """The legitimate original + reversal pair (financial roadmap
+        Task 15) must never be mistaken for a duplicate posting."""
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+        )
+        reversal = billing_services.reverse_write_off(
+            write_off=write_off, reason_code="reconsidered", reversed_by=manager,
+        )
+        assert JournalEntry.objects.filter(
+            source_type="WriteOff", source_id=write_off.id,
+        ).count() == 2  # original + reversal, legitimately
+
+        result = integrity.run_revenue_integrity_check()
+        assert _findings_for(result, "WriteOff", write_off.id) == []
+        assert _findings_for(result, "WriteOffReversal", reversal.id) == []
+        assert result["ok"] is True
+
+    def test_reversal_missing_journal_link_is_detected(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+        )
+        reversal = WriteOffReversal.objects.create(
+            write_off=write_off, reason_code="test", reversed_by=manager,
+            reversed_by_role=RoleChoices.MANAGER,
+        )
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "WriteOffReversal", reversal.id)
+        assert any(f["category"] == "write_off_reversal_ledger" for f in hit)
+
+    def test_reversal_journal_entry_that_does_not_reverse_the_original_is_detected(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+        )
+        unrelated_entry = _raw_entry(
+            user=manager, source_type="WriteOff", source_id=write_off.id,
+            lines=[("BAD_DEBT_PATIENT", Decimal("10.00"), Decimal("0.00")),
+                   ("AR_PATIENT", Decimal("0.00"), Decimal("10.00"))],
+        )
+        reversal = WriteOffReversal.objects.create(
+            write_off=write_off, reason_code="test", reversed_by=manager,
+            reversed_by_role=RoleChoices.MANAGER, journal_entry=unrelated_entry,
+        )
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "WriteOffReversal", reversal.id)
+        assert any("not the original write-off posting" in f["message"] for f in hit)
+
+    def test_ledger_reversal_without_a_business_reversal_record_is_detected(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        """Reverses the ledger entry directly (bypassing
+        services.reverse_write_off entirely) — no WriteOffReversal row is
+        ever created, which is exactly the gap this check exists for."""
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+        )
+        accounting_services.reverse(
+            write_off.journal_entry, reason_code="bypassed_reversal", user=manager,
+        )
+        assert not WriteOffReversal.objects.filter(write_off=write_off).exists()
+
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "WriteOff", write_off.id)
+        assert any(
+            f["category"] == "write_off_reversal_ledger"
+            and "no WriteOffReversal record exists" in f["message"]
+            for f in hit
+        )
+
+    def test_orphan_write_off_source_is_flagged(self, manager):
+        _raw_entry(
+            user=manager, source_type="WriteOff", source_id=999999,
+            lines=[("BAD_DEBT_PATIENT", Decimal("5.00"), Decimal("0.00")),
+                   ("AR_PATIENT", Decimal("0.00"), Decimal("5.00"))],
+        )
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "WriteOff", 999999)
+        assert any(f["category"] == "orphan_ledger_source" for f in hit)
+
+
+# --- Invoice.written_off_amount aggregate consistency -------------------------
+
+class TestInvoiceWriteOffAggregate:
+    def test_correct_written_off_amount_is_not_flagged(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+        )
+        result = integrity.run_revenue_integrity_check()
+        assert _findings_for(result, "Invoice", invoice.id) == []
+
+    def test_stale_persisted_written_off_amount_is_flagged(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        """Corrupts the persisted field directly (bypassing
+        services._recompute_written_off_amount) — this check must derive its
+        own expected value to catch exactly this."""
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+        )
+        Invoice.objects.filter(pk=invoice.pk).update(written_off_amount=Decimal("999.00"))
+
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "Invoice", invoice.id)
+        assert any(f["category"] == "write_off_aggregate" for f in hit)
+
+    def test_reversed_write_off_correctly_drops_out_of_the_aggregate(
+        self, consultation_item, patient, doctor_profile, secretary, manager,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        write_off = billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+        )
+        billing_services.reverse_write_off(
+            write_off=write_off, reason_code="reconsidered", reversed_by=manager,
+        )
+        result = integrity.run_revenue_integrity_check()
+        assert not any(
+            f["category"] == "write_off_aggregate" for f in _findings_for(result, "Invoice", invoice.id)
+        )
+
+
+# --- Invoice.balance sanity ----------------------------------------------------
+
+class TestInvoiceBalanceNonNegative:
+    def test_negative_balance_is_flagged(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        Invoice.objects.filter(pk=invoice.pk).update(balance=Decimal("-10.00"))
+
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "Invoice", invoice.id)
+        assert any(f["category"] == "invoice_balance" and f["severity"] == "critical" for f in hit)
+
+    def test_healthy_positive_balance_is_not_flagged(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        invoice = _issued_invoice(consultation_item, patient, doctor_profile, secretary)
+        result = integrity.run_revenue_integrity_check()
+        assert not any(
+            f["category"] == "invoice_balance" for f in _findings_for(result, "Invoice", invoice.id)
+        )
+
 
 # --- Cashier / cash-movement integrity ---------------------------------------
 
@@ -467,7 +714,7 @@ class TestCheckIsolation:
 
         result = integrity.run_revenue_integrity_check()
         assert "ledger_structure_and_balance" in result["checks_failed"]
-        assert result["summary"]["checks_run"] == 9
+        assert result["summary"]["checks_run"] == 12
         assert any(f["category"] == "invoice_ledger" for f in result["findings"])
         assert result["ok"] is False
 
@@ -493,6 +740,14 @@ class TestNoMutation:
         billing_services.record_cash_movement(
             shift=shift, movement_type=CashMovementType.FLOAT_IN, amount=Decimal("20.00"),
             reason="test", created_by=cashier, idempotency_key=str(uuid.uuid4()),
+        )
+        write_off = billing_services.write_off_invoice(
+            invoice=invoice, amount=Decimal("10.00"), reason_code="test", approved_by=manager,
+            idempotency_key=str(uuid.uuid4()),
+        )
+        billing_services.reverse_write_off(
+            write_off=write_off, reason_code="test", reversed_by=manager,
+            idempotency_key=str(uuid.uuid4()),
         )
         # Also present: some genuinely broken rows, so checks that find
         # things still don't touch them while finding them.
