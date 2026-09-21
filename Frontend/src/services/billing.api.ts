@@ -1,4 +1,5 @@
 import { api } from './apiClient'
+import { idempotencyHeader } from '../lib/idempotency'
 import type {
   BillingReport,
   Invoice,
@@ -18,14 +19,21 @@ export const billingApi = {
     api.get<Invoice>(`/invoices/${id}/`).then((r) => r.data),
 
   // Response embeds `invoice_detail` so the desk can refresh the row in place.
-  recordPayment: (data: {
-    invoice: number
-    amount: string
-    payment_method: PaymentMethod
-    reference?: string
-  }) =>
+  // Requires an Idempotency-Key (see lib/idempotency.ts + useIdempotencyKey) —
+  // the backend rejects POST /payments/ without one.
+  recordPayment: (
+    data: {
+      invoice: number
+      amount: string
+      payment_method: PaymentMethod
+      reference?: string
+    },
+    idempotencyKey: string,
+  ) =>
     api
-      .post<Payment & { invoice_detail: Invoice }>('/payments/', data)
+      .post<Payment & { invoice_detail: Invoice }>('/payments/', data, {
+        headers: idempotencyHeader(idempotencyKey),
+      })
       .then((r) => r.data),
 
   report: (period: 'day' | 'month' | 'year') =>

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useIdempotencyKey } from '../../hooks/useIdempotencyKey'
 import { useLanguage } from '../../hooks/useLanguage'
 import { formatCurrency } from '../../lib/format'
 import { errorMessage } from '../../services/apiClient'
@@ -28,19 +29,18 @@ export function PaymentFormModal({ invoice, onClose }: PaymentFormModalProps) {
   const { language } = useLanguage()
   const { showToast } = useToast()
   const qc = useQueryClient()
+  const idempotency = useIdempotencyKey()
   const [amount, setAmount] = useState(invoice.balance)
   const [method, setMethod] = useState<PaymentMethod>('CASH')
   const [reference, setReference] = useState('')
 
   const record = useMutation({
-    mutationFn: () =>
-      billingApi.recordPayment({
-        invoice: invoice.id,
-        amount,
-        payment_method: method,
-        reference,
-      }),
+    mutationFn: () => {
+      const payload = { invoice: invoice.id, amount, payment_method: method, reference }
+      return billingApi.recordPayment(payload, idempotency.getKey(payload))
+    },
     onSuccess: (data) => {
+      idempotency.reset()
       showToast(
         t(data.invoice_detail.status === 'PAID' ? 'billing.invoicePaid' : 'billing.paymentRecorded'),
         'success',
