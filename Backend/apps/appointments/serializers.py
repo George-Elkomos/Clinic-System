@@ -61,23 +61,47 @@ class AppointmentQueueSerializer(AppointmentSerializer):
     patient_chronic_conditions = serializers.CharField(source="patient.chronic_conditions", read_only=True)
     patient_current_medications = serializers.CharField(source="patient.current_medications", read_only=True)
     # Lets the "previous patient" card offer a "View Invoice" link (Phase 12)
-    # without depending on the one-shot post-completion pop-up.
+    # without depending on the one-shot post-completion pop-up. `invoice_id`
+    # means "a financial invoice the caller can actually view" — never a bare
+    # "some Invoice row exists" — so it is null while the consultation charge
+    # is still sitting on an Encounter's DRAFT invoice (encounter-based DRAFT
+    # invoicing): DRAFT invoices are intentionally excluded from
+    # GET /invoices/{id}/ for every role, so exposing a DRAFT pk here would
+    # offer a "View Invoice" link that 404s. `pending_checkout` tells the
+    # doctor UI the charge exists but reception hasn't checked it out yet,
+    # without leaking any DRAFT financial detail.
     invoice_id = serializers.SerializerMethodField()
+    pending_checkout = serializers.SerializerMethodField()
     # Flags a returning patient so the doctor notices before starting the exam,
     # even if this particular appointment has no encounter of its own yet.
     has_history = serializers.SerializerMethodField()
 
-    def get_invoice_id(self, obj):
+    def _appointment_invoice(self, obj):
         from apps.billing.models import InvoiceItem
         from apps.core.enums import BillingSourceType
 
-        return (
+        item = (
             InvoiceItem.objects.filter(
-                source_type=BillingSourceType.APPOINTMENT, source_id=obj.id
+                source_type=BillingSourceType.APPOINTMENT, source_id=obj.id,
             )
-            .values_list("invoice_id", flat=True)
+            .select_related("invoice")
             .first()
         )
+        return item.invoice if item else None
+
+    def get_invoice_id(self, obj):
+        from apps.core.enums import InvoiceStatus
+
+        invoice = self._appointment_invoice(obj)
+        if invoice is not None and invoice.status != InvoiceStatus.DRAFT:
+            return invoice.id
+        return None
+
+    def get_pending_checkout(self, obj):
+        from apps.core.enums import InvoiceStatus
+
+        invoice = self._appointment_invoice(obj)
+        return invoice is not None and invoice.status == InvoiceStatus.DRAFT
 
     def get_has_history(self, obj):
         from apps.encounters.models import Encounter
@@ -88,7 +112,7 @@ class AppointmentQueueSerializer(AppointmentSerializer):
         fields = AppointmentSerializer.Meta.fields + [
             "patient_profile_id", "patient_phone", "patient_dob", "patient_gender",
             "patient_blood_type", "patient_allergies", "patient_chronic_conditions",
-            "patient_current_medications", "invoice_id", "has_history",
+            "patient_current_medications", "invoice_id", "pending_checkout", "has_history",
         ]
         read_only_fields = fields
 

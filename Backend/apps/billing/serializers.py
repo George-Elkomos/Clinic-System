@@ -115,6 +115,87 @@ class InvoiceSerializer(serializers.ModelSerializer):
         return localized_name(obj.doctor, locale)
 
 
+class DraftInvoiceSerializer(serializers.ModelSerializer):
+    """DRAFT-only representation for encounter-based pending billing
+    (GET /api/encounters/{id}/pending-bill/) — deliberately NOT
+    `InvoiceSerializer`. That serializer exposes `number`, whose underlying
+    `Invoice.number` property falls back to a pk-derived display string
+    (`INV-000NN`) for rows with no allocated `invoice_number` — a fallback
+    meant for legacy/outside-service-layer rows, not for a DRAFT that
+    correctly has no number *yet*. Presenting it here would let an internal
+    placeholder masquerade as an issued invoice number. This serializer omits
+    `number`/`invoice_number` entirely rather than returning them as null —
+    the field doesn't apply yet, not merely "empty" — and makes the DRAFT
+    state explicit via `status`.
+    """
+
+    patient_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
+    items = InvoiceItemSerializer(many=True, read_only=True)
+    needs_pricing_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Invoice
+        fields = [
+            "id", "encounter", "patient", "patient_name", "doctor", "doctor_name",
+            "status", "subtotal", "discount", "total", "balance", "currency",
+            "notes", "items", "needs_pricing_count", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_patient_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.patient, locale)
+
+    def get_doctor_name(self, obj):
+        if not obj.doctor_id:
+            return None
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor, locale)
+
+    def get_needs_pricing_count(self, obj):
+        return sum(1 for item in obj.items.all() if item.needs_pricing)
+
+
+class PendingCheckoutSerializer(serializers.ModelSerializer):
+    """One row in the reception pending-checkout work queue
+    (GET /api/invoices/pending-checkout/) — a queue listing, not a normal
+    invoice detail: deliberately excludes `items`/`number` (see
+    `DraftInvoiceSerializer` for the full DRAFT detail these summarize).
+    `item_count`/`needs_pricing_count` are annotated onto the queryset by
+    `InvoiceViewSet.pending_checkout`, not computed per-row here, so listing
+    many pending visits stays a fixed number of queries.
+    """
+
+    patient_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
+    item_count = serializers.IntegerField(read_only=True)
+    needs_pricing_count = serializers.IntegerField(read_only=True)
+    has_needs_pricing = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Invoice
+        fields = [
+            "id", "encounter", "patient", "patient_name", "doctor", "doctor_name",
+            "status", "total", "currency", "item_count", "needs_pricing_count",
+            "has_needs_pricing", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_patient_name(self, obj):
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.patient, locale)
+
+    def get_doctor_name(self, obj):
+        if not obj.doctor_id:
+            return None
+        locale = get_request_locale(self.context.get("request"))
+        return localized_name(obj.doctor, locale)
+
+    def get_has_needs_pricing(self, obj):
+        return obj.needs_pricing_count > 0
+
+
 class FeeValiditySerializer(serializers.ModelSerializer):
     class Meta:
         model = FeeValidity

@@ -14,6 +14,7 @@ The chart of accounts + an open Period covering "today" are seeded once for
 the whole test session (see tests/conftest.py's django_db_setup override).
 """
 import threading
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -651,3 +652,226 @@ class TestNewEndpointAuthorization:
 
         item.refresh_from_db()
         assert item.needs_pricing is True  # never actually resolved
+
+
+def _results(resp):
+    return resp.data["results"] if isinstance(resp.data, dict) and "results" in resp.data else resp.data
+
+
+class TestPendingCheckoutQueue:
+    def test_secretary_allowed(self, api, encounter, patient, doctor_profile, secretary):
+        _complete_procedure(encounter, patient, doctor_profile)
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        assert resp.status_code == 200
+
+    def test_manager_allowed(self, api, encounter, patient, doctor_profile, manager):
+        _complete_procedure(encounter, patient, doctor_profile)
+        api.force_authenticate(manager)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        assert resp.status_code == 200
+
+    def test_patient_forbidden(self, api, patient):
+        api.force_authenticate(patient)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        assert resp.status_code == 403
+
+    def test_doctor_forbidden(self, api, doctor_profile):
+        api.force_authenticate(doctor_profile.user)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        assert resp.status_code == 403
+
+    def test_only_pending_draft_encounter_invoices_returned(
+        self, api, encounter, patient, doctor_profile, secretary,
+    ):
+        ServiceItem.objects.create(
+            name="Suturing", item_type=ServiceItemType.PROCEDURE, default_price="120.00",
+        )
+        _complete_procedure(encounter, patient, doctor_profile)
+        issued = billing_services.issue_invoice(
+            Invoice.objects.get(encounter=encounter).pk, user=secretary,
+        )
+
+        pending_encounter = Encounter.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, status=EncounterStatus.DRAFT,
+        )
+        _complete_procedure(pending_encounter, patient, doctor_profile, name="Pending one")
+        pending_invoice = Invoice.objects.get(encounter=pending_encounter)
+
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        ids = [row["id"] for row in _results(resp)]
+
+        assert pending_invoice.id in ids
+        assert issued.id not in ids  # now ISSUED, must not appear
+
+    def test_encounter_less_standalone_invoice_excluded(self, api, patient, doctor_profile, secretary):
+        """An encounter-less charge is always issued immediately (unchanged
+        fallback) — never appears as a pending checkout row."""
+        template = ProcedureTemplate.objects.create(name="Standalone")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+        )
+        procedure = start_procedure(procedure)
+        complete_procedure(procedure, post_procedure_notes="Done.", user=doctor_profile.user)
+        standalone = Invoice.objects.get(patient=patient, encounter__isnull=True)
+
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        ids = [row["id"] for row in _results(resp)]
+        assert standalone.id not in ids
+
+    def test_encounter_less_draft_row_excluded_defensively(
+        self, api, patient, doctor_profile, secretary,
+    ):
+        """No current code path creates an encounter-less DRAFT invoice, but
+        the queue's own encounter__isnull=False filter must exclude one if it
+        ever existed, rather than assuming it can't."""
+        Invoice.objects.create(patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.DRAFT)
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        assert _results(resp) == []
+
+    def test_multiple_pending_encounters_ordered_oldest_first(
+        self, api, patient, doctor_profile, secretary,
+    ):
+        enc_a = Encounter.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, status=EncounterStatus.DRAFT,
+        )
+        _complete_procedure(enc_a, patient, doctor_profile, name="A")
+        invoice_a = Invoice.objects.get(encounter=enc_a)
+        Invoice.objects.filter(pk=invoice_a.pk).update(created_at=timezone.now() - timedelta(hours=2))
+
+        enc_b = Encounter.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, status=EncounterStatus.DRAFT,
+        )
+        _complete_procedure(enc_b, patient, doctor_profile, name="B")
+        invoice_b = Invoice.objects.get(encounter=enc_b)
+
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        ids = [row["id"] for row in _results(resp)]
+        assert ids.index(invoice_a.id) < ids.index(invoice_b.id)
+
+    def test_needs_pricing_state_represented(
+        self, api, encounter, patient, doctor_profile, secretary,
+    ):
+        _complete_procedure(encounter, patient, doctor_profile)  # no ServiceItem seeded
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        row = next(r for r in _results(resp) if r["encounter"] == encounter.id)
+        assert row["item_count"] == 1
+        assert row["needs_pricing_count"] == 1
+        assert row["has_needs_pricing"] is True
+
+    def test_empty_queue_returns_normal_empty_result(self, api, secretary):
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        assert resp.status_code == 200
+        assert _results(resp) == []
+
+    def test_no_fake_invoice_number_exposed(
+        self, api, encounter, patient, doctor_profile, secretary,
+    ):
+        _complete_procedure(encounter, patient, doctor_profile)
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-pending-checkout"))
+        row = _results(resp)[0]
+        assert "number" not in row
+        assert "invoice_number" not in row
+
+
+class TestPendingBillSerializerFix:
+    def test_pending_bill_has_no_fake_invoice_number(
+        self, api, encounter, patient, doctor_profile, secretary,
+    ):
+        _complete_procedure(encounter, patient, doctor_profile)
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("encounter-pending-bill", args=[encounter.id]))
+        assert resp.status_code == 200
+        assert "number" not in resp.data
+        assert "invoice_number" not in resp.data
+        assert resp.data["status"] == "DRAFT"
+
+    def test_pending_bill_null_when_nothing_pending(
+        self, api, encounter, secretary,
+    ):
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("encounter-pending-bill", args=[encounter.id]))
+        assert resp.status_code == 200
+        assert resp.data is None
+
+    def test_normal_issued_invoice_detail_still_exposes_a_real_number(
+        self, api, encounter, patient, doctor_profile, secretary,
+    ):
+        """Regression guard: the fix must not change InvoiceSerializer's own
+        contract for a real, ISSUED invoice."""
+        ServiceItem.objects.create(
+            name="Suturing", item_type=ServiceItemType.PROCEDURE, default_price="120.00",
+        )
+        _complete_procedure(encounter, patient, doctor_profile)
+        issued = billing_services.issue_invoice(
+            Invoice.objects.get(encounter=encounter).pk, user=secretary,
+        )
+        api.force_authenticate(secretary)
+        resp = api.get(reverse("invoice-detail", args=[issued.id]))
+        assert resp.status_code == 200
+        assert resp.data["number"] == issued.invoice_number
+        assert resp.data["number"] != ""
+
+
+class TestDoctorQueueContract:
+    def test_draft_backed_appointment_has_no_viewable_invoice_id(
+        self, api, consultation_item, patient, doctor_profile, secretary,
+    ):
+        appointment, encounter_obj = _complete_visit_with_encounter(patient, doctor_profile, secretary)
+        invoice = Invoice.objects.get(encounter=encounter_obj)
+        assert invoice.status == InvoiceStatus.DRAFT
+
+        api.force_authenticate(doctor_profile.user)
+        resp = api.get(reverse("appointment-my-queue"))
+        assert resp.status_code == 200
+        previous = resp.data["previous"]
+        assert previous is not None
+        assert previous["id"] == appointment.id
+        assert previous["invoice_id"] is None
+        assert previous["pending_checkout"] is True
+
+    def test_after_issuance_the_real_invoice_id_becomes_available(
+        self, api, consultation_item, patient, doctor_profile, secretary,
+    ):
+        appointment, encounter_obj = _complete_visit_with_encounter(patient, doctor_profile, secretary)
+        draft = Invoice.objects.get(encounter=encounter_obj)
+        issued = billing_services.issue_invoice(draft.pk, user=secretary)
+
+        api.force_authenticate(doctor_profile.user)
+        resp = api.get(reverse("appointment-my-queue"))
+        previous = resp.data["previous"]
+        assert previous["invoice_id"] == issued.id
+        assert previous["pending_checkout"] is False
+
+    def test_free_followup_does_not_pretend_checkout_or_invoice_exists(
+        self, api, consultation_item, patient, doctor_profile, secretary,
+    ):
+        # First visit opens the follow-up window (encounter-less, for simplicity).
+        appointment1 = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary,
+        )
+        appointment_services.complete_appointment(appointment1, user=secretary)
+
+        # Second visit, same day, consumes the free follow-up.
+        appointment2 = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary,
+        )
+        Encounter.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile,
+            appointment=appointment2, status=EncounterStatus.DRAFT,
+        )
+        appointment_services.complete_appointment(appointment2, user=secretary)
+
+        api.force_authenticate(doctor_profile.user)
+        resp = api.get(reverse("appointment-my-queue"))
+        previous = resp.data["previous"]
+        assert previous["id"] == appointment2.id
+        assert previous["invoice_id"] is None
+        assert previous["pending_checkout"] is False

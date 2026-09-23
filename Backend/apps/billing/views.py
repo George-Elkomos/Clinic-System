@@ -2,6 +2,7 @@ import re
 
 import django_filters
 from django.db import transaction
+from django.db.models import Count, Q
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -23,11 +24,13 @@ from .serializers import (
     CloseShiftSerializer,
     CreditNoteCreateSerializer,
     CreditNoteSerializer,
+    DraftInvoiceSerializer,
     InvoiceItemSerializer,
     InvoiceSerializer,
     OpenShiftSerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
+    PendingCheckoutSerializer,
     RefundCreateSerializer,
     RefundSerializer,
     ResolveItemPricingSerializer,
@@ -139,11 +142,49 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         return qs.none()
 
     def get_permissions(self):
-        if self.action in ("credit_note", "refund", "write_off", "issue"):
+        if self.action in ("credit_note", "refund", "write_off", "issue", "pending_checkout"):
             return [IsSecretaryOrManager()]
         if self.action == "cancel":
             return [IsManager()]
         return super().get_permissions()
+
+    @action(detail=False, methods=["get"], url_path="pending-checkout")
+    def pending_checkout(self, request):
+        """GET /api/invoices/pending-checkout/ — reception's clinic-wide work
+        queue: every DRAFT invoice currently accumulating charges for an
+        Encounter, oldest first, so a waiting patient is never bumped by a
+        newer one. Deliberately bypasses `get_queryset()`'s own role-scoping
+        (this endpoint is Secretary/Manager-only via `get_permissions()`
+        above, not filtered by "whose" invoice the way patient/doctor access
+        is) and builds its own minimal queryset instead — a work queue, not
+        the general invoice listing.
+
+        `encounter__isnull=False` excludes the rare encounter-less DRAFT row
+        (there is no current code path that creates one, since
+        `bill_ad_hoc_service`'s fallback always issues immediately — but nothing
+        stops a future one from existing without ever reaching a checkout
+        workflow, so the filter states the real intent explicitly rather than
+        assuming). `item_count`/`needs_pricing_count` are annotated so this
+        list is exactly one query regardless of how many invoices are pending.
+        """
+        qs = (
+            Invoice.objects.filter(status=InvoiceStatus.DRAFT, encounter__isnull=False)
+            .select_related("patient", "doctor")
+            .annotate(
+                item_count=Count("items", distinct=True),
+                needs_pricing_count=Count(
+                    "items", filter=Q(items__needs_pricing=True), distinct=True,
+                ),
+            )
+            .order_by("created_at", "id")
+        )
+        page = self.paginate_queryset(qs)
+        serializer = PendingCheckoutSerializer(
+            page if page is not None else qs, many=True, context={"request": request},
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="issue")
     def issue(self, request, pk=None):
@@ -547,7 +588,7 @@ class EncounterPendingBillView(APIView):
         )
         if invoice is None:
             return Response(None, status=status.HTTP_200_OK)
-        return Response(InvoiceSerializer(invoice, context={"request": request}).data)
+        return Response(DraftInvoiceSerializer(invoice, context={"request": request}).data)
 
 
 class BillingReportView(APIView):
