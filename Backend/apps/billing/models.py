@@ -105,7 +105,28 @@ class Invoice(TimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="doctor_invoices",
     )
-    invoice_date = models.DateField(auto_now_add=True)
+    # Encounter-based DRAFT invoicing — nullable because not every billable
+    # source has (or needs) an Encounter (see services.capture_encounter_charge
+    # vs. the encounter-less bill_ad_hoc_service fallback it preserves
+    # unchanged). PROTECT, not CASCADE (CLAUDE.md's "PROTECT on every
+    # financial FK") — an Encounter is never hard-deleted anyway
+    # (SoftDeleteModel), but an Invoice must never be able to vanish as a side
+    # effect of one being. A normal FK, not OneToOne: one Encounter can have
+    # several Invoices over its lifetime (an already-ISSUED invoice plus a
+    # later supplementary DRAFT for a late-completing service — see
+    # services.capture_encounter_charge / issue_invoice).
+    encounter = models.ForeignKey(
+        "encounters.Encounter", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="invoices",
+    )
+    # Null while DRAFT — a not-yet-issued invoice has no real issuance date to
+    # report (auto_now_add would otherwise stamp the moment the *first*
+    # charge landed, not when the invoice actually became real). Set once,
+    # atomically with the DRAFT->ISSUED transition, by services.issue_invoice.
+    # Every pre-existing row (created before this field could ever be null)
+    # keeps whatever date auto_now_add already gave it — this migration never
+    # rewrites a stored date.
+    invoice_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     status = models.CharField(
         max_length=16, choices=InvoiceStatus.choices, default=InvoiceStatus.DRAFT,
@@ -173,6 +194,18 @@ class Invoice(TimeStampedModel):
                 fields=["invoice_number"],
                 condition=~models.Q(invoice_number=""),
                 name="uniq_invoice_number",
+            ),
+            # At most one accumulating DRAFT invoice per Encounter — the same
+            # partial-unique-per-status shape CashierShift already uses for
+            # "at most one OPEN shift per cashier/till" (see
+            # uniq_open_shift_per_cashier). This is what makes
+            # services.get_or_create_draft_invoice race-safe: a concurrent
+            # second attempt to create a DRAFT for the same Encounter hits
+            # this constraint and retries the lookup instead of creating a
+            # second one.
+            models.UniqueConstraint(
+                fields=["encounter"], condition=models.Q(status=InvoiceStatus.DRAFT),
+                name="uniq_draft_invoice_per_encounter",
             ),
         ]
 
@@ -248,6 +281,21 @@ class InvoiceItem(TimeStampedModel):
         default=BillingSourceType.APPOINTMENT,
     )
     source_id = models.PositiveIntegerField(null=True, blank=True)
+    # True only when this line's price was bootstrapped on the spot because no
+    # active ServiceItem existed at all for its item_type (see
+    # services._catalog_price_with_signal) — never set for an explicitly
+    # configured catalog price of 0.00, which is a legitimate free/
+    # complimentary charge. Blocks services.issue_invoice until resolved
+    # (services.resolve_item_pricing); never blocks the clinical completion
+    # that captured the charge in the first place.
+    needs_pricing = models.BooleanField(default=False)
+    # Who resolved a missing price via resolve_item_pricing — set once, only
+    # while the parent Invoice is still DRAFT; never set/changed for a line
+    # that never needed resolution or whose invoice has already been issued.
+    price_resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="+",
+    )
 
     class Meta:
         ordering = ["id"]

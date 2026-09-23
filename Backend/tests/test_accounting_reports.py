@@ -103,6 +103,10 @@ class TestIncomeStatement:
         )
         invoice = InvoiceModel.objects.create(
             patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.ISSUED,
+            # invoice_date no longer auto-populates (DRAFT invoices must not
+            # get a false issuance date) — billing_report() below filters on
+            # it, so a directly-constructed ISSUED invoice needs it explicit.
+            invoice_date=timezone.localdate(),
         )
         InvoiceItem.objects.create(
             invoice=invoice, description=item.name, service_item=item,
@@ -152,7 +156,9 @@ class TestIncomeStatement:
         item = ServiceItem.objects.create(
             name="Consult", item_type=ServiceItemType.CONSULTATION, default_price=Decimal("100.00"),
         )
-        invoice = InvoiceModel.objects.create(patient=patient, doctor=doctor_profile.user)
+        invoice = InvoiceModel.objects.create(
+            patient=patient, doctor=doctor_profile.user, invoice_date=timezone.localdate(),
+        )
         InvoiceItem.objects.create(
             invoice=invoice, description=item.name, service_item=item,
             quantity=1, unit_price=item.default_price,

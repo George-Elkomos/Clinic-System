@@ -337,6 +337,10 @@ class TestBillingSummaryAlias:
         Invoice.objects.create(
             patient=patient, doctor=doctor_profile.user,
             due_date=timezone.localdate() + timedelta(days=7),
+            # invoice_date no longer auto-populates (DRAFT invoices must not
+            # get a false issuance date) — billing_report() filters on it,
+            # so a directly-constructed ISSUED test invoice needs it explicit.
+            invoice_date=timezone.localdate(),
             status=InvoiceStatus.ISSUED, subtotal=Decimal("100.00"), total=Decimal("100.00"),
         )
         api.force_authenticate(manager)

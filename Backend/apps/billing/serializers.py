@@ -40,20 +40,27 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
     # that also has an Arabic name, prefer that under an Arabic locale rather
     # than adding a second frozen snapshot column.
     description = serializers.SerializerMethodField()
+    price_resolved_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = InvoiceItem
         fields = [
             "id", "description", "service_item", "quantity", "unit_price",
-            "line_total", "source_type", "source_id",
+            "line_total", "source_type", "source_id", "needs_pricing",
+            "price_resolved_by", "price_resolved_by_name",
         ]
-        read_only_fields = ["line_total"]
+        read_only_fields = [
+            "line_total", "needs_pricing", "price_resolved_by", "price_resolved_by_name",
+        ]
 
     def get_description(self, obj):
         locale = get_request_locale(self.context.get("request"))
         if locale == "ar" and obj.service_item_id and obj.service_item.name_ar:
             return obj.service_item.name_ar
         return obj.description
+
+    def get_price_resolved_by_name(self, obj):
+        return obj.price_resolved_by.get_full_name() if obj.price_resolved_by else None
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -90,7 +97,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = [
             "id", "number", "patient", "patient_name", "doctor", "doctor_name",
-            "invoice_date", "due_date", "status", "subtotal", "discount",
+            "encounter", "invoice_date", "due_date", "status", "subtotal", "discount",
             "total", "paid_amount", "credited_amount", "written_off_amount",
             "refunded_amount", "balance", "currency", "notes", "items", "payments",
         ]
@@ -148,6 +155,18 @@ class RefundCreateSerializer(serializers.Serializer):
 
 class CancelInvoiceSerializer(serializers.Serializer):
     reason_code = serializers.CharField(max_length=64)
+
+
+class ResolveItemPricingSerializer(serializers.Serializer):
+    """Input for POST /api/invoice-items/{id}/resolve-pricing/ — one-way fix
+    for a DRAFT line captured with needs_pricing=True. See
+    services.resolve_item_pricing for the full rules (DRAFT-only,
+    needs_pricing must currently be True, never usable as a generic
+    repricing action)."""
+
+    unit_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.00"),
+    )
 
 
 class CreditNoteSerializer(serializers.ModelSerializer):

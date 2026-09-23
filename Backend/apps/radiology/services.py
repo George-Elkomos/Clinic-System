@@ -2,7 +2,13 @@
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from apps.core.enums import NotificationVerb, RadiologyModality, RadiologyOrderStatus, ScanCategory
+from apps.core.enums import (
+    BillingSourceType,
+    NotificationVerb,
+    RadiologyModality,
+    RadiologyOrderStatus,
+    ScanCategory,
+)
 from apps.core.text import bidi_isolate
 from apps.notifications.services import notify
 
@@ -107,10 +113,25 @@ def report_order(order: RadiologyOrder, *, findings: str, impression: str) -> Ra
 def cancel_order(order: RadiologyOrder, reason: str, cancelled_by) -> RadiologyOrder:
     if order.status not in CANCELLABLE_STATUSES:
         raise ValidationError({"status": f"Cannot cancel an order with status '{order.status}'."})
+
+    was_completed = order.status == RadiologyOrderStatus.COMPLETED
     order.status = RadiologyOrderStatus.CANCELLED
     order.cancellation_reason = reason
     order.cancelled_at = timezone.now()
     order.save(update_fields=["status", "cancellation_reason", "cancelled_at", "updated_at"])
+
+    if was_completed:
+        # The only clinical source whose COMPLETED is not terminal — an
+        # already-billed order can be cancelled here. See
+        # billing.services.remove_unissued_charge's own docstring for what
+        # happens depending on whether its invoice is still DRAFT or already
+        # ISSUED.
+        from apps.billing.services import remove_unissued_charge
+
+        remove_unissued_charge(
+            source_type=BillingSourceType.RADIOLOGY_ORDER, source_id=order.id,
+        )
+
     notify(
         recipient=order.patient.user,
         verb=NotificationVerb.RADIOLOGY_ORDER_CANCELLED,

@@ -9,11 +9,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.services import record_event
-from apps.core.enums import AuditAction, CashierShiftStatus, RoleChoices
+from apps.core.enums import AuditAction, CashierShiftStatus, InvoiceStatus, RoleChoices
 from apps.users.permissions import IsManager, IsSecretaryOrManager
 
 from . import services
-from .models import CashierShift, CashMovement, Invoice, Payment, ServiceItem, WriteOff
+from .models import CashierShift, CashMovement, Invoice, InvoiceItem, Payment, ServiceItem, WriteOff
 from .permissions import ServiceItemPermission
 from .serializers import (
     CancelInvoiceSerializer,
@@ -23,12 +23,14 @@ from .serializers import (
     CloseShiftSerializer,
     CreditNoteCreateSerializer,
     CreditNoteSerializer,
+    InvoiceItemSerializer,
     InvoiceSerializer,
     OpenShiftSerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
     RefundCreateSerializer,
     RefundSerializer,
+    ResolveItemPricingSerializer,
     ServiceItemSerializer,
     WriteOffCreateSerializer,
     WriteOffReversalCreateSerializer,
@@ -110,6 +112,12 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     require_authorization`), not here, so it can't be bypassed by a direct
     service call outside DRF. `cancel` stays MANAGER-only at both layers —
     it has no threshold concept at all.
+
+    DRAFT invoices are internal working objects (encounter-based DRAFT
+    invoicing) — excluded here for every action except `issue`, which is the
+    one action that must be able to find one. Secretary/Manager access to a
+    DRAFT otherwise happens only through `EncounterPendingBillView`, never
+    this general list/retrieve surface.
     """
 
     serializer_class = InvoiceSerializer
@@ -120,6 +128,8 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         qs = Invoice.objects.select_related("patient", "doctor").prefetch_related(
             "items", "payments__received_by"
         )
+        if self.action != "issue":
+            qs = qs.exclude(status=InvoiceStatus.DRAFT)
         if user.role in (RoleChoices.SECRETARY, RoleChoices.MANAGER):
             return qs
         if user.role == RoleChoices.PATIENT:
@@ -129,11 +139,27 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         return qs.none()
 
     def get_permissions(self):
-        if self.action in ("credit_note", "refund", "write_off"):
+        if self.action in ("credit_note", "refund", "write_off", "issue"):
             return [IsSecretaryOrManager()]
         if self.action == "cancel":
             return [IsManager()]
         return super().get_permissions()
+
+    @action(detail=True, methods=["post"], url_path="issue")
+    def issue(self, request, pk=None):
+        """POST /api/invoices/{id}/issue/ — reception checkout. Reuses
+        services.issue_invoice, which targets this exact pk — never "the
+        current DRAFT for an encounter" — so a delayed/retried request can
+        only ever act on the invoice it originally named, never a later
+        supplementary one. Safe to call again after success: returns the
+        same already-issued invoice, allocates no second number, posts
+        nothing twice."""
+        invoice = self.get_object()
+        issued = services.issue_invoice(invoice.pk, user=request.user)
+        return Response(
+            InvoiceSerializer(issued, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"], url_path="credit-note")
     def credit_note(self, request, pk=None):
@@ -230,6 +256,40 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
                 "invoice": InvoiceSerializer(write_off.invoice, context={"request": request}).data,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class InvoiceItemViewSet(
+    mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet,
+):
+    """Read access to invoice line items, plus the one lifecycle action a
+    line has for a missing catalog price — resolving it (encounter-based
+    DRAFT invoicing). Mirrors `WriteOffViewSet`'s shape: no generic create —
+    an `InvoiceItem` is only ever created by the billing completion hooks or
+    `services.issue_invoice`'s checkout flow, never directly."""
+
+    serializer_class = InvoiceItemSerializer
+    permission_classes = [IsSecretaryOrManager]
+    filterset_fields = ["invoice", "needs_pricing"]
+
+    def get_queryset(self):
+        return InvoiceItem.objects.select_related("invoice", "service_item")
+
+    @action(detail=True, methods=["post"], url_path="resolve-pricing")
+    def resolve_pricing(self, request, pk=None):
+        """POST /api/invoice-items/{id}/resolve-pricing/ — one-way fix for a
+        DRAFT line captured with needs_pricing=True. Gated the same as every
+        other billing mutation (IsSecretaryOrManager) — there is no more
+        specific "billing correction" permission in this codebase to prefer
+        over that established policy."""
+        item = self.get_object()
+        serializer = ResolveItemPricingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        resolved = services.resolve_item_pricing(
+            item, unit_price=serializer.validated_data["unit_price"], user=request.user,
+        )
+        return Response(
+            InvoiceItemSerializer(resolved, context={"request": request}).data,
         )
 
 
@@ -457,6 +517,37 @@ class CashMovementViewSet(
         return Response(
             CashMovementSerializer(movement).data, status=status.HTTP_201_CREATED,
         )
+
+
+class EncounterPendingBillView(APIView):
+    """GET /api/encounters/{encounter_id}/pending-bill/ — the Encounter's
+    current accumulating DRAFT invoice (its `id` is what
+    `POST /invoices/{id}/issue/` needs to check out), or `null` if nothing
+    has been charged to this visit yet.
+
+    Lives in `billing`, not `encounters`, even though the URL is keyed by
+    encounter id: this only ever touches `Invoice` — never any clinical
+    field on `Encounter` — and uses the same `IsSecretaryOrManager` gate
+    every other billing endpoint already does.
+    `apps.encounters.permissions.EncounterPermission` deliberately excludes
+    Secretary from the clinical `EncounterViewSet` ("Secretaries have no
+    access to encounters" — see that module's own docstring); this view is
+    the one, narrowly-scoped, billing-only exception a Secretary needs for
+    checkout, without punching a hole in that clinical boundary.
+    """
+
+    permission_classes = [IsSecretaryOrManager]
+
+    def get(self, request, encounter_id):
+        invoice = (
+            Invoice.objects.filter(encounter_id=encounter_id, status=InvoiceStatus.DRAFT)
+            .select_related("patient", "doctor")
+            .prefetch_related("items")
+            .first()
+        )
+        if invoice is None:
+            return Response(None, status=status.HTTP_200_OK)
+        return Response(InvoiceSerializer(invoice, context={"request": request}).data)
 
 
 class BillingReportView(APIView):

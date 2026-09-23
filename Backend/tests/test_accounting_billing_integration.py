@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 from django.db.models import Sum
+from django.utils import timezone
 
 from apps.accounting import services as accounting_services
 from apps.accounting.models import AccountMap, JournalEntry
@@ -74,7 +75,9 @@ class TestInvoiceIssuePosting:
         item = ServiceItem.objects.create(
             name="Consult", item_type=ServiceItemType.CONSULTATION, default_price=Decimal("100.00"),
         )
-        invoice = Invoice.objects.create(patient=patient, doctor=doctor_profile.user)
+        invoice = Invoice.objects.create(
+            patient=patient, doctor=doctor_profile.user, invoice_date=timezone.localdate(),
+        )
         InvoiceItem.objects.create(
             invoice=invoice, description=item.name, service_item=item,
             quantity=1, unit_price=item.default_price,

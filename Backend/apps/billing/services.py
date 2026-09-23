@@ -239,17 +239,34 @@ def handle_appointment_completed(appointment, *, user):
 
     Returns (invoice, fee_validity, arrears_balance):
     - Free follow-up consumed  -> (None, fee_validity, arrears_balance)
-    - New invoice issued       -> (invoice, new_fee_validity, Decimal("0.00"))
+    - New charge captured/invoice issued -> (invoice, new_fee_validity, Decimal("0.00"))
+      `invoice` is a DRAFT (encounter-linked — see `capture_encounter_charge`'s
+      pattern, applied inline below) or an already-ISSUED standalone invoice
+      (encounter-less fallback, unchanged from the original behavior).
     - Already billed (idempotent re-complete) -> (existing_invoice, None, Decimal("0.00"))
 
     `arrears_balance` is the patient's overdue balance from other invoices,
     checked at the point a free visit is consumed. The visit is never
     refused because of it — the receptionist decides what to do with the
     warning.
+
+    `FeeValidity` is deliberately still created here, at charge-capture time,
+    not moved to `issue_invoice` — traced every consumer of it and found none
+    in `apps.appointments` reads it from the database (only a transient,
+    non-persisted `appointment.billing_fee_validity` attribute, used purely
+    to word the completion API's response). Delaying it to checkout would be
+    a real regression: a same-day follow-up booked before a delayed checkout
+    would wrongly miss its free-visit window. `FeeValidity.invoice` (PROTECT)
+    is fine pointing at a still-DRAFT invoice — nothing about it requires
+    ISSUED.
     """
     patient_user = appointment.patient.user
     doctor_user = appointment.doctor.user
     today = timezone.localdate()
+    # Reverse OneToOne accessor — Django's RelatedObjectDoesNotExist is a
+    # subclass of AttributeError specifically so this getattr(..., None)
+    # idiom is safe when no Encounter has been created for this appointment.
+    encounter = getattr(appointment, "encounter", None)
 
     # Idempotency: completing the same appointment twice must not double-bill.
     existing = InvoiceItem.objects.filter(
@@ -278,39 +295,66 @@ def handle_appointment_completed(appointment, *, user):
         arrears_balance = _overdue_balance(patient_user, today)
         return None, validity, arrears_balance
 
-    # No free visit -> issue a consultation invoice from the catalog.
+    # No free visit -> bill the consultation from the catalog.
     service_item = _consultation_service_item()
     price = _consultation_price(appointment.doctor, service_item)
 
-    try:
-        with transaction.atomic():
-            invoice = Invoice.objects.create(
-                patient=patient_user,
-                doctor=doctor_user,
-                due_date=today + timedelta(days=settings.BILLING_INVOICE_DUE_DAYS),
-                status=InvoiceStatus.ISSUED,
-                currency=settings.BILLING_CURRENCY,
-                invoice_number=allocate_invoice_number(),
-            )
-            InvoiceItem.objects.create(
-                invoice=invoice,
-                description=service_item.name,
-                service_item=service_item,
-                quantity=1,
-                unit_price=price,
-                source_type=BillingSourceType.APPOINTMENT,
-                source_id=appointment.id,
-            )
-    except IntegrityError:
-        # Race: another request won between the idempotency check above and
-        # this insert. Return its invoice instead of double-billing.
-        existing = InvoiceItem.objects.filter(
-            source_type=BillingSourceType.APPOINTMENT, source_id=appointment.id
-        ).select_related("invoice").first()
-        return existing.invoice, None, Decimal("0.00")
+    if encounter is not None:
+        # Encounter-linked: accumulate into its DRAFT invoice — same pattern
+        # as capture_encounter_charge, inlined because the consultation
+        # price/service-item resolution above is appointment-specific and
+        # doesn't fit that function's generic _catalog_price signature.
+        invoice = get_or_create_draft_invoice(encounter, patient=patient_user, doctor=doctor_user)
+        try:
+            with transaction.atomic():
+                InvoiceItem.objects.create(
+                    invoice=invoice,
+                    description=service_item.name,
+                    service_item=service_item,
+                    quantity=1,
+                    unit_price=price,
+                    source_type=BillingSourceType.APPOINTMENT,
+                    source_id=appointment.id,
+                )
+        except IntegrityError:
+            existing = InvoiceItem.objects.filter(
+                source_type=BillingSourceType.APPOINTMENT, source_id=appointment.id
+            ).select_related("invoice").first()
+            return existing.invoice, None, Decimal("0.00")
+        invoice.recalculate_totals()
+    else:
+        # Encounter-less: original immediate-standalone-invoice behavior,
+        # unchanged.
+        try:
+            with transaction.atomic():
+                invoice = Invoice.objects.create(
+                    patient=patient_user,
+                    doctor=doctor_user,
+                    due_date=today + timedelta(days=settings.BILLING_INVOICE_DUE_DAYS),
+                    status=InvoiceStatus.ISSUED,
+                    currency=settings.BILLING_CURRENCY,
+                    invoice_number=allocate_invoice_number(),
+                    invoice_date=today,
+                )
+                InvoiceItem.objects.create(
+                    invoice=invoice,
+                    description=service_item.name,
+                    service_item=service_item,
+                    quantity=1,
+                    unit_price=price,
+                    source_type=BillingSourceType.APPOINTMENT,
+                    source_id=appointment.id,
+                )
+        except IntegrityError:
+            # Race: another request won between the idempotency check above
+            # and this insert. Return its invoice instead of double-billing.
+            existing = InvoiceItem.objects.filter(
+                source_type=BillingSourceType.APPOINTMENT, source_id=appointment.id
+            ).select_related("invoice").first()
+            return existing.invoice, None, Decimal("0.00")
 
-    invoice.recalculate_totals()
-    post_invoice_issued(invoice, user=user)
+        invoice.recalculate_totals()
+        post_invoice_issued(invoice, user=user)
 
     new_validity = FeeValidity.objects.create(
         patient=patient_user,
@@ -336,15 +380,25 @@ def _catalog_price(item_type):
     failure that blocks the underlying clinical action. A 0.00 invoice is a
     visible prompt for the clinic to add real pricing, not a silent guess at
     what the charge should be.
+
+    Returns `(item, was_bootstrapped)`. `was_bootstrapped` is True only when
+    no active ServiceItem existed at all for `item_type` and one had to be
+    invented on the spot — exactly (and only) the case `InvoiceItem.
+    needs_pricing` should be set for (see `capture_encounter_charge`). An
+    existing catalog entry deliberately priced at 0.00 is a legitimate free/
+    complimentary charge and always reports False here, never confused with
+    "unconfigured". `bill_ad_hoc_service`'s encounter-less fallback ignores
+    this second value — its own immediate-invoice behavior is unchanged.
     """
     item = ServiceItem.objects.filter(item_type=item_type, is_active=True).order_by("id").first()
-    if item is None:
-        item = ServiceItem.objects.create(
-            name=_DEFAULT_ITEM_NAME_BY_TYPE.get(item_type, item_type),
-            item_type=item_type,
-            default_price=Decimal("0.00"),
-        )
-    return item
+    if item is not None:
+        return item, False
+    item = ServiceItem.objects.create(
+        name=_DEFAULT_ITEM_NAME_BY_TYPE.get(item_type, item_type),
+        item_type=item_type,
+        default_price=Decimal("0.00"),
+    )
+    return item, True
 
 
 @transaction.atomic
@@ -364,7 +418,7 @@ def bill_ad_hoc_service(
     if existing is not None:
         return existing.invoice
 
-    service_item = _catalog_price(item_type)
+    service_item, _was_bootstrapped = _catalog_price(item_type)
     today = timezone.localdate()
 
     try:
@@ -376,6 +430,11 @@ def bill_ad_hoc_service(
                 status=InvoiceStatus.ISSUED,
                 currency=settings.BILLING_CURRENCY,
                 invoice_number=allocate_invoice_number(),
+                # invoice_date lost its auto_now_add default (DRAFT invoices
+                # must not get a false issuance date — see the Invoice model)
+                # so every still-immediate-issue path, this one included,
+                # must set it explicitly now.
+                invoice_date=today,
             )
             InvoiceItem.objects.create(
                 invoice=invoice,
@@ -399,8 +458,248 @@ def bill_ad_hoc_service(
     return invoice
 
 
+def get_or_create_draft_invoice(encounter, *, patient, doctor):
+    """Find-or-create the one DRAFT invoice an Encounter may have at a time
+    (enforced by `Invoice`'s `uniq_draft_invoice_per_encounter` partial
+    unique constraint). Once that DRAFT has been issued, this returns a
+    *new* DRAFT for the same Encounter — the supplementary-invoice path a
+    late-completing service needs (see `issue_invoice`'s own docstring for
+    why an already-issued invoice is never reused for a new charge).
+
+    Concurrency-safe the same way `apps.encounters.services.get_or_create_draft`
+    already is: pre-check, then create inside a nested `transaction.atomic()`
+    — a genuine SAVEPOINT, not the outer transaction — so a race that trips
+    the partial unique constraint only rolls back that savepoint, never
+    whatever outer transaction this was called from (e.g. a clinical
+    completion hook's own `@transaction.atomic`). Without the savepoint, the
+    `IntegrityError` would poison the whole outer transaction and the
+    fallback re-query below would itself raise `TransactionManagementError`.
+    """
+    invoice = Invoice.objects.filter(
+        encounter=encounter, status=InvoiceStatus.DRAFT,
+    ).first()
+    if invoice is not None:
+        return invoice
+    try:
+        with transaction.atomic():
+            invoice = Invoice.objects.create(
+                encounter=encounter, patient=patient, doctor=doctor,
+                status=InvoiceStatus.DRAFT,
+            )
+    except IntegrityError:
+        invoice = Invoice.objects.get(encounter=encounter, status=InvoiceStatus.DRAFT)
+    return invoice
+
+
+@transaction.atomic
+def capture_encounter_charge(
+    *, encounter, patient_user, doctor_user, source_type, source_id, item_type, description,
+):
+    """Capture a completed clinical item as an `InvoiceItem` on its
+    Encounter's accumulating DRAFT invoice — the encounter-linked
+    counterpart to `bill_ad_hoc_service`. Never allocates an
+    `invoice_number`, sets `invoice_date`, or posts to the ledger; that only
+    happens at checkout (see `issue_invoice`).
+
+    Same Task-1 idempotency pattern `bill_ad_hoc_service` already uses
+    (`InvoiceItem`'s own `uniq_invoice_item_source` constraint +
+    `IntegrityError` handler) — a source already captured, by an earlier
+    call or a race with a concurrent one, is returned as-is, never
+    double-captured. Unlike `bill_ad_hoc_service`, a failed race here only
+    retries the `InvoiceItem` insert, never the DRAFT invoice itself: the
+    invoice is a shared, multi-item container that must survive regardless
+    of whether this particular item's insert won or lost its race.
+    """
+    existing = InvoiceItem.objects.filter(
+        source_type=source_type, source_id=source_id,
+    ).select_related("invoice").first()
+    if existing is not None:
+        return existing.invoice
+
+    service_item, needs_pricing = _catalog_price(item_type)
+    invoice = get_or_create_draft_invoice(encounter, patient=patient_user, doctor=doctor_user)
+
+    try:
+        with transaction.atomic():
+            InvoiceItem.objects.create(
+                invoice=invoice,
+                description=description or service_item.name,
+                service_item=service_item,
+                quantity=1,
+                unit_price=service_item.default_price,
+                source_type=source_type,
+                source_id=source_id,
+                needs_pricing=needs_pricing,
+            )
+    except IntegrityError:
+        existing = InvoiceItem.objects.filter(
+            source_type=source_type, source_id=source_id,
+        ).select_related("invoice").first()
+        return existing.invoice
+
+    invoice.recalculate_totals()
+    return invoice
+
+
+@transaction.atomic
+def issue_invoice(invoice_id, *, user):
+    """Reception checkout: turn one specific DRAFT invoice into a real,
+    numbered, posted ISSUED invoice.
+
+    Deliberately identified by `Invoice.pk`, never by "the Encounter's
+    current DRAFT" — an Encounter can have more than one invoice over its
+    lifetime (an already-issued one plus a later supplementary DRAFT for a
+    late-completing service, see `get_or_create_draft_invoice`), so looking
+    up "the current DRAFT" *inside* this action would let a delayed retry of
+    an old request accidentally issue a different, newer invoice. `pk` has
+    no such ambiguity: the caller already named a specific row (via
+    `GET /encounters/{id}/pending-bill/`), so this can only ever act on it.
+
+    Replay-safe without any client-supplied Idempotency-Key: `select_for_update()`
+    locks the exact row, and if it's no longer DRAFT (a concurrent or retried
+    call already issued it), this simply returns the same invoice — no second
+    number, no second posting. `pk` in the URL already *is* the idempotency
+    key; nothing else could tell "a retry of issuing invoice #7" apart from
+    "a fresh, unrelated issuance of invoice #7" the way it can for a
+    free-form payment/refund amount, so the client-key machinery those use
+    would add a second mechanism to solve a problem that doesn't exist here.
+    """
+    invoice = Invoice.objects.select_for_update().get(pk=invoice_id)
+
+    if invoice.status == InvoiceStatus.DRAFT:
+        if not invoice.items.exists():
+            raise ValidationError({
+                "detail": "Nothing to issue — no charges on this visit yet.",
+            })
+        if invoice.items.filter(needs_pricing=True).exists():
+            raise ValidationError({
+                "detail": "Resolve pricing on all items before issuing this invoice.",
+            })
+
+        invoice.recalculate_totals(save=False)
+        invoice.invoice_number = allocate_invoice_number()
+        invoice.invoice_date = timezone.localdate()
+        invoice.status = InvoiceStatus.ISSUED
+        invoice.save()
+
+        post_invoice_issued(invoice, user=user)
+        return invoice
+
+    if invoice.status in (InvoiceStatus.ISSUED, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.PAID):
+        # Safe replay of a request that already succeeded for this exact pk.
+        return invoice
+
+    raise ValidationError({
+        "status": f"Invoice #{invoice.pk} is {invoice.status} and cannot be issued.",
+    })
+
+
+@transaction.atomic
+def resolve_item_pricing(item, *, unit_price, user):
+    """One-way fix for an `InvoiceItem` captured with `needs_pricing=True`
+    (no active catalog price existed at capture time — see `_catalog_price`).
+
+    Deliberately narrow, not a general repricing endpoint: only a still-DRAFT
+    item may be touched (an issued item is immutable, same as every other
+    posted financial detail in this system — see `issue_invoice`), and only
+    while `needs_pricing` is still True. Calling this again after it has
+    already resolved to False is refused rather than silently allowed to
+    change an already-resolved price — a deliberate second repricing action
+    would need its own reason/audit semantics, not a second call to this one.
+    """
+    item = InvoiceItem.objects.select_related("invoice").select_for_update().get(pk=item.pk)
+
+    if item.invoice.status != InvoiceStatus.DRAFT:
+        raise ValidationError({
+            "detail": "Only a line on a still-DRAFT invoice can have its price resolved.",
+        })
+    if not item.needs_pricing:
+        raise ValidationError({
+            "detail": "This item's price is already resolved.",
+        })
+
+    unit_price = Decimal(unit_price)
+    if unit_price < 0:
+        raise ValidationError({"unit_price": "The price cannot be negative."})
+
+    item.unit_price = unit_price
+    item.needs_pricing = False
+    item.price_resolved_by = user
+    item.save(update_fields=["unit_price", "needs_pricing", "price_resolved_by", "updated_at"])
+
+    item.invoice.recalculate_totals()
+    return item
+
+
+@transaction.atomic
+def remove_unissued_charge(*, source_type, source_id):
+    """Undo a clinical cancellation's billing side effect — used when a
+    clinical item is cancelled *after* it was already billed (currently only
+    possible for `RadiologyOrder`: `apps.radiology.services.cancel_order`
+    allows COMPLETED -> CANCELLED, unlike procedures/lab orders/appointments,
+    whose COMPLETED is terminal — see that function for the one call site).
+
+    Only ever touches a still-mutable DRAFT line: nothing was posted to the
+    ledger yet (posting only ever happens in `issue_invoice`), so removing
+    the line is a plain delete, never a reversing entry. An already-ISSUED
+    invoice is a posted financial fact and is never silently altered here —
+    this logs instead, for Secretary/Manager to correct through the existing
+    credit-note/write-off tools, exactly like any other post-issuance
+    correction in this system. Not a new correction framework; this is only
+    the delete-only half that is already safe under CLAUDE.md's "never
+    edit/delete a posted entry" rule, since the item removed here was never
+    posted in the first place.
+
+    If removing the line leaves its DRAFT invoice with nothing on it, the
+    invoice itself is deleted too — but only when it is unambiguously still
+    just an unissued working object: DRAFT, no `invoice_number` ever
+    allocated, no items left. Under this design the three conditions are
+    actually co-implied by one invariant — a number is only ever allocated
+    atomically with the DRAFT->ISSUED transition in `issue_invoice` — but a
+    `DELETE` on an `Invoice` row still checks all of them explicitly rather
+    than relying on that alone.
+    """
+    item = InvoiceItem.objects.filter(
+        source_type=source_type, source_id=source_id,
+    ).select_related("invoice").first()
+    if item is None:
+        return  # never billed (or a still-open billing failure) — nothing to remove
+
+    invoice = Invoice.objects.select_for_update().get(pk=item.invoice_id)
+    if invoice.status != InvoiceStatus.DRAFT:
+        logger.warning(
+            "remove_unissued_charge: %s %s was cancelled after its invoice "
+            "(#%s) was already issued — financial history is immutable, no "
+            "automatic change made. Correct via a credit note/write-off.",
+            source_type, source_id, invoice.pk,
+        )
+        return
+
+    item.delete()
+    if not invoice.items.exists() and not invoice.invoice_number:
+        invoice.delete()
+    else:
+        invoice.recalculate_totals()
+
+
 def handle_procedure_completed(procedure, *, user):
-    """Bill a completed `ClinicalProcedure` — financial roadmap Task 8."""
+    """Bill a completed `ClinicalProcedure` — financial roadmap Task 8.
+
+    Encounter-linked procedures accumulate into that Encounter's DRAFT
+    invoice (issued later at reception checkout — see `issue_invoice`).
+    Encounter-less procedures preserve the original immediate
+    standalone-invoice fallback unchanged.
+    """
+    if procedure.encounter_id is not None:
+        return capture_encounter_charge(
+            encounter=procedure.encounter,
+            patient_user=procedure.patient.user,
+            doctor_user=procedure.doctor.user,
+            source_type=BillingSourceType.PROCEDURE,
+            source_id=procedure.id,
+            item_type=ServiceItemType.PROCEDURE,
+            description=procedure.procedure_name,
+        )
     return bill_ad_hoc_service(
         patient_user=procedure.patient.user,
         doctor_user=procedure.doctor.user,
@@ -413,7 +712,19 @@ def handle_procedure_completed(procedure, *, user):
 
 
 def handle_radiology_order_completed(order, *, user):
-    """Bill a completed `RadiologyOrder` (scan performed) — financial roadmap Task 8."""
+    """Bill a completed `RadiologyOrder` (scan performed) — financial roadmap
+    Task 8. Encounter-linked/encounter-less split, same as
+    `handle_procedure_completed` — see that function's docstring."""
+    if order.encounter_id is not None:
+        return capture_encounter_charge(
+            encounter=order.encounter,
+            patient_user=order.patient.user,
+            doctor_user=order.doctor.user,
+            source_type=BillingSourceType.RADIOLOGY_ORDER,
+            source_id=order.id,
+            item_type=ServiceItemType.RADIOLOGY,
+            description=order.study_name or "Radiology scan",
+        )
     return bill_ad_hoc_service(
         patient_user=order.patient.user,
         doctor_user=order.doctor.user,
@@ -426,7 +737,19 @@ def handle_radiology_order_completed(order, *, user):
 
 
 def handle_lab_order_completed(order, *, user):
-    """Bill a completed `LabOrder` (results entered) — financial roadmap Task 8."""
+    """Bill a completed `LabOrder` (results entered) — financial roadmap
+    Task 8. Encounter-linked/encounter-less split, same as
+    `handle_procedure_completed` — see that function's docstring."""
+    if order.encounter_id is not None:
+        return capture_encounter_charge(
+            encounter=order.encounter,
+            patient_user=order.patient.user,
+            doctor_user=order.doctor.user,
+            source_type=BillingSourceType.LAB_ORDER,
+            source_id=order.id,
+            item_type=ServiceItemType.LAB_TEST,
+            description=f"Laboratory tests ({order.order_number})",
+        )
     return bill_ad_hoc_service(
         patient_user=order.patient.user,
         doctor_user=order.doctor.user,

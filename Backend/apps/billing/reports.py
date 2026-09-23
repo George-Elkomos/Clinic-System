@@ -97,7 +97,15 @@ def patient_statement(patient, as_of=None):
     """One patient's invoices/payments/credit-notes/refunds as of `as_of`,
     reconciled against the ledger's own party_balance for that patient."""
     as_of = as_of or timezone.localdate()
-    invoices = Invoice.objects.filter(patient=patient, invoice_date__lte=as_of)
+    # DRAFT invoices are internal working objects, never a patient-facing
+    # receivable — excluded explicitly, not merely via invoice_date__lte
+    # happening to exclude a null date. A DRAFT's date is None precisely
+    # because it isn't real yet (see Invoice.invoice_date); relying on that
+    # NULL-comparison side effect alone would make the exclusion implicit
+    # and easy to lose track of, so it's filtered by status too.
+    invoices = Invoice.objects.filter(
+        patient=patient, invoice_date__lte=as_of,
+    ).exclude(status=InvoiceStatus.DRAFT)
     payments = Payment.objects.filter(invoice__patient=patient, paid_at__date__lte=as_of)
     credit_notes = CreditNote.objects.filter(invoice__patient=patient, created_at__date__lte=as_of)
     refunds = Refund.objects.filter(invoice__patient=patient, created_at__date__lte=as_of)

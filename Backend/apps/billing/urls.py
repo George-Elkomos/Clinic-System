@@ -6,6 +6,8 @@ from .views import (
     BillingSummaryView,
     CashierShiftViewSet,
     CashMovementViewSet,
+    EncounterPendingBillView,
+    InvoiceItemViewSet,
     InvoiceViewSet,
     PaymentViewSet,
     ServiceItemViewSet,
@@ -14,6 +16,7 @@ from .views import (
 
 router = DefaultRouter()
 router.register("invoices", InvoiceViewSet, basename="invoice")
+router.register("invoice-items", InvoiceItemViewSet, basename="invoice-item")
 router.register("payments", PaymentViewSet, basename="payment")
 router.register("service-items", ServiceItemViewSet, basename="service-item")
 router.register("cashier-shifts", CashierShiftViewSet, basename="cashier-shift")
@@ -23,5 +26,10 @@ router.register("write-offs", WriteOffViewSet, basename="write-off")
 urlpatterns = [
     path("reports/billing/", BillingReportView.as_view(), name="reports-billing"),
     path("reports/billing-summary/", BillingSummaryView.as_view(), name="reports-billing-summary"),
+    path(
+        "encounters/<int:encounter_id>/pending-bill/",
+        EncounterPendingBillView.as_view(),
+        name="encounter-pending-bill",
+    ),
     path("", include(router.urls)),
 ]

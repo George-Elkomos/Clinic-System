@@ -158,6 +158,9 @@ class Command(BaseCommand):
             due_date=today + timedelta(days=7), status=InvoiceStatus.ISSUED,
             notes=f"{SEED_TAG} target={status}",
             invoice_number=billing_services.allocate_invoice_number(),
+            # invoice_date no longer auto-populates (DRAFT invoices must not
+            # get a false issuance date) — seeded ISSUED invoices need it set.
+            invoice_date=today,
         )
         InvoiceItem.objects.create(
             invoice=invoice,

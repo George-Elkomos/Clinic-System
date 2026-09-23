@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.appointments.models import Appointment
-from apps.core.enums import RoleChoices
+from apps.core.enums import InvoiceStatus, RoleChoices
 
 from . import services
 from .models import Complaint, Diagnosis, DiagnosisCategory, Encounter
@@ -79,11 +79,23 @@ class EncounterViewSet(viewsets.ModelViewSet):
             invoice = getattr(appointment, "billing_invoice", None)
             validity = getattr(appointment, "billing_fee_validity", None)
             arrears = getattr(appointment, "billing_arrears_balance", None)
+            # Encounter-based DRAFT invoicing: an encounter-linked
+            # consultation charge lands on the encounter's DRAFT invoice
+            # (checked out later, see billing.views.InvoiceViewSet.issue) —
+            # it has no real invoice_number yet, so `invoice.number`'s
+            # historical pk-derived fallback (meant for pre-Task-14/legacy
+            # rows) must not be reported here as if it were one.
+            is_draft = invoice is not None and invoice.status == InvoiceStatus.DRAFT
             data["billing"] = {
                 "invoice_id": invoice.id if invoice else None,
-                "invoice_number": invoice.number if invoice else None,
+                "invoice_number": None if is_draft else (invoice.number if invoice else None),
                 "invoice_total": str(invoice.total) if invoice else None,
                 "free_followup_used": invoice is None and validity is not None,
+                # True when the charge above is sitting on a DRAFT invoice —
+                # reception still needs to check out this visit's Encounter
+                # (GET /encounters/{id}/pending-bill/, POST /invoices/{id}/issue/)
+                # before it becomes a real, numbered, payable invoice.
+                "pending_checkout": is_draft,
                 # Overdue balance from other invoices, informational only.
                 "arrears_balance": str(arrears) if arrears else None,
             }

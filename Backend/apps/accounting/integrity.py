@@ -147,6 +147,7 @@ def run_revenue_integrity_check() -> dict:
         ("invoice_write_off_aggregate", _check_invoice_write_off_aggregate),
         ("invoice_balance_non_negative", _check_invoice_balance_non_negative),
         ("unbilled_clinical_completions", _check_unbilled_clinical_completions),
+        ("unresolved_needs_pricing", _check_unresolved_needs_pricing),
         ("ar_reconciliation", _check_ar_reconciliation),
     )
     for name, fn in checks:
@@ -407,6 +408,35 @@ def _check_unbilled_clinical_completions() -> list[Finding]:
                     "`manage.py retry_unbilled_clinical_items`."
                 ),
             ))
+    return findings
+
+
+def _check_unresolved_needs_pricing() -> list[Finding]:
+    """Encounter-based DRAFT invoicing: an `InvoiceItem` still
+    `needs_pricing=True` on a DRAFT invoice is a lost-revenue risk hiding in
+    plain sight — a completed clinical item billed at 0.00 because no
+    catalog price existed, sitting unnoticed until someone happens to open
+    checkout. Warning, not critical: nothing is actually broken yet —
+    `services.issue_invoice` already refuses to issue while this is true,
+    and clinical completion was never blocked by it either — this only
+    makes an easy-to-miss item visible before it goes stale. Read-only, like
+    every check in this module: it never resolves the price itself, only
+    reports it (see `services.resolve_item_pricing` for the human-driven fix).
+    """
+    findings: list[Finding] = []
+    for item_id, invoice_id, description in (
+        InvoiceItem.objects.filter(needs_pricing=True, invoice__status=InvoiceStatus.DRAFT)
+        .values_list("id", "invoice_id", "description")
+    ):
+        findings.append(Finding(
+            category="unresolved_needs_pricing", severity="warning",
+            object_type="InvoiceItem", object_id=item_id,
+            message=(
+                f"InvoiceItem {item_id} ({description!r}) on DRAFT Invoice "
+                f"{invoice_id} still needs pricing resolved before that "
+                "invoice can be issued."
+            ),
+        ))
     return findings
 
 
