@@ -875,3 +875,97 @@ class TestDoctorQueueContract:
         assert previous["id"] == appointment2.id
         assert previous["invoice_id"] is None
         assert previous["pending_checkout"] is False
+
+
+class TestAppointmentBillingSummaryContract:
+    """`billing_services.appointment_billing_summary` is the single shared
+    source of truth for both `EncounterViewSet.submit` and
+    `AppointmentViewSet.complete`'s `AppointmentBilling` response — this is
+    the exact contract the Frontend audit required: `invoice_id != None`
+    means "a real, viewable invoice exists"; `pending_checkout == True`
+    means "clinical work is done but Finance checkout hasn't happened yet".
+    The two must never both be true, and a DRAFT invoice's pk/total must
+    never leak through this response."""
+
+    def test_draft_encounter_charge_exposes_no_invoice_identifiers(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        appointment, encounter_obj = _complete_visit_with_encounter(patient, doctor_profile, secretary)
+        draft = Invoice.objects.get(encounter=encounter_obj)
+        assert draft.status == InvoiceStatus.DRAFT
+
+        summary = billing_services.appointment_billing_summary(appointment)
+
+        assert summary["pending_checkout"] is True
+        assert summary["invoice_id"] is None
+        assert summary["invoice_number"] is None
+        assert summary["invoice_total"] is None
+        assert summary["free_followup_used"] is False
+
+    def test_free_followup_exposes_no_invoice_identifiers_either(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        appointment1 = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary,
+        )
+        appointment_services.complete_appointment(appointment1, user=secretary)  # opens the window
+
+        appointment2 = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary,
+        )
+        appointment_services.complete_appointment(appointment2, user=secretary)  # consumes it
+
+        summary = billing_services.appointment_billing_summary(appointment2)
+
+        assert summary["pending_checkout"] is False
+        assert summary["free_followup_used"] is True
+        assert summary["invoice_id"] is None
+        assert summary["invoice_number"] is None
+        assert summary["invoice_total"] is None
+
+    def test_real_issued_invoice_still_exposes_full_identifiers(
+        self, consultation_item, patient, doctor_profile, secretary,
+    ):
+        """Encounter-less fallback: issued immediately, unchanged."""
+        appointment = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary,
+        )
+        appointment_services.complete_appointment(appointment, user=secretary)
+        issued = Invoice.objects.get(patient=patient, encounter__isnull=True)
+        assert issued.status == InvoiceStatus.ISSUED
+
+        summary = billing_services.appointment_billing_summary(appointment)
+
+        assert summary["pending_checkout"] is False
+        assert summary["invoice_id"] == issued.id
+        assert summary["invoice_number"] == issued.invoice_number
+        assert summary["invoice_number"] != ""
+        assert summary["invoice_total"] == str(issued.total)
+
+    def test_submit_endpoint_never_exposes_a_draft_pk_or_total(
+        self, api, consultation_item, patient, doctor_profile, secretary,
+    ):
+        """HTTP-level regression guard for the exact bug the audit found:
+        EncounterViewSet.submit previously leaked the DRAFT invoice's pk/total
+        as though it were real."""
+        appointment = appointment_services.create_walk_in(
+            patient=patient.patient_profile, doctor=doctor_profile, created_by=secretary,
+        )
+        encounter_obj = Encounter.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile,
+            appointment=appointment, status=EncounterStatus.DRAFT,
+            chief_complaint="Follow-up visit",  # submit_encounter requires clinical content
+        )
+        draft = billing_services.get_or_create_draft_invoice(
+            encounter_obj, patient=patient, doctor=doctor_profile.user,
+        )  # pre-exists so its pk is unmistakably different from anything issued later
+        assert Invoice.objects.filter(pk=draft.pk, status=InvoiceStatus.DRAFT).exists()
+
+        api.force_authenticate(doctor_profile.user)
+        resp = api.post(reverse("encounter-submit", args=[encounter_obj.id]))
+        assert resp.status_code == 200
+        billing = resp.data["billing"]
+        assert billing["pending_checkout"] is True
+        assert billing["invoice_id"] is None
+        assert billing["invoice_number"] is None
+        assert billing["invoice_total"] is None

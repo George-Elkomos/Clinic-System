@@ -199,17 +199,13 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         data = AppointmentSerializer(appointment).data
         # Billing outcome (Phase 12): lets the desk show "Invoice #INV-XXXX
         # generated" or "free follow-up visit used" right after completion.
-        invoice = getattr(appointment, "billing_invoice", None)
-        validity = getattr(appointment, "billing_fee_validity", None)
-        arrears = getattr(appointment, "billing_arrears_balance", None)
-        data["billing"] = {
-            "invoice_id": invoice.id if invoice else None,
-            "invoice_number": invoice.number if invoice else None,
-            "invoice_total": str(invoice.total) if invoice else None,
-            "free_followup_used": invoice is None and validity is not None,
-            # Overdue balance from other invoices, informational only.
-            "arrears_balance": str(arrears) if arrears else None,
-        }
+        # Shared with EncounterViewSet.submit via
+        # billing.services.appointment_billing_summary — both must agree on
+        # this shape exactly (see that function's docstring for why: they
+        # previously diverged on DRAFT-invoice handling).
+        from apps.billing.services import appointment_billing_summary
+
+        data["billing"] = appointment_billing_summary(appointment)
         return Response(data)
 
     @action(detail=False, methods=["post"], url_path="walk-in")

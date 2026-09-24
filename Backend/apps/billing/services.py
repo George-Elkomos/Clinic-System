@@ -366,6 +366,48 @@ def handle_appointment_completed(appointment, *, user):
     return invoice, new_validity, Decimal("0.00")
 
 
+def appointment_billing_summary(appointment):
+    """The `AppointmentBilling` response shape shared by
+    `AppointmentViewSet.complete` and `EncounterViewSet.submit` — both
+    surface the same post-`handle_appointment_completed` outcome to staff,
+    and must agree on it exactly (they previously didn't: only one had been
+    updated for encounter-based DRAFT invoicing, leaving the other still
+    exposing a DRAFT Invoice pk as `invoice_id`).
+
+    Contract: `invoice_id`/`invoice_number`/`invoice_total` are populated
+    only when a real, viewable ISSUED/PARTIALLY_PAID/PAID invoice exists —
+    never for a still-DRAFT encounter-linked charge, which is Finance-
+    internal working state (potentially still blocked on `needs_pricing`,
+    with no allocated number and no final total yet). `pending_checkout=True`
+    signals that case instead, without leaking the DRAFT invoice's pk. The
+    only sanctioned way to obtain that pk is
+    `GET /encounters/{id}/pending-bill/` (Secretary/Manager only) — a
+    clinical completion response is not a Finance document.
+
+    `invoice_id != None` means "a real invoice the caller can actually
+    view"; `pending_checkout == True` means "clinical work is complete but
+    Finance checkout still needs to happen" — the two are mutually
+    exclusive by construction here, never requiring a special "ignore
+    invoice_id, it's actually a DRAFT" rule on the reading end.
+    """
+    invoice = getattr(appointment, "billing_invoice", None)
+    validity = getattr(appointment, "billing_fee_validity", None)
+    arrears = getattr(appointment, "billing_arrears_balance", None)
+
+    is_draft = invoice is not None and invoice.status == InvoiceStatus.DRAFT
+    viewable = invoice if (invoice is not None and not is_draft) else None
+
+    return {
+        "invoice_id": viewable.id if viewable else None,
+        "invoice_number": viewable.number if viewable else None,
+        "invoice_total": str(viewable.total) if viewable else None,
+        "free_followup_used": invoice is None and validity is not None,
+        "pending_checkout": is_draft,
+        # Overdue balance from other invoices, informational only.
+        "arrears_balance": str(arrears) if arrears else None,
+    }
+
+
 _DEFAULT_ITEM_NAME_BY_TYPE = {
     ServiceItemType.PROCEDURE: "Clinical Procedure",
     ServiceItemType.RADIOLOGY: "Radiology Study",
