@@ -20,8 +20,10 @@ interface InvoiceGeneratedModalProps {
 }
 
 /**
- * Post-completion pop-up: "Invoice #INV-XXXX generated. [View Invoice]
- * [Print Receipt]" — or the free-follow-up variant when no invoice was issued.
+ * Post-completion pop-up. Three mutually-exclusive outcomes, checked in order:
+ * free follow-up (no charge at all), pending checkout (charges captured on an
+ * encounter-scoped DRAFT invoice, not yet issued by reception), or a real
+ * issued invoice ("Invoice #INV-XXXX generated. [View Invoice] [Print Receipt]").
  */
 export function InvoiceGeneratedModal({ billing, onClose }: InvoiceGeneratedModalProps) {
   const { t } = useTranslation()
@@ -47,6 +49,22 @@ export function InvoiceGeneratedModal({ billing, onClose }: InvoiceGeneratedModa
     return (
       <Modal title={t('billing.visitCompleted')} onClose={onClose}>
         <p>{t('billing.freeFollowupUsed')}</p>
+        <div className="mt-4 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className={BTN_PRIMARY}>{t('common.done')}</button>
+        </div>
+      </Modal>
+    )
+  }
+
+  // Charges landed on an encounter-scoped DRAFT invoice awaiting reception
+  // checkout — not a real, viewable invoice yet (Backend/apps/billing/
+  // services.py appointment_billing_summary never populates invoice_id for
+  // this case). No View Invoice / Print Receipt / invoice number here, and
+  // no fetch — that invoice isn't reachable through the normal invoice API.
+  if (billing.pending_checkout) {
+    return (
+      <Modal title={t('billing.visitCompleted')} onClose={onClose}>
+        <p>{t('billing.pendingCheckoutMessage')}</p>
         <div className="mt-4 flex justify-end gap-3">
           <button type="button" onClick={onClose} className={BTN_PRIMARY}>{t('common.done')}</button>
         </div>

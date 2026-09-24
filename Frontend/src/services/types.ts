@@ -163,6 +163,11 @@ export interface QueueAppointment extends Appointment {
   patient_chronic_conditions: string
   patient_current_medications: string
   invoice_id: number | null
+  // True while this appointment's consultation charge sits on an
+  // encounter-scoped DRAFT invoice awaiting reception checkout — mutually
+  // exclusive with invoice_id being non-null (Backend/apps/appointments/
+  // serializers.py AppointmentQueueSerializer).
+  pending_checkout: boolean
   has_history: boolean
 }
 
@@ -859,6 +864,13 @@ export interface InvoiceItem {
   line_total: string
   source_type: 'APPOINTMENT' | 'LAB_ORDER'
   source_id: number | null
+  // True when unit_price was set by bootstrapping a catalog entry that never
+  // had a configured price (Backend/apps/billing/models.py InvoiceItem) —
+  // NOT the same as a legitimate configured 0.00 charge, which has this
+  // false. Always present, issued or still-DRAFT.
+  needs_pricing: boolean
+  price_resolved_by: number | null
+  price_resolved_by_name: string | null
 }
 
 export interface Payment {
@@ -898,12 +910,67 @@ export interface Invoice {
   payments: Payment[]
 }
 
-// Billing block appended to the complete-appointment response.
+// --- Pending Checkout (encounter-based DRAFT invoicing) ---
+// A DRAFT invoice is Finance-internal working state — never a financial
+// document — so it has a deliberately different, smaller shape than
+// `Invoice` above: no number, no invoice_date, no paid/credited/refunded
+// amounts, no payments. See Backend/apps/billing/serializers.py
+// PendingCheckoutSerializer / DraftInvoiceSerializer.
+
+// One row of GET /api/invoices/pending-checkout/ (the clinic-wide queue).
+export interface PendingCheckoutRow {
+  id: number
+  encounter: number
+  patient: number
+  patient_name: string
+  doctor: number | null
+  doctor_name: string | null
+  status: InvoiceStatus
+  total: string
+  currency: string
+  item_count: number
+  needs_pricing_count: number
+  has_needs_pricing: boolean
+  created_at: string
+}
+
+// GET /api/encounters/{encounter_id}/pending-bill/ — deliberately NOT
+// extending Invoice; do not add `number`/`invoice_date` here, the backend
+// omits them on purpose (see DraftInvoiceSerializer's docstring).
+export interface DraftInvoice {
+  id: number
+  encounter: number
+  patient: number
+  patient_name: string
+  doctor: number | null
+  doctor_name: string | null
+  status: InvoiceStatus
+  subtotal: string
+  discount: string
+  total: string
+  balance: string
+  currency: string
+  notes: string
+  items: InvoiceItem[]
+  needs_pricing_count: number
+  created_at: string
+}
+
+// Billing block appended to the complete-appointment / submit-encounter
+// response (Backend/apps/billing/services.py appointment_billing_summary —
+// the single shared source for both, normalized 2026-09-24). invoice_id/
+// invoice_number/invoice_total are populated only for a real, viewable
+// ISSUED/PARTIALLY_PAID/PAID invoice — never for a still-DRAFT encounter-
+// linked charge. pending_checkout signals that case instead; the two are
+// mutually exclusive by construction, so invoice_id != null always means
+// "a real invoice the caller can view" with no special-case needed.
 export interface AppointmentBilling {
   invoice_id: number | null
   invoice_number: string | null
   invoice_total: string | null
   free_followup_used: boolean
+  pending_checkout: boolean
+  arrears_balance: string | null
 }
 
 export interface DoctorRevenue {

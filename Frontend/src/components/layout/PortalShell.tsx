@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CalendarX,
   ChevronDown,
+  ClipboardCheck,
   ClipboardList,
   Clock,
   DollarSign,
@@ -237,7 +238,13 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
     },
     {
       headerKey: 'nav.sectionFinance',
-      items: [{ to: '/finance', labelKey: 'nav.finance', icon: fromLucide(Landmark) }],
+      items: [
+        // Distinct, non-overlapping prefixes (not the redirecting bare
+        // `/finance`) — otherwise both links would show active at once on
+        // `/finance/pending-checkout`, which also starts with `/finance`.
+        { to: '/finance/invoices', labelKey: 'nav.financeInvoices', icon: fromLucide(Landmark) },
+        { to: '/finance/pending-checkout', labelKey: 'nav.financePendingCheckout', icon: fromLucide(ClipboardCheck) },
+      ],
     },
     {
       headerKey: 'nav.sectionSettings',
@@ -258,7 +265,13 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
     },
     {
       headerKey: 'nav.sectionFinance',
-      items: [{ to: '/finance', labelKey: 'nav.finance', icon: fromLucide(Landmark) }],
+      items: [
+        // Distinct, non-overlapping prefixes (not the redirecting bare
+        // `/finance`) — otherwise both links would show active at once on
+        // `/finance/pending-checkout`, which also starts with `/finance`.
+        { to: '/finance/invoices', labelKey: 'nav.financeInvoices', icon: fromLucide(Landmark) },
+        { to: '/finance/pending-checkout', labelKey: 'nav.financePendingCheckout', icon: fromLucide(ClipboardCheck) },
+      ],
     },
     {
       headerKey: 'nav.sectionSettings',

@@ -21,10 +21,13 @@ import type {
   CashMovement,
   CashMovementType,
   CreditNote,
+  DraftInvoice,
   Invoice,
+  InvoiceItem,
   Paginated,
   Payment,
   PaymentMethod,
+  PendingCheckoutRow,
   Refund,
 } from './types'
 
@@ -54,6 +57,11 @@ export interface CashierShiftListParams {
 export interface CashMovementListParams {
   shift?: number
   movement_type?: CashMovementType
+  page?: number
+  page_size?: number
+}
+
+export interface PendingCheckoutListParams {
   page?: number
   page_size?: number
 }
@@ -134,4 +142,23 @@ export const financeApi = {
     api
       .post<CashMovement>('/cash-movements/', data, { headers: idempotencyHeader(idempotencyKey) })
       .then((r) => r.data),
+
+  // --- Pending checkout (encounter-based DRAFT invoicing, Secretary +
+  // Manager; issue/resolve-pricing need no Idempotency-Key — see
+  // Backend/apps/billing/views.py InvoiceViewSet.issue /
+  // InvoiceItemViewSet.resolve_pricing, both confirmed replay-safe /
+  // one-way without one) ---
+
+  pendingCheckoutQueue: (params?: PendingCheckoutListParams) =>
+    api.get<Paginated<PendingCheckoutRow>>('/invoices/pending-checkout/', { params }).then((r) => r.data),
+
+  // 200 + null body when nothing is pending for this encounter — never a 404.
+  pendingBillForEncounter: (encounterId: number) =>
+    api.get<DraftInvoice | null>(`/encounters/${encounterId}/pending-bill/`).then((r) => r.data),
+
+  issueInvoice: (invoiceId: number) =>
+    api.post<Invoice>(`/invoices/${invoiceId}/issue/`).then((r) => r.data),
+
+  resolveItemPricing: (itemId: number, data: { unit_price: string }) =>
+    api.post<InvoiceItem>(`/invoice-items/${itemId}/resolve-pricing/`, data).then((r) => r.data),
 }

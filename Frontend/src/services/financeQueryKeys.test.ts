@@ -27,4 +27,10 @@ describe('financeKeys', () => {
     expect(financeKeys.currentShift()).toEqual(['finance', 'cashier-shifts', 'current'])
     expect(financeKeys.currentShift()).not.toEqual(financeKeys.cashierShiftList())
   })
+
+  it('scopes pending-checkout keys under their own namespace, bill keyed by encounter id', () => {
+    expect(financeKeys.pendingCheckoutList()).toEqual(['finance', 'pending-checkout', 'list', {}])
+    expect(financeKeys.pendingBill(7)).toEqual(['finance', 'pending-checkout', 'bill', 7])
+    expect(financeKeys.pendingBill(7)).not.toEqual(financeKeys.pendingBill(8))
+  })
 })

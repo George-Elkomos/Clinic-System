@@ -44,8 +44,8 @@ function buildInvoice(overrides: Partial<Invoice> = {}): Invoice {
     currency: 'EGP',
     notes: '',
     items: [
-      { id: 1, description: 'Consultation', service_item: 5, quantity: 1, unit_price: '150.00', line_total: '150.00', source_type: 'APPOINTMENT', source_id: 1 },
-      { id: 2, description: 'Follow-up test', service_item: null, quantity: 2, unit_price: '25.00', line_total: '50.00', source_type: 'LAB_ORDER', source_id: 2 },
+      { id: 1, description: 'Consultation', service_item: 5, quantity: 1, unit_price: '150.00', line_total: '150.00', source_type: 'APPOINTMENT', source_id: 1, needs_pricing: false, price_resolved_by: null, price_resolved_by_name: null },
+      { id: 2, description: 'Follow-up test', service_item: null, quantity: 2, unit_price: '25.00', line_total: '50.00', source_type: 'LAB_ORDER', source_id: 2, needs_pricing: false, price_resolved_by: null, price_resolved_by_name: null },
     ],
     payments: [
       { id: 1, invoice: 42, paid_at: '2026-01-16T10:00:00Z', amount: '100.00', payment_method: 'CASH', reference: '', received_by: 3, received_by_name: 'Layla Secretary' },

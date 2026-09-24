@@ -50,6 +50,8 @@ import { MyInvoicesPage } from '../pages/patient/MyInvoicesPage'
 import { BillingReportsPage } from '../pages/manager/BillingReportsPage'
 import { FinanceInvoicesPage } from '../pages/finance/FinanceInvoicesPage'
 import { FinanceInvoiceDetailPage } from '../pages/finance/FinanceInvoiceDetailPage'
+import { FinancePendingCheckoutsPage } from '../pages/finance/FinancePendingCheckoutsPage'
+import { FinancePendingCheckoutDetailPage } from '../pages/finance/FinancePendingCheckoutDetailPage'
 import { NotificationPrefsPage } from '../pages/account/NotificationPrefsPage'
 import { AccountSettingsPage } from '../pages/account/AccountSettingsPage'
 import { PatientNotificationSettingsPage } from '../pages/patient/PatientNotificationSettingsPage'
@@ -149,6 +151,8 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="invoices" replace /> },
       { path: 'invoices', element: <FinanceInvoicesPage /> },
       { path: 'invoices/:id', element: <FinanceInvoiceDetailPage /> },
+      { path: 'pending-checkout', element: <FinancePendingCheckoutsPage /> },
+      { path: 'pending-checkout/:encounterId', element: <FinancePendingCheckoutDetailPage /> },
     ],
   },
 

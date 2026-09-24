@@ -21,4 +21,8 @@ export const financeKeys = {
 
   cashMovements: () => [...financeKeys.all, 'cash-movements'] as const,
   cashMovementList: (params?: QueryParams) => [...financeKeys.cashMovements(), 'list', params ?? {}] as const,
+
+  pendingCheckout: () => [...financeKeys.all, 'pending-checkout'] as const,
+  pendingCheckoutList: (params?: QueryParams) => [...financeKeys.pendingCheckout(), 'list', params ?? {}] as const,
+  pendingBill: (encounterId: number) => [...financeKeys.pendingCheckout(), 'bill', encounterId] as const,
 }

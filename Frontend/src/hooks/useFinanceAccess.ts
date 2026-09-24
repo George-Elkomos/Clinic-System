@@ -8,6 +8,7 @@ export interface FinanceAccess {
   canRecordPayment: boolean
   canManageCashierShift: boolean
   canRecordCashMovement: boolean
+  canManagePendingCheckout: boolean
   canIssueCreditNote: boolean
   canIssueRefund: boolean
   canCancelInvoice: boolean
@@ -37,6 +38,7 @@ export function useFinanceAccess(): FinanceAccess {
       canRecordPayment: isFinanceStaff,
       canManageCashierShift: isFinanceStaff,
       canRecordCashMovement: isFinanceStaff,
+      canManagePendingCheckout: isFinanceStaff,
       canIssueCreditNote: isFinanceManager,
       canIssueRefund: isFinanceManager,
       canCancelInvoice: isFinanceManager,

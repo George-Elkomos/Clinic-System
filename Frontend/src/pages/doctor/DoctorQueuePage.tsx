@@ -53,6 +53,17 @@ function HistoryBadge() {
   )
 }
 
+// Non-interactive — the doctor has no Finance access, so this is informational
+// only (reception completes checkout via the Finance Pending Checkout page).
+function PendingCheckoutBadge() {
+  const { t } = useTranslation()
+  return (
+    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+      {t('queue.pendingCheckout')}
+    </span>
+  )
+}
+
 // Follow-ups get their own color so the doctor spots them at a glance —
 // they're the ones that carry a previous-visit summary into the encounter.
 const TYPE_BADGE: Record<string, string> = {
@@ -203,7 +214,10 @@ function PreviousPanel({
 
   return (
     <PanelShell title={t('queue.previous')}>
-      <h3 className="patient-text-card-title" style={{ color: 'var(--text-secondary)' }}>{appt.patient_name}</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="patient-text-card-title" style={{ color: 'var(--text-secondary)' }}>{appt.patient_name}</h3>
+        {appt.pending_checkout && <PendingCheckoutBadge />}
+      </div>
       {appt.completed_at && (
         <div className="patient-text-body-secondary mt-1" style={{ color: 'var(--text-secondary)' }}>
           {t('queue.completedAt', { time: formatTime(appt.completed_at, language) })}
