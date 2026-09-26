@@ -1,8 +1,15 @@
 # Clinic Server Access — Setup for a New Developer
 
+> ## ⚠️ REVOKED 2026-09-26 — this account no longer exists
+> The other developer never sent a public key and will not be using the server, so the
+> `clinicdev` account, its `sudoers` rule and the group/ACL grants on `/var/www/clinic_app`
+> were all removed on 2026-09-26. `/var/www/clinic_app` is back to `755 root:root`,
+> `Backend/.env` to `600`, and the logs to `640 root:root`.
+> The old sudoers file is kept at `/root/clinicdev-sudoers.removed-2026-09-26` in case this
+> has to be set up again — the recipe below still works, start at section 2.
+
 **Prepared 2026-09-21 for the Clinic System production box.**
-An account has already been created for you. It is **waiting for your public key** —
-that is the one thing still needed. Everything else below is ready.
+An account had been created and was **waiting for a public key**; everything else below was ready.
 
 ---
 
