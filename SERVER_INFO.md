@@ -68,7 +68,7 @@ for the full annotated template). Current production values, by category:
 | `CSRF_TRUSTED_ORIGINS` | `https://clinicms.duckdns.org` | Needed for HTTPS behind the Nginx proxy |
 | `JWT_COOKIE_SECURE` | `True` | Requires real HTTPS — it is now live |
 | `SECURE_SSL_REDIRECT` / `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | `True` | Flipped on once Certbot HTTPS was confirmed working |
-| `EMAIL_BACKEND` | console (not real SMTP) | App emails just log to `journalctl -u clinic-daphne`, not sent — flip to SMTP backend + `EMAIL_HOST`/`EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD` when ready |
+| `EMAIL_BACKEND` | **SMTP (real mail) since 2026-09-26** | The box's shared Brevo account, from `Clinic <clinic@coptsite.com>`: `EMAIL_HOST=smtp-relay.brevo.com`, `EMAIL_PORT=587`, `EMAIL_USE_TLS=True`, `EMAIL_HOST_USER=bb42f6001@smtp-brevo.com`, `EMAIL_HOST_PASSWORD=<key, never committed>`. **Patients now really get appointment reminders** from the `*/5` `send_reminders` cron (24 h + 1 h, guarded by `reminder_24h_sent`/`reminder_1h_sent`). The free plan is 300 mails/day shared with every other app on the box. Old console values: `/root/clinic-env.bak-2026-09-26-brevo` |
 | `AI_SCRIBE_ENABLED` | `False` | Off for now — needs a Gemini API key (free tier) to turn on, and ~3GB disk for the Whisper model on first use |
 | `SMS_ENABLED` / `WHATSAPP_ENABLED` | `False` | Off — Twilio is the one dependency in this stack that would ever need a paid account |
 
