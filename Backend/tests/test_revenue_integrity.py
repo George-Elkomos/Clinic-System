@@ -44,6 +44,9 @@ from apps.core.enums import (
     RoleChoices,
     ServiceItemType,
 )
+from apps.encounters.models import Encounter, EncounterStatus
+from apps.procedures.models import ClinicalProcedure, ProcedureTemplate
+from apps.procedures.services import complete_procedure, start_procedure
 
 pytestmark = pytest.mark.django_db
 
@@ -190,9 +193,11 @@ class TestLedgerBalance:
 
 class TestInvoiceLedger:
     def test_missing_invoice_posting_is_detected(self, patient, doctor_profile):
+        # Non-zero total: a real missing-posting corruption, not the
+        # legitimate zero-total case (see TestZeroTotalInvoiceLedger below).
         invoice = Invoice.objects.create(
             patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.ISSUED,
-            invoice_number="INV-90001",
+            invoice_number="INV-90001", total=Decimal("75.00"),
         )
         result = integrity.run_revenue_integrity_check()
         hit = _findings_for(result, "Invoice", invoice.id)
@@ -237,6 +242,87 @@ class TestInvoiceLedger:
         result = integrity.run_revenue_integrity_check()
         hit = _findings_for(result, "Invoice", invoice.id)
         assert any("no reversing entry" in f["message"] for f in hit)
+
+    def test_draft_invoice_is_excluded_regardless_of_total(self, patient, doctor_profile):
+        invoice = Invoice.objects.create(
+            patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.DRAFT,
+        )
+        result = integrity.run_revenue_integrity_check()
+        assert _findings_for(result, "Invoice", invoice.id) == []
+
+
+# --- Legitimate zero-total issued invoices -----------------------------------
+# apps.billing.services.post_invoice_issued deliberately posts no JournalEntry
+# when invoice.total == 0 (a configured free/zero-priced service bills
+# nothing) — _check_invoice_ledger must not mistake that for a missing
+# posting. Built through the real issue flow, not raw ORM state, so this
+# proves the exemption against the actual supported zero-price path.
+
+class TestZeroTotalInvoiceLedger:
+    @pytest.fixture
+    def encounter(self, patient, doctor_profile):
+        return Encounter.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, status=EncounterStatus.DRAFT,
+        )
+
+    def _issue_zero_total_invoice(self, encounter, patient, doctor_profile, secretary):
+        ServiceItem.objects.create(
+            name="Complimentary consult", item_type=ServiceItemType.PROCEDURE,
+            default_price=Decimal("0.00"), is_active=True,
+        )
+        template = ProcedureTemplate.objects.create(name="Free check")
+        procedure = ClinicalProcedure.objects.create(
+            patient=patient.patient_profile, doctor=doctor_profile, template=template,
+            encounter=encounter,
+        )
+        procedure = start_procedure(procedure)
+        complete_procedure(procedure, post_procedure_notes="Clean.", user=doctor_profile.user)
+        draft = Invoice.objects.get(encounter=encounter)
+        assert draft.items.get().needs_pricing is False  # explicitly configured, not bootstrapped
+        return billing_services.issue_invoice(draft.pk, user=secretary)
+
+    def test_legitimate_zero_total_issued_invoice_is_not_flagged(
+        self, encounter, patient, doctor_profile, secretary,
+    ):
+        issued = self._issue_zero_total_invoice(encounter, patient, doctor_profile, secretary)
+        assert issued.status == InvoiceStatus.ISSUED
+        assert issued.total == Decimal("0.00")
+        # Confirms the premise: post_invoice_issued really posted nothing.
+        assert not JournalEntry.objects.filter(
+            source_type="Invoice", source_id=issued.id,
+        ).exists()
+
+        result = integrity.run_revenue_integrity_check()
+        assert _findings_for(result, "Invoice", issued.id) == []
+        assert "invoice_ledger" not in {
+            f["category"] for f in result["findings"] if f["object_id"] == issued.id
+        }
+
+    def test_zero_total_invoice_does_not_mask_unrelated_findings(
+        self, encounter, patient, doctor_profile, secretary,
+    ):
+        """The exemption is narrow: a zero-total invoice is still eligible
+        for every other invoice_ledger check (e.g. an unexplained reversal
+        would still be flagged) — only the missing-original-posting finding
+        is suppressed."""
+        issued = self._issue_zero_total_invoice(encounter, patient, doctor_profile, secretary)
+        original = _raw_entry(
+            user=secretary, source_type="Invoice", source_id=issued.id,
+            lines=[("CASH_DEFAULT", Decimal("5.00"), Decimal("0.00")),
+                   ("AR_PATIENT", Decimal("0.00"), Decimal("5.00"))],
+        )
+        _raw_entry(
+            user=secretary, source_type="Invoice", source_id=issued.id,
+            lines=[("AR_PATIENT", Decimal("5.00"), Decimal("0.00")),
+                   ("CASH_DEFAULT", Decimal("0.00"), Decimal("5.00"))],
+            reverses=original,
+        )
+        result = integrity.run_revenue_integrity_check()
+        hit = _findings_for(result, "Invoice", issued.id)
+        assert any(
+            "has a reversing entry" in f["message"] and "not CANCELLED" in f["message"]
+            for f in hit
+        )
 
 
 # --- Payment -> ledger integrity ---------------------------------------------
@@ -718,9 +804,11 @@ class TestCheckIsolation:
 
         monkeypatch.setattr(integrity, "_check_ledger_structure_and_balance", _boom)
         # A finding that should still surface from an unrelated, still-working check.
+        # Non-zero total: a real missing-posting corruption, not the legitimate
+        # zero-total case (see TestZeroTotalInvoiceLedger).
         Invoice.objects.create(
             patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.ISSUED,
-            invoice_number="INV-90003",
+            invoice_number="INV-90003", total=Decimal("60.00"),
         )
 
         result = integrity.run_revenue_integrity_check()
@@ -764,7 +852,7 @@ class TestNoMutation:
         # things still don't touch them while finding them.
         Invoice.objects.create(
             patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.ISSUED,
-            invoice_number="INV-90004",
+            invoice_number="INV-90004", total=Decimal("45.00"),
         )
 
         before = _snapshot_counts()
@@ -800,7 +888,7 @@ class TestScheduledWrapper:
     ):
         Invoice.objects.create(
             patient=patient, doctor=doctor_profile.user, status=InvoiceStatus.ISSUED,
-            invoice_number="INV-90005",
+            invoice_number="INV-90005", total=Decimal("30.00"),
         )
         direct = integrity.run_revenue_integrity_check()
         via_wrapper = accounting_tasks.run_revenue_integrity_check()

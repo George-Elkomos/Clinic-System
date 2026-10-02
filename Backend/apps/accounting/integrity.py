@@ -240,14 +240,21 @@ def _check_invoice_ledger() -> list[Finding]:
     `accounting.services.reverse`), so both are found via the same
     (source_type="Invoice", source_id=invoice.id) filter, distinguished only
     by `reverses`.
+
+    Exception: `apps.billing.services.post_invoice_issued` deliberately posts
+    *no* JournalEntry when `invoice.total == 0` (a wholly free/zero-priced
+    invoice has no lines to post — see that function's own docstring), so a
+    zero-total invoice with no original posting is the expected, correct
+    state, not a missing-ledger finding. This never weakens the check for a
+    non-zero invoice, which must still have its original posting.
     """
     findings: list[Finding] = []
     invoices = list(
-        Invoice.objects.exclude(status=InvoiceStatus.DRAFT).values_list("id", "status")
+        Invoice.objects.exclude(status=InvoiceStatus.DRAFT).values_list("id", "status", "total")
     )
     if not invoices:
         return findings
-    invoice_ids = [pk for pk, _ in invoices]
+    invoice_ids = [pk for pk, _, _ in invoices]
 
     originals: dict[int, int] = {}
     reversals: dict[int, int] = {}
@@ -257,16 +264,19 @@ def _check_invoice_ledger() -> list[Finding]:
         bucket = originals if reverses_id is None else reversals
         bucket[source_id] = bucket.get(source_id, 0) + 1
 
-    for invoice_id, status in invoices:
+    for invoice_id, status, total in invoices:
         n_original = originals.get(invoice_id, 0)
         n_reversal = reversals.get(invoice_id, 0)
 
         if n_original == 0:
-            findings.append(Finding(
-                category="invoice_ledger", severity="critical",
-                object_type="Invoice", object_id=invoice_id,
-                message=f"Invoice {invoice_id} (status={status}) has no original issue posting.",
-            ))
+            if total:
+                findings.append(Finding(
+                    category="invoice_ledger", severity="critical",
+                    object_type="Invoice", object_id=invoice_id,
+                    message=f"Invoice {invoice_id} (status={status}) has no original issue posting.",
+                ))
+            # else: total == 0.00 — post_invoice_issued() intentionally posts
+            # nothing for a zero-total invoice; no original posting is valid.
         elif n_original > 1:
             findings.append(Finding(
                 category="invoice_ledger", severity="critical",
